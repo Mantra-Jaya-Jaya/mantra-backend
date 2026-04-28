@@ -1,14 +1,14 @@
 package config
 
 import (
-	"backend-mantra/models"
-	"fmt"
 	"log"
+	"fmt"
 	"os"
-
+	
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"backend-mantra/models"
 )
 
 var DB *gorm.DB
@@ -29,7 +29,7 @@ func ConnectDatabase() {
 
 	// Susun DSN secara dinamis
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		host, user, password, dbname, port)
+			host, user, password, dbname, port)
 
 	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
@@ -39,14 +39,8 @@ func ConnectDatabase() {
 
 	// Langsung sikat bikin tabelnya aja
 	err = database.AutoMigrate(
-		&models.Role{},
+		&models.Role{}, 
 		&models.User{},
-		&models.Customer{},
-		&models.Kurir{},
-		&models.Kasir{},
-		&models.Alamat{},
-		&models.Barang{},
-		&models.Barcode{},
 	)
 
 	if err != nil {
