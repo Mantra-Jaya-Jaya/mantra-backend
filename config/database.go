@@ -1,17 +1,18 @@
 package config
 
 import (
+	"backend-mantra/models"
 	"log"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"backend-mantra/models"
 )
 
 var DB *gorm.DB
 
 func ConnectDatabase() {
 	// Sesuaikan user & password postgres di komputer kalian masing masing ya!
-	dsn := "host=localhost user=postgres password=062006 dbname=mantra_db port=5432 sslmode=disable"
+	dsn := "host=localhost user=postgres password=openpgpwd dbname=mantra_db port=5432 sslmode=disable"
 	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
 	if err != nil {
@@ -20,8 +21,14 @@ func ConnectDatabase() {
 
 	// Langsung sikat bikin tabelnya aja
 	err = database.AutoMigrate(
-		&models.Role{}, 
+		&models.Role{},
 		&models.User{},
+		&models.Customer{},
+		&models.Kurir{},
+		&models.Kasir{},
+		&models.Alamat{},
+		&models.Barang{},
+		&models.Barcode{},
 	)
 
 	if err != nil {
