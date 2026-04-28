@@ -1,0 +1,196 @@
+// Database Schema - ERD Mantra (Fixed Version)
+
+Table role {
+  id_role int [pk]
+  nama_role varchar
+}
+
+Table user {
+  id_user int [pk]
+  id_role int
+  username varchar
+  email varchar
+  password varchar
+  nama_lengkap varchar
+}
+
+Table kasir {
+  id_kasir int [pk]
+  id_user int
+  no_telp varchar
+  alamat text
+  shiff varchar
+}
+
+Table customer {
+  id_customer int [pk]
+  id_user int
+  no_telp varchar
+}
+
+Table kurir {
+  id_kurir int [pk]
+  id_user int
+  no_telp varchar
+}
+
+Table barang {
+  id_barang int [pk]
+  id_diskon int
+  id_satuan int
+  id_kategori int
+  nama_barang varchar
+  harga_barang int
+  stok_barang int
+  gambar_barang varchar
+}
+
+Table alamat {
+  id_alamat int [pk]
+  id_customer int
+  nama_penerima varchar
+  label_alamat varchar
+  no_telp_penerima varchar
+  alamat_lengkap text
+  latitude float
+  longitude float
+  catatan_lokasi text
+  is_utama bool
+}
+
+Table kategori {
+  id_kategori int [pk]
+  nama_kategori varchar
+  icon_kategori varchar
+}
+
+Table diskon {
+  id_diskon int [pk]
+  besar_diskon int
+  nama_diskon varchar
+  banner_diskon varchar
+  tgl_mulai date
+  tgl_selesai date
+}
+
+Table satuan {
+  id_satuan int [pk]
+  nama_satuan varchar
+}
+
+Table pesanan {
+  id_pesanan int [pk]
+  id_customer int
+  id_kasir int
+  id_alamat int
+  total_pembayaran int
+  tanggal_pesanan timestamp
+  tipe_pesanan varchar
+  status_pesanan varchar
+}
+
+Table detail_pesanan {
+  id_detail_pesanan int [pk]
+  id_pesanan int
+  id_barang int
+  jumlah int
+  harga_satuan int
+  subtotal int
+}
+
+Table pembayaran {
+  id_pembayaran int [pk]
+  id_pesanan int
+  order_id_midtrans varchar
+  payment_type varchar
+  status_transaksi varchar
+  fraud_status varchar
+}
+
+Table ekspedisi {
+  id_ekspedisi int [pk]
+  nama_ekspedisi varchar
+  kode_api varchar
+}
+
+Table status_pengantaran {
+  id_status_pengantaran int [pk]
+  nama_status varchar
+}
+
+Table pengantaran {
+  id_pengantaran int [pk]
+  id_pesanan int
+  id_kurir int
+  id_status_pengantaran int
+  id_ekspedisi int
+  waktu_pickup datetime
+  waktu_sampai datetime
+  last_latitude float
+  last_longitude float
+  foto_bukti_pengiriman varchar
+}
+
+Table barcode {
+  id_barcode int [pk]
+  id_barang int
+  id_satuan int
+  kode_barcode varchar
+  kuantitas int
+}
+
+Table spesifikasi {
+  id_spesifikasi int [pk]
+  nama_spesifikasi varchar
+}
+
+Table detail_spesifikasi {
+  id_detail_spesifikasi int [pk]
+  id_spesifikasi int
+  id_barang int
+  nama_detail_spesifikasi text
+}
+
+Table notifikasi {
+  id_notifikasi int [pk]
+  id_user int
+  judul varchar
+  pesan text
+  status varchar
+}
+
+Table keranjang {
+  id_keranjang int [pk]
+  id_customer int
+  id_barang int
+  id_kategori int
+  nama_barang varchar
+  harga_barang int
+  stok_barang int
+  gambar_barang varchar
+}
+
+// Relasi (Pastikan semua kurung siku tutup ']' ada di tempatnya)
+Ref: user.id_role > role.id_role
+Ref: kasir.id_user > user.id_user
+Ref: customer.id_user > user.id_user
+Ref: kurir.id_user > user.id_user
+Ref: alamat.id_customer > customer.id_customer
+Ref: barang.id_diskon > diskon.id_diskon
+Ref: barang.id_satuan > satuan.id_satuan
+Ref: barang.id_kategori > kategori.id_kategori
+Ref: pesanan.id_customer > customer.id_customer
+Ref: pesanan.id_kasir > kasir.id_kasir
+Ref: pesanan.id_alamat > alamat.id_alamat
+Ref: detail_pesanan.id_pesanan > pesanan.id_pesanan
+Ref: detail_pesanan.id_barang > barang.id_barang
+Ref: pengantaran.id_pesanan > pesanan.id_pesanan
+Ref: pengantaran.id_kurir > kurir.id_kurir
+Ref: pengantaran.id_status_pengantaran > status_pengantaran.id_status_pengantaran
+Ref: pengantaran.id_ekspedisi > ekspedisi.id_ekspedisi
+Ref: pembayaran.id_pesanan > pesanan.id_pesanan
+Ref: barcode.id_barang > barang.id_barang
+Ref: barcode.id_satuan > satuan.id_satuan
+Ref: detail_spesifikasi.id_spesifikasi > spesifikasi.id_spesifikasi
+Ref: detail_spesifikasi.id_barang > barang.id_barang
+Ref: notifikasi.id_user > user.id_user
