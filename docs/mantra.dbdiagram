@@ -1,0 +1,483 @@
+{
+  "version": "1.0.0",
+  "darkMode": true,
+  "gridEnabling": false,
+  "detailLevel": "All",
+  "tablePositions": [
+    {
+      "name": "role",
+      "schemaName": "public",
+      "x": 12,
+      "y": 386
+    },
+    {
+      "name": "user",
+      "schemaName": "public",
+      "x": 589.47509765625,
+      "y": 386
+    },
+    {
+      "name": "kasir",
+      "schemaName": "public",
+      "x": 1151.9853515625,
+      "y": 427
+    },
+    {
+      "name": "customer",
+      "schemaName": "public",
+      "x": 1151.9853515625,
+      "y": 665
+    },
+    {
+      "name": "kurir",
+      "schemaName": "public",
+      "x": 1151.9853515625,
+      "y": 839
+    },
+    {
+      "name": "barang",
+      "schemaName": "public",
+      "x": 589.47509765625,
+      "y": 656
+    },
+    {
+      "name": "alamat",
+      "schemaName": "public",
+      "x": 1687.16064453125,
+      "y": 469
+    },
+    {
+      "name": "kategori",
+      "schemaName": "public",
+      "x": 12,
+      "y": 528
+    },
+    {
+      "name": "diskon",
+      "schemaName": "public",
+      "x": 12,
+      "y": 702
+    },
+    {
+      "name": "satuan",
+      "schemaName": "public",
+      "x": 12,
+      "y": 972
+    },
+    {
+      "name": "pesanan",
+      "schemaName": "public",
+      "x": 2204.080078125,
+      "y": 427
+    },
+    {
+      "name": "detail_pesanan",
+      "schemaName": "public",
+      "x": 2747.6328125,
+      "y": 386
+    },
+    {
+      "name": "pembayaran",
+      "schemaName": "public",
+      "x": 2747.6328125,
+      "y": 656
+    },
+    {
+      "name": "ekspedisi",
+      "schemaName": "public",
+      "x": 12,
+      "y": 1114
+    },
+    {
+      "name": "status_pengantaran",
+      "schemaName": "public",
+      "x": 12,
+      "y": 1430
+    },
+    {
+      "name": "pengantaran",
+      "schemaName": "public",
+      "x": 2747.6328125,
+      "y": 926
+    },
+    {
+      "name": "barcode",
+      "schemaName": "public",
+      "x": 1151.9853515625,
+      "y": 1251
+    },
+    {
+      "name": "spesifikasi",
+      "schemaName": "public",
+      "x": 12,
+      "y": 1288
+    },
+    {
+      "name": "detail_spesifikasi",
+      "schemaName": "public",
+      "x": 1151.9853515625,
+      "y": 1490
+    },
+    {
+      "name": "notifikasi",
+      "schemaName": "public",
+      "x": 1151.9853515625,
+      "y": 1013
+    },
+    {
+      "name": "keranjang",
+      "schemaName": "public",
+      "x": 12,
+      "y": 12
+    }
+  ],
+  "tableGroupCollapseStates": [],
+  "stickyNoteLayouts": [],
+  "referencePaths": [
+    {
+      "firstFieldNames": [
+        "id_role"
+      ],
+      "firstTableName": "user",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_role"
+      ],
+      "secondTableName": "role",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_user"
+      ],
+      "firstTableName": "kasir",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_user"
+      ],
+      "secondTableName": "user",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_user"
+      ],
+      "firstTableName": "customer",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_user"
+      ],
+      "secondTableName": "user",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_user"
+      ],
+      "firstTableName": "kurir",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_user"
+      ],
+      "secondTableName": "user",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_customer"
+      ],
+      "firstTableName": "alamat",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_customer"
+      ],
+      "secondTableName": "customer",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_diskon"
+      ],
+      "firstTableName": "barang",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_diskon"
+      ],
+      "secondTableName": "diskon",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_satuan"
+      ],
+      "firstTableName": "barang",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_satuan"
+      ],
+      "secondTableName": "satuan",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_kategori"
+      ],
+      "firstTableName": "barang",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_kategori"
+      ],
+      "secondTableName": "kategori",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_customer"
+      ],
+      "firstTableName": "pesanan",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_customer"
+      ],
+      "secondTableName": "customer",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_kasir"
+      ],
+      "firstTableName": "pesanan",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_kasir"
+      ],
+      "secondTableName": "kasir",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_alamat"
+      ],
+      "firstTableName": "pesanan",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_alamat"
+      ],
+      "secondTableName": "alamat",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_pesanan"
+      ],
+      "firstTableName": "detail_pesanan",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_pesanan"
+      ],
+      "secondTableName": "pesanan",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_barang"
+      ],
+      "firstTableName": "detail_pesanan",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_barang"
+      ],
+      "secondTableName": "barang",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_pesanan"
+      ],
+      "firstTableName": "pengantaran",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_pesanan"
+      ],
+      "secondTableName": "pesanan",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_kurir"
+      ],
+      "firstTableName": "pengantaran",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_kurir"
+      ],
+      "secondTableName": "kurir",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_status_pengantaran"
+      ],
+      "firstTableName": "pengantaran",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_status_pengantaran"
+      ],
+      "secondTableName": "status_pengantaran",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_ekspedisi"
+      ],
+      "firstTableName": "pengantaran",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_ekspedisi"
+      ],
+      "secondTableName": "ekspedisi",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_pesanan"
+      ],
+      "firstTableName": "pembayaran",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_pesanan"
+      ],
+      "secondTableName": "pesanan",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_barang"
+      ],
+      "firstTableName": "barcode",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_barang"
+      ],
+      "secondTableName": "barang",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_satuan"
+      ],
+      "firstTableName": "barcode",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_satuan"
+      ],
+      "secondTableName": "satuan",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_spesifikasi"
+      ],
+      "firstTableName": "detail_spesifikasi",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_spesifikasi"
+      ],
+      "secondTableName": "spesifikasi",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_barang"
+      ],
+      "firstTableName": "detail_spesifikasi",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_barang"
+      ],
+      "secondTableName": "barang",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id_user"
+      ],
+      "firstTableName": "notifikasi",
+      "firstSchemaName": "public",
+      "firstRelation": "*",
+      "secondFieldNames": [
+        "id_user"
+      ],
+      "secondTableName": "user",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    }
+  ]
+}
