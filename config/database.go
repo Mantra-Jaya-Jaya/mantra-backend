@@ -41,6 +41,24 @@ func ConnectDatabase() {
 	err = database.AutoMigrate(
 		&models.Role{}, 
 		&models.User{},
+		&models.Customer{},
+		&models.Kasir{},
+		&models.Kurir{},
+		&models.Alamat{},
+		&models.Notifikasi{},
+		&models.Kategori{},
+		&models.Satuan{},
+		&models.Diskon{},
+		&models.Barcode{},
+		&models.Barang{},
+		&models.Spesifikasi{},
+		&models.DetailSpesifikasi{},
+		&models.Pesanan{},
+		&models.DetailPesanan{},
+		&models.Pembayaran{},
+		&models.StatusPengantaran{},
+		&models.Ekspedisi{},
+		&models.Pengantaran{},
 	)
 
 	if err != nil {

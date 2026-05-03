@@ -13,9 +13,9 @@ type Kasir struct {
 	NoTelp             string    `gorm:"column:no_telp"`
 	TempatLahir        string    `gorm:"column:tempat_lahir"`
 	TanggalLahir       time.Time `gorm:"type:date;column:tanggal_lahir"`
-	JenisKelamin       string    `gorm:"type:enum('Laki-Laki', 'Perempuan');column:jenis_kelamin"`
+	JenisKelamin       string    `gorm:"column:jenis_kelamin"`
 	Alamat             string    `gorm:"column:alamat"`
-	PendidikanTerakhir string    `gorm:"type:enum('Taman Kanak-Kanak', 'SD/MI', 'SMP/MTS', 'SMA/SMK/MA');column:pendidikan_terakhir"`
+	PendidikanTerakhir string    `gorm:"column:pendidikan_terakhir"`
 	Nik                string    `gorm:"type:varchar(16);column:nik;unique;not null"`
 
 	//Relasi ke User

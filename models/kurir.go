@@ -12,10 +12,10 @@ type Kurir struct {
 	IdKurir            uint      `gorm:"primaryKey;column:id_kurir"`
 	NoTelp             string    `gorm:"type:varchar(15);column:no_telp;unique;not null"`
 	TempatLahir        string    `gorm:"column:tempat_lahir"`
-	TanggalLahir       time.Time `gorm:"tyoe:date;column:tanggal_lahir"`
-	JenisKelamin       string    `gorm:"type:enum('Laki-Laki', 'Perempuan');column:jenis_kelamin"`
+	TanggalLahir       time.Time `gorm:"type:date;column:tanggal_lahir"`
+	JenisKelamin       string    `gorm:"column:jenis_kelamin"`
 	Alamat             string    `gorm:"column:alamat"`
-	PendidikanTerakhir string    `gorm:"type:enum('Taman Kanak-Kanak', 'SD/MI', 'SMP/MTS', 'SMA/SMK/MA');column:pendidikan_terakhir"`
+	PendidikanTerakhir string    `gorm:"column:pendidikan_terakhir"`
 	Nik                string    `gorm:"type:varchar(16);column:nik;unique;not null"`
 
 	//Relasi ke User
