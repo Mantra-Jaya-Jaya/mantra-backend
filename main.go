@@ -5,16 +5,12 @@ import (
 	"log"
 	"net/http"
 	"backend-mantra/config"
-	"backend-mantra/routes"
-	
+	"backend-mantra/seeders"
 )
 
 func main() {
-	// Mulai koneksi ke database
+	// Connect ke database
 	config.ConnectDatabase()
-	// Panggil daftar routes
-	routes.SetupRoutes()
-
-	fmt.Println("🚀 Server jalan di http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	// Seed data ke tabel
+	seeders.RunAllSeeders()
 }
