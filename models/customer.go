@@ -8,7 +8,7 @@ func (Customer) TableName() string {
 type Customer struct {
 	// Nama variabel WAJIB Kapital (IdRole), nama di DB diatur lewat Tag (id_role)
 	IdCustomer uint `gorm:"primaryKey;column:id_customer"`
-	NoTelp     int  `gorm:"column:no_telp"`
+	NoTelp     string  `gorm:"column:no_telp"`
 
 	//Relasi ke User
 	UserId uint `gorm:"column:id_user;unique"`

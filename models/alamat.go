@@ -9,7 +9,7 @@ type Alamat struct {
 	CustomerId     uint    `gorm:"column:id_customer"`
 	NamaPenerima   string  `gorm:"column:nama_penerima"`
 	LabelAlamat    string  `gorm:"column:label_alamat"`
-	NoTelpPenerima int     `gorm:"column:no_telp_penerima"`
+	NoTelpPenerima string  `gorm:"column:no_telp_penerima"`
 	AlamatLengkap  string  `gorm:"column:alamat_lengkap"`
 	Latitude       float64 `gorm:"column:latitude"`
 	Longitude      float64 `gorm:"column:longitude"`

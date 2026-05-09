@@ -3,6 +3,8 @@ module backend-mantra
 go 1.26.2
 
 require (
+	github.com/brianvoe/gofakeit/v6 v6.28.0 // indirect
+	github.com/brianvoe/gofakeit/v7 v7.14.1 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.1 // indirect
