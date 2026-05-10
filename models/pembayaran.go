@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 func (Pembayaran) TableName() string {
 	return "pembayaran"
 }

@@ -1,7 +1,9 @@
 package models
 
+import "time"
+
 func (User) TableName() string {
-  return "user"
+	return "user"
 }
 
 type User struct {

@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 // Memaksa nama tabel
 func (Customer) TableName() string {
 	return "customer"

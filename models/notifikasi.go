@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 func (Notifikasi) TableName() string {
 	return "notifikasi"
 }

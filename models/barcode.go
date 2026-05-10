@@ -17,3 +17,4 @@ type Barcode struct {
 	//Relasi  ke tabel barang
 	Barang Barang `gorm:"foreignKey:BarangId;references:IdBarang" json:"barang"`
 }
+

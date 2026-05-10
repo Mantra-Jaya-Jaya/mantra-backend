@@ -28,3 +28,4 @@ type Pengantaran struct {
 	EkspedisiID uint      `gorm:"column:id_ekspedisi" json:"id_ekspedisi"`
 	Ekspedisi   Ekspedisi `gorm:"foreignKey:EkspedisiID;references:IdEkspedisi" json:"ekspedisi"`
 }
+
