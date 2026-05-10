@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SetupRoutes registers all API routes
 func SetupRoutes(r *gin.Engine) {
 	v1 := r.Group("/api/v1")
 	{

@@ -25,6 +25,8 @@ func RunAllSeeders() {
 	SeedDetailSpesifikasi()
 	SeedSpesifikasiBarang()
 	SeedStokOpname()
+	SeedPesanan()
+	SeedDetailPesanan()
 
 
 	fmt.Println("======================================")

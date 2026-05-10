@@ -6,7 +6,10 @@ import (
 	"backend-mantra/config"
 	"backend-mantra/routes"
 	"backend-mantra/seeders"
-	"backend-mantra/routes"
+	"log"
+	"os"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -34,4 +37,3 @@ func main() {
 		log.Fatalf("Gagal menjalankan server: %v", err)
 	}
 }
-
