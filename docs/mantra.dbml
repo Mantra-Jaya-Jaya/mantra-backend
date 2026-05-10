@@ -1,196 +1,362 @@
-// Database Schema - ERD Mantra (Fixed Version)
+// =============================================================================
+// MANTRA - Database Schema (DBML)
+// Version    : 1.1.0
+// Updated    : 2026-05-09
+// =============================================================================
+//
+// CARA PAKAI FILE INI:
+// 1. Buka di VS Code / Antigravity dengan ekstensi "DBML Entity-Relationship Diagram" / "dbdiagram"
+// 2. Klik kanan file → "Open Preview" untuk melihat diagram visual ERD
+// 3. Atau upload ke https://dbdiagram.io untuk tampilan online
+//
+// KONVENSI PENULISAN:
+// - Tipe data ditulis tanpa panjang: varchar, int, text, bool, float, timestamp
+// - Semua Ref (relasi) dikumpulkan di bagian bawah, tidak inline di tabel
+// - PK ditulis [pk], tidak ada increment/not null/unique/default
+// - Komentar tabel ditulis sebagai // di atas Table
+// - Kolom penting diberi [note: '...']
+//
+// CARA TAMBAH TABEL BARU:
+// 1. Tulis Table nama_tabel { ... } di section yang sesuai
+// 2. Ikuti konvensi tipe data di atas
+// 3. Tambahkan relasi di bagian "RELASI" paling bawah
+// 4. Gunakan simbol: > (many-to-one), < (one-to-many), - (one-to-one)
+//
+// ARSITEKTUR SINGKAT:
+// - Single-tenant: satu instalasi = satu toko
+// - Client: Flutter (Customer & Kasir), Next.js (Admin Web)
+// - Auth: JWT Bearer Token untuk Flutter, httpOnly Cookie untuk Next.js
+// - Semua nilai uang disimpan sebagai integer (Rupiah), bukan float
+// =============================================================================
 
+
+// -----------------------------------------------------------------------------
+// AUTH & USER MANAGEMENT
+// -----------------------------------------------------------------------------
+
+// Master role untuk semua user
 Table role {
-  id_role int [pk]
-  nama_role varchar
+  id_role   int     [pk]
+  nama_role varchar [note: 'customer | kasir | admin | kurir']
 }
 
+// Tabel utama autentikasi semua role
 Table user {
-  id_user int [pk]
-  id_role int
-  username varchar
-  email varchar
-  password varchar
+  id_user      int       [pk]
+  id_role      int
+  username     varchar
+  email        varchar
+  password     varchar   [note: 'bcrypt hashed, cost factor 12']
   nama_lengkap varchar
+  created_at   timestamp
+  updated_at   timestamp
 }
 
+// Refresh token untuk strategi auto-login. Access token: 15 menit, Refresh: 7 hari
+Table refresh_token {
+  id_token   int       [pk]
+  id_user    int
+  token      text
+  expires_at timestamp
+  created_at timestamp
+  revoked_at timestamp  [note: 'Diisi saat logout. Null berarti masih aktif']
+}
+
+
+// -----------------------------------------------------------------------------
+// PROFIL PER ROLE
+// -----------------------------------------------------------------------------
+
+// Profil kasir. Dibuat oleh Admin
 Table kasir {
-  id_kasir int [pk]
-  id_user int
-  no_telp varchar
-  alamat text
-  shiff varchar
+  id_kasir      int       [pk]
+  id_user       int
+  no_telp       varchar
+  alamat        text
+  tanggal_lahir date
+  foto          varchar
+  shift         varchar   [note: 'Pagi | Siang | Malam']
+  created_at    timestamp
+  updated_at    timestamp
 }
 
+// Profil customer. Dibuat saat register mandiri
 Table customer {
-  id_customer int [pk]
-  id_user int
-  no_telp varchar
+  id_customer int       [pk]
+  id_user     int
+  no_telp     varchar
+  created_at  timestamp
+  updated_at  timestamp
 }
 
+// Profil kurir internal. Endpoint belum diimplementasi - roadmap
 Table kurir {
-  id_kurir int [pk]
-  id_user int
-  no_telp varchar
+  id_kurir      int       [pk]
+  id_user       int
+  no_telp       varchar
+  alamat        text
+  tanggal_lahir date
+  foto          varchar
+  created_at    timestamp
+  updated_at    timestamp
 }
 
-Table barang {
-  id_barang int [pk]
-  id_diskon int
-  id_satuan int
-  id_kategori int
-  nama_barang varchar
-  harga_barang int
-  stok_barang int
-  gambar_barang varchar
-}
 
+// -----------------------------------------------------------------------------
+// ALAMAT
+// -----------------------------------------------------------------------------
+
+// Daftar alamat pengiriman milik customer
 Table alamat {
-  id_alamat int [pk]
-  id_customer int
-  nama_penerima varchar
-  label_alamat varchar
+  id_alamat        int       [pk]
+  id_customer      int
+  nama_penerima    varchar
+  label_alamat     varchar   [note: 'Rumah | Kantor | Kos | Lainnya']
   no_telp_penerima varchar
-  alamat_lengkap text
-  latitude float
-  longitude float
-  catatan_lokasi text
-  is_utama bool
+  alamat_lengkap   text
+  latitude         float
+  longitude        float
+  catatan_lokasi   text
+  is_utama         bool
+  created_at       timestamp
+  updated_at       timestamp
 }
 
+
+// -----------------------------------------------------------------------------
+// KATALOG & PRODUK
+// -----------------------------------------------------------------------------
+
+// Master kategori barang
 Table kategori {
-  id_kategori int [pk]
+  id_kategori   int     [pk]
   nama_kategori varchar
   icon_kategori varchar
 }
 
-Table diskon {
-  id_diskon int [pk]
-  besar_diskon int
-  nama_diskon varchar
-  banner_diskon varchar
-  tgl_mulai date
-  tgl_selesai date
-}
-
+// Master satuan barang (Pcs, Kg, Lusin, Box, dll)
 Table satuan {
-  id_satuan int [pk]
+  id_satuan   int     [pk]
   nama_satuan varchar
 }
 
-Table pesanan {
-  id_pesanan int [pk]
-  id_customer int
-  id_kasir int
-  id_alamat int
-  total_pembayaran int
-  tanggal_pesanan timestamp
-  tipe_pesanan varchar
-  status_pesanan varchar
+// Master diskon yang bisa diterapkan ke barang
+Table diskon {
+  id_diskon     int     [pk]
+  nama_diskon   varchar
+  besar_diskon  int     [note: 'Persentase: 0-100']
+  banner_diskon varchar
+  tgl_mulai     date
+  tgl_selesai   date
 }
 
-Table detail_pesanan {
-  id_detail_pesanan int [pk]
-  id_pesanan int
-  id_barang int
-  jumlah int
-  harga_satuan int
-  subtotal int
-}
-
-Table pembayaran {
-  id_pembayaran int [pk]
-  id_pesanan int
-  order_id_midtrans varchar
-  payment_type varchar
-  status_transaksi varchar
-  fraud_status varchar
-}
-
-Table ekspedisi {
-  id_ekspedisi int [pk]
-  nama_ekspedisi varchar
-  kode_api varchar
-}
-
-Table status_pengantaran {
-  id_status_pengantaran int [pk]
-  nama_status varchar
-}
-
-Table pengantaran {
-  id_pengantaran int [pk]
-  id_pesanan int
-  id_kurir int
-  id_status_pengantaran int
-  id_ekspedisi int
-  waktu_pickup datetime
-  waktu_sampai datetime
-  last_latitude float
-  last_longitude float
-  foto_bukti_pengiriman varchar
-}
-
-Table barcode {
-  id_barcode int [pk]
-  id_barang int
-  id_satuan int
-  kode_barcode varchar
-  kuantitas int
-}
-
-Table spesifikasi {
-  id_spesifikasi int [pk]
-  nama_spesifikasi varchar
-}
-
-Table detail_spesifikasi {
-  id_detail_spesifikasi int [pk]
-  id_spesifikasi int
-  id_barang int
-  nama_detail_spesifikasi text
-}
-
-Table notifikasi {
-  id_notifikasi int [pk]
-  id_user int
-  judul varchar
-  pesan text
-  status varchar
-}
-
-Table keranjang {
-  id_keranjang int [pk]
-  id_customer int
-  id_barang int
-  id_kategori int
-  nama_barang varchar
-  harga_barang int
-  stok_barang int
+// Tabel master barang. Harga dan stok tidak disimpan di sini.
+// Harga & stok dikelola per varian di tabel spesifikasi_barang
+Table barang {
+  id_barang     int       [pk]
+  id_diskon     int       [note: 'Nullable: barang bisa tidak punya diskon']
+  id_satuan     int
+  id_kategori   int
+  nama_barang   varchar
   gambar_barang varchar
 }
 
-// Relasi (Pastikan semua kurung siku tutup ']' ada di tempatnya)
+// Master tipe spesifikasi/varian (Warna, Ukuran, RAM, dll)
+Table spesifikasi {
+  id_spesifikasi   int     [pk]
+  nama_spesifikasi varchar
+}
+
+// Nilai dari setiap tipe spesifikasi per barang (Hitam, Merah, XL, 16GB, dll)
+Table detail_spesifikasi {
+  id_detail_spesifikasi   int  [pk]
+  id_spesifikasi          int
+  nama_detail_spesifikasi text
+}
+
+// Junction table: barang + varian + stok + harga per varian.
+// Barang tanpa varian tetap wajib punya 1 baris dengan detail "Default"
+Table spesifikasi_barang {
+  id_spesifikasi_barang int [pk]
+  id_barang             int
+  id_detail_spesifikasi int
+  jumlah                int [note: 'Stok per varian']
+  harga_barang          int [note: 'Harga per varian dalam Rupiah (integer)']
+}
+
+// Pemetaan kode barcode ke barang. Satu barang bisa punya beberapa barcode
+Table barcode {
+  id_barcode   int     [pk]
+  id_barang    int
+  id_satuan    int
+  kode_barcode varchar [note: 'String bukan int agar support leading zero']
+  kuantitas    int     [note: 'Jumlah per scan, misal 1 dus = 12 pcs']
+}
+
+
+// -----------------------------------------------------------------------------
+// TRANSAKSI & PESANAN
+// -----------------------------------------------------------------------------
+
+// Tabel utama pesanan online (Flutter Customer) dan offline (Kasir POS)
+Table pesanan {
+  id_pesanan       int       [pk]
+  id_customer      int       [note: 'Null jika pesanan offline/walk-in']
+  id_kasir         int       [note: 'Null jika pesanan online mandiri']
+  id_alamat        int       [note: 'Null jika pesanan offline']
+  total_pembayaran int
+  tanggal_pesanan  timestamp
+  tipe_pesanan     varchar   [note: 'online | offline']
+  status_pesanan   varchar   [note: 'menunggu_pembayaran | diproses | dikemas | dikirim | selesai | dibatalkan']
+  updated_at       timestamp
+}
+
+// Detail item per pesanan. harga_satuan adalah snapshot saat transaksi
+Table detail_pesanan {
+  id_detail_pesanan     int [pk]
+  id_pesanan            int
+  id_spesifikasi_barang int
+  jumlah                int
+  harga_satuan          int [note: 'Snapshot harga saat transaksi, tidak berubah jika harga diupdate']
+  subtotal              int
+}
+
+// Record pembayaran. Satu pesanan satu pembayaran
+Table pembayaran {
+  id_pembayaran     int       [pk]
+  id_pesanan        int
+  order_id_midtrans varchar   [note: 'Dari Midtrans, null jika bayar tunai']
+  payment_type      varchar   [note: 'cash | qris | ewallet | va | kartu']
+  status_transaksi  varchar   [note: 'pending | settlement | cancel | expire | deny']
+  fraud_status      varchar   [note: 'Dari Midtrans: accept | challenge | deny']
+  created_at        timestamp
+  updated_at        timestamp
+}
+
+
+// -----------------------------------------------------------------------------
+// PENGANTARAN (DELIVERY)
+// -----------------------------------------------------------------------------
+
+// Master data ekspedisi. Internal atau eksternal (JNE, J&T, dll) - roadmap
+Table ekspedisi {
+  id_ekspedisi   int     [pk]
+  nama_ekspedisi varchar
+  kode_api       varchar [note: 'Untuk integrasi API ekspedisi eksternal - roadmap']
+}
+
+// Master status pengantaran
+Table status_pengantaran {
+  id_status_pengantaran int     [pk]
+  nama_status           varchar [note: 'menunggu_pickup | dalam_perjalanan | tiba | selesai']
+}
+
+// Data pengantaran per pesanan.
+// Kurir internal: isi id_kurir, kosongkan id_ekspedisi. Sebaliknya untuk eksternal
+Table pengantaran {
+  id_pengantaran        int      [pk]
+  id_pesanan            int
+  id_kurir              int      [note: 'Null jika pakai ekspedisi eksternal']
+  id_status_pengantaran int
+  id_ekspedisi          int      [note: 'Null jika pakai kurir internal']
+  waktu_pickup          datetime
+  waktu_sampai          datetime
+  last_latitude         float    [note: 'Koordinat terakhir kurir - realtime update']
+  last_longitude        float
+  foto_bukti_pengiriman varchar
+}
+
+
+// -----------------------------------------------------------------------------
+// STOK OPNAME
+// -----------------------------------------------------------------------------
+
+// Riwayat pergerakan stok per varian barang
+Table stok_opname {
+  id_stok_opname        int       [pk]
+  id_spesifikasi_barang int
+  harga_beli            int       [note: 'Harga beli/modal dalam Rupiah']
+  harga_jual            int       [note: 'Harga jual dalam Rupiah']
+  status                bool      [note: 'true = stok masuk, false = stok keluar']
+  jumlah_stok           int
+  keterangan            text
+  tanggal               timestamp
+}
+
+
+// -----------------------------------------------------------------------------
+// NOTIFIKASI
+// -----------------------------------------------------------------------------
+
+// Notifikasi untuk semua role, difilter berdasarkan id_user
+Table notifikasi {
+  id_notifikasi int       [pk]
+  id_user       int
+  judul         varchar
+  pesan         text
+  status        varchar   [note: 'unread | read']
+  created_at    timestamp
+}
+
+
+// -----------------------------------------------------------------------------
+// KERANJANG
+// -----------------------------------------------------------------------------
+
+// Keranjang belanja customer. FK ke spesifikasi_barang agar stok dan varian sinkron
+Table keranjang {
+  id_keranjang          int [pk]
+  id_customer           int
+  id_spesifikasi_barang int
+  quantity              int
+}
+
+
+// =============================================================================
+// RELASI
+// Simbol: > = many-to-one | < = one-to-many | - = one-to-one
+// =============================================================================
+
+// Auth & User
 Ref: user.id_role > role.id_role
 Ref: kasir.id_user > user.id_user
 Ref: customer.id_user > user.id_user
 Ref: kurir.id_user > user.id_user
+Ref: refresh_token.id_user > user.id_user
+
+// Alamat
 Ref: alamat.id_customer > customer.id_customer
+
+// Katalog & Produk
 Ref: barang.id_diskon > diskon.id_diskon
 Ref: barang.id_satuan > satuan.id_satuan
 Ref: barang.id_kategori > kategori.id_kategori
+Ref: detail_spesifikasi.id_spesifikasi > spesifikasi.id_spesifikasi
+Ref: spesifikasi_barang.id_barang > barang.id_barang
+Ref: spesifikasi_barang.id_detail_spesifikasi > detail_spesifikasi.id_detail_spesifikasi
+Ref: barcode.id_barang > barang.id_barang
+Ref: barcode.id_satuan > satuan.id_satuan
+
+// Transaksi & Pesanan
 Ref: pesanan.id_customer > customer.id_customer
 Ref: pesanan.id_kasir > kasir.id_kasir
 Ref: pesanan.id_alamat > alamat.id_alamat
 Ref: detail_pesanan.id_pesanan > pesanan.id_pesanan
-Ref: detail_pesanan.id_barang > barang.id_barang
+Ref: detail_pesanan.id_spesifikasi_barang > spesifikasi_barang.id_spesifikasi_barang
+Ref: pembayaran.id_pesanan > pesanan.id_pesanan
+
+// Pengantaran
 Ref: pengantaran.id_pesanan > pesanan.id_pesanan
 Ref: pengantaran.id_kurir > kurir.id_kurir
 Ref: pengantaran.id_status_pengantaran > status_pengantaran.id_status_pengantaran
 Ref: pengantaran.id_ekspedisi > ekspedisi.id_ekspedisi
-Ref: pembayaran.id_pesanan > pesanan.id_pesanan
-Ref: barcode.id_barang > barang.id_barang
-Ref: barcode.id_satuan > satuan.id_satuan
-Ref: detail_spesifikasi.id_spesifikasi > spesifikasi.id_spesifikasi
-Ref: detail_spesifikasi.id_barang > barang.id_barang
+
+// Stok Opname
+Ref: stok_opname.id_spesifikasi_barang > spesifikasi_barang.id_spesifikasi_barang
+
+// Notifikasi
 Ref: notifikasi.id_user > user.id_user
+
+// Keranjang
+Ref: keranjang.id_customer > customer.id_customer
+Ref: keranjang.id_spesifikasi_barang > spesifikasi_barang.id_spesifikasi_barang

@@ -19,12 +19,14 @@ type Pengantaran struct {
 	PesananID uint    `gorm:"column:id_pesanan"`
 	Pesanan   Pesanan `gorm:"foreignKey:PesananID;references:IdPesanan"`
 
-	KurirID uint  `gorm:"column:id_kurir"`
-	Kurir   Kurir `gorm:"foreignKey:KurirID;references:IdKurir"`
+	// Nullable: kurir internal ATAU ekspedisi eksternal, tidak keduanya
+	KurirID *uint  `gorm:"column:id_kurir"`
+	Kurir   *Kurir `gorm:"foreignKey:KurirID;references:IdKurir"`
 
 	StatusPengantaranID uint              `gorm:"column:id_status_pengantaran"`
 	StatusPengantaran   StatusPengantaran `gorm:"foreignKey:StatusPengantaranID;references:IdStatusPengantaran"`
 
-	EkspedisiID uint      `gorm:"column:id_ekspedisi"`
-	Ekspedisi   Ekspedisi `gorm:"foreignKey:EkspedisiID;references:IdEkspedisi"`
+	EkspedisiID *uint      `gorm:"column:id_ekspedisi"`
+	Ekspedisi   *Ekspedisi `gorm:"foreignKey:EkspedisiID;references:IdEkspedisi"`
 }
+

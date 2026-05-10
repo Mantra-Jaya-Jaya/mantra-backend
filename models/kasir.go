@@ -8,19 +8,16 @@ func (Kasir) TableName() string {
 }
 
 type Kasir struct {
-	// Nama variabel WAJIB Kapital (IdRole), nama di DB diatur lewat Tag (id_role)
-	IdKasir            uint      `gorm:"primaryKey;column:id_kasir"`
-	NoTelp             string    `gorm:"column:no_telp"`
-	TempatLahir        string    `gorm:"column:tempat_lahir"`
-	TanggalLahir       time.Time `gorm:"type:date;column:tanggal_lahir"`
-	JenisKelamin       string    `gorm:"column:jenis_kelamin"`
-	Alamat             string    `gorm:"column:alamat"`
-	PendidikanTerakhir string    `gorm:"column:pendidikan_terakhir"`
-	Nik                string    `gorm:"type:varchar(16);column:nik;unique;not null"`
+	IdKasir      uint      `gorm:"primaryKey;column:id_kasir"`
+	NoTelp       string    `gorm:"column:no_telp"`
+	Alamat       string    `gorm:"type:text;column:alamat"`
+	TanggalLahir time.Time `gorm:"type:date;column:tanggal_lahir"`
+	Foto         string    `gorm:"column:foto"`
+	Shift        string    `gorm:"column:shift"` // Pagi | Siang | Malam
+	CreatedAt    time.Time `gorm:"column:created_at"`
+	UpdatedAt    time.Time `gorm:"column:updated_at"`
 
-	//Relasi ke User
+	// Relasi ke User
 	UserId uint `gorm:"column:id_user;unique"`
-
-	//Relasi  ke tabel user
-	User User `gorm:"foreignKey:UserId;references:IdUser"`
+	User   User `gorm:"foreignKey:UserId;references:IdUser"`
 }

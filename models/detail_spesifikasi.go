@@ -6,11 +6,10 @@ func (DetailSpesifikasi) TableName() string {
 
 type DetailSpesifikasi struct {
 	IdDetailSpesifikasi   uint   `gorm:"primaryKey;column:id_detail_spesifikasi"`
-	NamaDetailSpesifikasi string `gorm:"column:nama_detail_spesifikasi"`
+	NamaDetailSpesifikasi string `gorm:"type:text;column:nama_detail_spesifikasi"` // Hitam, Merah, XL, 16GB, dll
 
-	BarangID uint   `gorm:"column:id_barang"`
-	Barang   Barang `gorm:"foreignKey:BarangID;references:IdBarang"`
-
+	// Relasi ke master tipe spesifikasi (Warna, Ukuran, RAM, dll)
 	SpesifikasiID uint        `gorm:"column:id_spesifikasi"`
 	Spesifikasi   Spesifikasi `gorm:"foreignKey:SpesifikasiID;references:IdSpesifikasi"`
 }
+
