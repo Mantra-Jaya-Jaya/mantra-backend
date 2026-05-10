@@ -2,23 +2,46 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"backend-mantra/config"
+	"backend-mantra/models"
 )
 
 // GetPromo handles fetching active promos
 func GetPromo(c *gin.Context) {
+	var diskons []models.Diskon
+	now := time.Now()
+
+	// Ambil diskon yang aktif (tgl_mulai <= now <= tgl_selesai)
+	if err := config.DB.Where("tgl_mulai <= ? AND tgl_selesai >= ?", now, now).Find(&diskons).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengambil data promo",
+		})
+		return
+	}
+
+	var responseData []gin.H
+	for _, d := range diskons {
+		responseData = append(responseData, gin.H{
+			"id_diskon":   d.IdDiskon,
+			"nama_diskon": d.NamaDiskon,
+			"banner_url":  d.BannerDiskon,
+			"tgl_selesai": d.TglSelesai,
+		})
+	}
+
+	// Jika data kosong, pastikan return array kosong bukan null
+	if responseData == nil {
+		responseData = []gin.H{}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Berhasil mengambil data promo",
-		"data": []gin.H{
-			{
-				"id_diskon":   1,
-				"nama_diskon": "Promo Awal Tahun",
-				"banner_url":  "https://api.mantra.com/storage/banner/promo-1.jpg",
-				"tgl_selesai": "2026-12-31T23:59:59Z",
-			},
-		},
+		"data":    responseData,
 	})
 }
 
