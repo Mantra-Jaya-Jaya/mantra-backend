@@ -6,16 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes() {
-	// Daftarin endpoint di sini
-	http.HandleFunc("/customer/kategori", controllers.GetKategori)
-	http.HandleFunc("/admin/kategori", controllers.CreateKategori)
-	http.HandleFunc("/customer/diskon", controllers.GetPromoCustomer)
-	
-	// Nanti endpoint lain nyusul di bawahnya
-	// http.HandleFunc("/customer/barang", controllers.GetBarang)
-}
-// SetupRoutes registers all API routes
 func SetupRoutes(r *gin.Engine) {
 	v1 := r.Group("/api/v1")
 	{

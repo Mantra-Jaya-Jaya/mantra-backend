@@ -1,7 +1,5 @@
 package models
 
-import "time"
-
 func (Alamat) TableName() string {
 	return "alamat"
 }
