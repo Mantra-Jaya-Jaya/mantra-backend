@@ -9,12 +9,11 @@ import (
 
 // Fungsi buat Get Kategori
 func GetKategori(w http.ResponseWriter, r *http.Request) {
-	// Wajib set header biar dibaca sebagai JSON
 	w.Header().Set("Content-Type", "application/json")
 
 	var kategori []models.Kategori
 	
-	// Tarik data dari database pake GORM
+	// Tarik data dari database
 	if err := config.DB.Find(&kategori).Error; err != nil {
 		// Kalau error server (500)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -26,7 +25,7 @@ func GetKategori(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Kalau berhasil (200 OK)
+	// Berhasil (200 OK)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "success",
@@ -49,10 +48,10 @@ func CreateKategori(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Siapin "laci" buat nangkep kiriman data JSON dari Postman
+	// 2. Siapin Variabel buat nangkep kiriman data JSON dari Postman
 	var inputKategori models.Kategori
 
-	// 3. Buka "surat" request (r.Body) dan masukin isinya ke laci (inputKategori)
+	// 3. Buka request (r.Body) dan masukin isinya ke variabel (inputKategori)
 	if err := json.NewDecoder(r.Body).Decode(&inputKategori); err != nil {
 		w.WriteHeader(http.StatusBadRequest) // Error 400
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -63,7 +62,7 @@ func CreateKategori(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Simpan laci tadi ke database pakai mantra GORM: "Create"
+	// 4. Simpan variabel tadi ke database
 	if err := config.DB.Create(&inputKategori).Error; err != nil {
 		w.WriteHeader(http.StatusInternalServerError) // Error 500
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -74,8 +73,8 @@ func CreateKategori(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 5. Kalau sukses, kasih tau admin dan tampilin data yang berhasil disimpen
-	w.WriteHeader(http.StatusCreated) // Status 201 (Created/Berhasil Dibuat)
+	// 5. Kalau sukses
+	w.WriteHeader(http.StatusCreated) // Status 201 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "success",
 		"message": "Mantap! Kategori berhasil ditambahkan",

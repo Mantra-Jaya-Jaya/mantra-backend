@@ -5,19 +5,19 @@ func (Barang) TableName() string {
 }
 
 type Barang struct {
-	IdBarang     uint   `gorm:"primaryKey;column:id_barang"`
-	NamaBarang   string `gorm:"column:nama_barang"`
-	HargaBarang  uint   `gorm:"column:harga_barang"`
-	StokBarang   int    `gorm:"column:stok_barang"`
-	GambarBarang string `gorm:"column:gambar_barang"`
+	IdBarang     uint   `gorm:"primaryKey;column:id_barang" json:"id_barang"`
+	NamaBarang   string `gorm:"column:nama_barang" json:"nama_barang"`
+	HargaBarang  uint   `gorm:"column:harga_barang" json:"harga_barang"`
+	StokBarang   int    `gorm:"column:stok_barang" json:"stok_barang"`
+	GambarBarang string `gorm:"column:gambar_barang" json:"gambar_barang"`
 
 	//Relasi
-	DiskonId   uint `gorm:"column:id_diskon;unique"`
-	SatuanId   uint `gorm:"column:id_satuan;unique"`
-	KategoriId uint `gorm:"column:id_kategori;unique"`
+	DiskonId   uint `gorm:"column:id_diskon;unique" json:"id_diskon"`
+	SatuanId   uint `gorm:"column:id_satuan;unique" json:"id_satuan"`
+	KategoriId uint `gorm:"column:id_kategori;unique" json:"id_kategori"`
 
 	// Relasi
-	Diskon   Diskon   `gorm:"foreignKey:DiskonId;references:IdDiskon"`
-	Satuan   Satuan   `gorm:"foreignKey:SatuanId;references:IdSatuan"`
-	Kategori Kategori `gorm:"foreignKey:KategoriId;references:IdKategori"`
+	Diskon   Diskon   `gorm:"foreignKey:DiskonId;references:IdDiskon" json:"diskon"`
+	Satuan   Satuan   `gorm:"foreignKey:SatuanId;references:IdSatuan" json:"satuan"`
+	Kategori Kategori `gorm:"foreignKey:KategoriId;references:IdKategori" json:"kategori"`
 }
