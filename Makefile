@@ -8,7 +8,7 @@ export
 
 # Melihat perbandingan (diff) antara GORM Models dan Database saat ini
 db-diff:
-	atlas schema diff --env local
+	atlas schema diff --env local --from "env://from" --to "env://to"
 
 # Perintah untuk melihat raw SQL (Dry Run) sebelum apply
 db-plan:

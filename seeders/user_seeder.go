@@ -1,9 +1,9 @@
 package seeders
 
 import (
-	"fmt"
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"fmt"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -19,8 +19,8 @@ func SeedUser() {
 		Username     string
 		Email        string
 		NamaLengkap  string
-		NamaRole     string 
-		PasswordAsli string 
+		NamaRole     string
+		PasswordAsli string
 	}{
 		{"terra_admin", "admin@mantra.com", "Terra Surya", "Admin", "AdminMantra#1"},
 		{"nabila_kasir", "kasir@mantra.com", "Nabila Az Zahra", "Kasir", "Kasir#123"},
@@ -32,7 +32,7 @@ func SeedUser() {
 		var role models.Role
 		if err := config.DB.Where("nama_role = ?", data.NamaRole).First(&role).Error; err != nil {
 			fmt.Println("Hamdehh, Role", data.NamaRole, "gak ketemu!")
-			continue 
+			continue
 		}
 
 		// Hash password aslinya SATU PER SATU pas lagi di-loop
@@ -43,7 +43,7 @@ func SeedUser() {
 			Email:       data.Email,
 			Password:    hashedPassword, // Yang disimpen tetep yang acak (Hashed)
 			NamaLengkap: data.NamaLengkap,
-			RoleID:      role.IdRole, 
+			RoleID:      role.IdRole,
 		}
 
 		// Cek apakah email udah ada biar gak dobel

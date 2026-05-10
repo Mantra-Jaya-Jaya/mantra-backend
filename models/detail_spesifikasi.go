@@ -12,4 +12,3 @@ type DetailSpesifikasi struct {
 	SpesifikasiID uint        `gorm:"column:id_spesifikasi" json:"spesifikasi_id"`
 	Spesifikasi   Spesifikasi `gorm:"foreignKey:SpesifikasiID;references:IdSpesifikasi" json:"spesifikasi"`
 }
-

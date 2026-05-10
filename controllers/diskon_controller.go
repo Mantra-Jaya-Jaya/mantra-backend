@@ -35,6 +35,7 @@ package controllers
 // 		return
 // 	}
 
+<<<<<<< HEAD
 // 	// Kalau datanya kosong di database (Error 404, tapi status success)
 // 	if len(promos) == 0 {
 // 		w.WriteHeader(http.StatusNotFound)
@@ -54,3 +55,24 @@ package controllers
 // 		"data":    promos, 
 // 	})
 // }
+=======
+	// Kalau datanya kosong di database (Error 404, tapi status success)
+	if len(promos) == 0 {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "success",
+			"message": "Saat ini tidak ada promo yang tersedia",
+			"data":    promos,
+		})
+		return
+	}
+
+	// Kalau berhasil narik data (200 OK)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "success",
+		"message": "Berhasil mengambil data promo",
+		"data":    promos,
+	})
+}
+>>>>>>> 53575eb (refactor(customer): pecah controller monolith dan selesaikan migrasi DB)

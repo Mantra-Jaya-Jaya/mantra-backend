@@ -12,7 +12,7 @@ package controllers
 // 	w.Header().Set("Content-Type", "application/json")
 
 // 	var kategori []models.Kategori
-	
+
 // 	// Tarik data dari database
 // 	if err := config.DB.Find(&kategori).Error; err != nil {
 // 		// Kalau error server (500)
@@ -74,7 +74,7 @@ package controllers
 // 	}
 
 // 	// 5. Kalau sukses
-// 	w.WriteHeader(http.StatusCreated) // Status 201 
+// 	w.WriteHeader(http.StatusCreated) // Status 201
 // 	json.NewEncoder(w).Encode(map[string]interface{}{
 // 		"status":  "success",
 // 		"message": "Mantap! Kategori berhasil ditambahkan",

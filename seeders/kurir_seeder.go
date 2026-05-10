@@ -1,10 +1,10 @@
 package seeders
 
 import (
-	"fmt"
-	"time"
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"fmt"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
 )
@@ -13,7 +13,7 @@ func SeedKurir() {
 	// 1. Cari user lewat email kurir@mantra.com
 	var user models.User
 	err := config.DB.Where("email = ?", "kurir@mantra.com").First(&user).Error
-	
+
 	if err != nil {
 		fmt.Println("Waduh, akun (kurir@mantra.com) gak ketemu! Pastiin SeedUser jalan duluan.")
 		return

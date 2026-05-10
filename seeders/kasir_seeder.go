@@ -1,10 +1,10 @@
 package seeders
 
 import (
-	"fmt"
-	"time"
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"fmt"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
 )
@@ -14,7 +14,7 @@ func SeedKasir() {
 	// 1. Cari user lewat email kasir@mantra.com
 	var user models.User
 	err := config.DB.Where("email = ?", "kasir@mantra.com").First(&user).Error
-	
+
 	if err != nil {
 		fmt.Println("Walah, akun (kasir@mantra.com) gak ketemu! Pastiin SeedUser jalan duluan.")
 		return
@@ -31,8 +31,8 @@ func SeedKasir() {
 		JenisKelamin:       "Perempuan",
 		Alamat:             "Jl. Prof. Sudarto, Tembalang, Kota Semarang",
 		PendidikanTerakhir: "D3 Teknik Komputer",
-		Nik:                "3374" + gofakeit.DigitN(12), 
-		UserId:             user.IdUser,                 
+		Nik:                "3374" + gofakeit.DigitN(12),
+		UserId:             user.IdUser,
 	}
 
 	// 4. Simpan ke database (FirstOrCreate berdasarkan UserId)

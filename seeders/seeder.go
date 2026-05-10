@@ -28,7 +28,6 @@ func RunAllSeeders() {
 	SeedPesanan()
 	SeedDetailPesanan()
 
-
 	fmt.Println("======================================")
 	fmt.Println("SEMUA DATA BERHASIL DI-SEED!")
 	fmt.Println("======================================")

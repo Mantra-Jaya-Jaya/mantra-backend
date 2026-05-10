@@ -2,7 +2,7 @@ package routes
 
 import (
 	"backend-mantra/controllers"
-	// "net/http" hapus // kalau mau pakai net/http
+	"backend-mantra/controllers/customer"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,28 +17,28 @@ func SetupRoutes(r *gin.Engine) {
 		v1.PUT("/change-password", controllers.ChangePassword)
 
 		// Shared Routes
-		v1.GET("/scan/:kode_barcode", controllers.GetDetailBarangByScan)
+		v1.GET("/scan/:kode_barcode", customer.GetDetailBarangByScan)
 
 		// Customer Routes
-		customer := v1.Group("/customer")
+		customerGroup := v1.Group("/customer")
 		{
-			customer.GET("/promo", controllers.GetPromo)
-			customer.GET("/kategori", controllers.GetKategori)
-			customer.GET("/barang", controllers.GetDaftarBarang)
-			customer.POST("/keranjang", controllers.TambahKeKeranjang)
-			customer.PATCH("/keranjang/:id_keranjang", controllers.UpdateKeranjang)
-			customer.DELETE("/keranjang/:id_keranjang", controllers.HapusItemKeranjang)
-			customer.GET("/notifikasi", controllers.GetNotifikasiCustomer)
-			customer.GET("/pesanan", controllers.GetDaftarPesananCustomer)
-			customer.POST("/pesanan/checkout", controllers.CheckoutPesanan)
-			customer.PATCH("/pesanan/:id_pesanan/batal", controllers.BatalkanPesanan)
-			customer.GET("/pesanan/:id_pesanan", controllers.GetDetailPesananCustomer)
-			customer.GET("/pesanan/:id_pesanan/lacak", controllers.LacakPesanan)
-			customer.GET("/profil", controllers.GetProfilCustomer)
-			customer.PUT("/akun", controllers.UpdateAkunCustomer)
-			customer.POST("/alamat", controllers.TambahAlamat)
-			customer.PUT("/alamat/:id_alamat", controllers.UpdateAlamat)
-			customer.DELETE("/alamat/:id_alamat", controllers.HapusAlamat)
+			customerGroup.GET("/promo", customer.GetPromo)
+			customerGroup.GET("/kategori", customer.GetKategori)
+			customerGroup.GET("/barang", customer.GetDaftarBarang)
+			customerGroup.POST("/keranjang", customer.TambahKeKeranjang)
+			customerGroup.PATCH("/keranjang/:id_keranjang", customer.UpdateKeranjang)
+			customerGroup.DELETE("/keranjang/:id_keranjang", customer.HapusItemKeranjang)
+			customerGroup.GET("/notifikasi", customer.GetNotifikasiCustomer)
+			customerGroup.GET("/pesanan", customer.GetDaftarPesananCustomer)
+			customerGroup.POST("/pesanan/checkout", customer.CheckoutPesanan)
+			customerGroup.PATCH("/pesanan/:id_pesanan/batal", customer.BatalkanPesanan)
+			customerGroup.GET("/pesanan/:id_pesanan", customer.GetDetailPesananCustomer)
+			customerGroup.GET("/pesanan/:id_pesanan/lacak", customer.LacakPesanan)
+			customerGroup.GET("/profil", customer.GetProfilCustomer)
+			customerGroup.PUT("/akun", customer.UpdateAkunCustomer)
+			customerGroup.POST("/alamat", customer.TambahAlamat)
+			customerGroup.PUT("/alamat/:id_alamat", customer.UpdateAlamat)
+			customerGroup.DELETE("/alamat/:id_alamat", customer.HapusAlamat)
 		}
 
 		// Kasir Routes
