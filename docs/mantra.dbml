@@ -75,6 +75,9 @@ Table kasir {
   alamat        text
   tanggal_lahir date
   foto          varchar
+  jenis_kelamin varchar [note: 'Laki-laki | Perempuan']
+  pendidikan_terakhir varchar [note: 'SD | SMP | SMA | S1 | S2 | S3 | Tidak Sekolah']
+  nik varchar [note: 'Nomor Induk Kependudukan']
   shift         varchar   [note: 'Pagi | Siang | Malam']
   created_at    timestamp
   updated_at    timestamp
