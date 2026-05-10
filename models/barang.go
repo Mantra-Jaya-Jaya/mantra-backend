@@ -7,8 +7,6 @@ func (Barang) TableName() string {
 type Barang struct {
 	IdBarang     uint   `gorm:"primaryKey;column:id_barang" json:"id_barang"`
 	NamaBarang   string `gorm:"column:nama_barang" json:"nama_barang"`
-	HargaBarang  uint   `gorm:"column:harga_barang" json:"harga_barang"`
-	StokBarang   int    `gorm:"column:stok_barang" json:"stok_barang"`
 	GambarBarang string `gorm:"column:gambar_barang" json:"gambar_barang"`
 
 	//Relasi
