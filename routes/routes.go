@@ -2,19 +2,28 @@ package routes
 
 import (
 	"backend-mantra/controllers"
+	"backend-mantra/controllers/auth"
 	"backend-mantra/controllers/customer"
+	"backend-mantra/middleware"
+
 	"github.com/gin-gonic/gin"
 )
 
 func SetupRoutes(r *gin.Engine) {
 	v1 := r.Group("/api/v1")
 	{
-		// Auth Routes
-		v1.POST("/login", controllers.Login)
-		v1.POST("/register", controllers.RegisterCustomer)
-		v1.POST("/auth/refresh", controllers.RefreshToken)
-		v1.POST("/logout", controllers.Logout)
-		v1.PUT("/change-password", controllers.ChangePassword)
+		// Public Auth Routes
+		v1.POST("/login", auth.Login)
+		v1.POST("/register", auth.RegisterCustomer)
+		v1.POST("/auth/refresh", auth.RefreshToken)
+
+		// Protected Auth Routes
+		authGroup := v1.Group("/")
+		authGroup.Use(middleware.AuthMiddleware())
+		{
+			authGroup.POST("/logout", auth.Logout)
+			authGroup.PUT("/change-password", auth.ChangePassword)
+		}
 
 		// Shared Routes
 		v1.GET("/scan/:kode_barcode", customer.GetDetailBarangByScan)
