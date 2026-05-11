@@ -5,7 +5,7 @@
 // =============================================================================
 //
 // CARA PAKAI FILE INI:
-// 1. Buka di VS Code / Antigravity dengan ekstensi "DBML Entity-Relationship Diagram" / "dbdiagram"
+// 1. Buka di VS Code dengan ekstensi "DBML Entity-Relationship Diagram"
 // 2. Klik kanan file → "Open Preview" untuk melihat diagram visual ERD
 // 3. Atau upload ke https://dbdiagram.io untuk tampilan online
 //
@@ -75,9 +75,6 @@ Table kasir {
   alamat        text
   tanggal_lahir date
   foto          varchar
-  jenis_kelamin varchar [note: 'Laki-laki | Perempuan']
-  pendidikan_terakhir varchar [note: 'SD | SMP | SMA | S1 | S2 | S3 | Tidak Sekolah']
-  nik varchar [note: 'Nomor Induk Kependudukan']
   shift         varchar   [note: 'Pagi | Siang | Malam']
   created_at    timestamp
   updated_at    timestamp
@@ -162,6 +159,8 @@ Table barang {
   id_kategori   int
   nama_barang   varchar
   gambar_barang varchar
+  created_at    timestamp
+  updated_at    timestamp
 }
 
 // Master tipe spesifikasi/varian (Warna, Ukuran, RAM, dll)
@@ -174,6 +173,7 @@ Table spesifikasi {
 Table detail_spesifikasi {
   id_detail_spesifikasi   int  [pk]
   id_spesifikasi          int
+  id_barang               int
   nama_detail_spesifikasi text
 }
 
@@ -335,6 +335,7 @@ Ref: barang.id_diskon > diskon.id_diskon
 Ref: barang.id_satuan > satuan.id_satuan
 Ref: barang.id_kategori > kategori.id_kategori
 Ref: detail_spesifikasi.id_spesifikasi > spesifikasi.id_spesifikasi
+Ref: detail_spesifikasi.id_barang > barang.id_barang
 Ref: spesifikasi_barang.id_barang > barang.id_barang
 Ref: spesifikasi_barang.id_detail_spesifikasi > detail_spesifikasi.id_detail_spesifikasi
 Ref: barcode.id_barang > barang.id_barang

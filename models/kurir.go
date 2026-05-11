@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // Memaksa nama tabel
 func (Kurir) TableName() string {
@@ -10,6 +14,7 @@ func (Kurir) TableName() string {
 type Kurir struct {
 	// Nama variabel WAJIB Kapital (IdRole), nama di DB diatur lewat Tag (id_role)
 	IdKurir            uint      `gorm:"primaryKey;column:id_kurir" json:"id_kurir"`
+	PublicId           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
 	NoTelp             string    `gorm:"type:varchar(15);column:no_telp;unique;not null" json:"no_telp"`
 	TempatLahir        string    `gorm:"column:tempat_lahir" json:"tempat_lahir"`
 	TanggalLahir       time.Time `gorm:"type:date;column:tanggal_lahir" json:"tanggal_lahir"`

@@ -2,6 +2,8 @@ package models
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func (Pesanan) TableName() string {
@@ -10,6 +12,7 @@ func (Pesanan) TableName() string {
 
 type Pesanan struct {
 	IdPesanan       uint      `gorm:"primaryKey;column:id_pesanan" json:"id_pesanan"`
+	PublicId        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
 	TotalPembayaran int       `gorm:"column:total_pembayaran" json:"total_pembayaran"`
 	TanggalPesanan  time.Time `gorm:"column:tanggal_pesanan" json:"tanggal_pesanan"`
 	TipePesanan     string    `gorm:"column:tipe_pesanan" json:"tipe_pesanan"`     // Online / Offline
