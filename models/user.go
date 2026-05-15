@@ -15,6 +15,7 @@ type User struct {
 	Email       string    `gorm:"unique;column:email" json:"email"`
 	Password    string    `gorm:"column:password" json:"-"`
 	NamaLengkap string    `gorm:"column:nama_lengkap" json:"nama_lengkap"`
+	FotoProfil  string    `gorm:"column:foto_profil" json:"foto_profil"`
 
 	RoleID uint `gorm:"column:id_role" json:"id_role"`
 	Role   Role `gorm:"foreignKey:RoleID;references:IdRole" json:"role"`
