@@ -1,9 +1,9 @@
 package seeders
 
 import (
-	"fmt"
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"fmt"
 
 	"github.com/brianvoe/gofakeit/v7"
 )
@@ -15,7 +15,7 @@ func SeedCustomer() {
 	// 1. Cari user yang emailnya customer@mantra.com (Akun Rajaba Hamim)
 	var user models.User
 	err := config.DB.Where("email = ?", "customer@mantra.com").First(&user).Error
-	
+
 	if err != nil {
 		fmt.Println("Waduh Error Euyy, akun customer@mantra.com gak ketemu! Pastiin SeedUser jalan duluan.")
 		return
@@ -24,7 +24,7 @@ func SeedCustomer() {
 	// 2. Siapin data profil customer-nya
 	customerProfil := models.Customer{
 		NoTelp: "085" + gofakeit.DigitN(9),
-		UserId: user.IdUser, 
+		UserId: user.IdUser,
 	}
 
 	// 3. Simpan ke database (Pakai FirstOrCreate biar gak dobel pas di-run ulang)

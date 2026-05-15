@@ -1,9 +1,9 @@
 package seeders
 
 import (
-	"fmt"
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"fmt"
 
 	"github.com/brianvoe/gofakeit/v7"
 )
@@ -32,12 +32,12 @@ func SeedAlamat() {
 			CustomerId:     customer.IdCustomer,
 			NamaPenerima:   user.NamaLengkap,
 			LabelAlamat:    "Kost",
-			NoTelpPenerima: "08" + gofakeit.DigitN(10), 
+			NoTelpPenerima: "08" + gofakeit.DigitN(10),
 			AlamatLengkap:  "Jl. Banjarsari Selatan, Tembalang, Kota Semarang",
 			Latitude:       -7.051410,
 			Longitude:      110.438125,
 			CatatanLokasi:  "Pagar hitam, samping warung burjo",
-			IsUtama:        true, 
+			IsUtama:        true,
 		},
 		{
 			CustomerId:     customer.IdCustomer,

@@ -1,14 +1,14 @@
 package config
 
 import (
-	"log"
 	"fmt"
+	"log"
 	"os"
-	
+
+	"backend-mantra/models"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"backend-mantra/models"
 )
 
 var DB *gorm.DB
@@ -28,8 +28,8 @@ func ConnectDatabase() {
 	port := os.Getenv("DB_PORT")
 
 	// Susun DSN secara dinamis
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-			host, user, password, dbname, port)
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable search_path=public",
+		host, user, password, dbname, port)
 
 	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
@@ -39,23 +39,35 @@ func ConnectDatabase() {
 
 	// Langsung sikat bikin tabelnya aja
 	err = database.AutoMigrate(
-		&models.Role{}, 
+		// Auth & User (urutan: Role -> User -> profil per role)
+		&models.Role{},
 		&models.User{},
+		&models.RefreshToken{},
 		&models.Customer{},
 		&models.Kasir{},
 		&models.Kurir{},
+		// Alamat (butuh Customer)
 		&models.Alamat{},
+		// Notifikasi (butuh User)
 		&models.Notifikasi{},
+		// Katalog master (tidak ada dependensi)
 		&models.Kategori{},
 		&models.Satuan{},
 		&models.Diskon{},
-		&models.Barcode{},
-		&models.Barang{},
 		&models.Spesifikasi{},
+		// Katalog detail (butuh master di atas)
+		&models.Barang{},
 		&models.DetailSpesifikasi{},
+		&models.SpesifikasiBarang{},
+		&models.Barcode{},
+		&models.StokOpname{},
+		// Keranjang (butuh Customer & SpesifikasiBarang)
+		&models.Keranjang{},
+		// Transaksi (butuh Customer, Kasir, Alamat, SpesifikasiBarang)
 		&models.Pesanan{},
 		&models.DetailPesanan{},
 		&models.Pembayaran{},
+		// Pengantaran (butuh Pesanan, Kurir, Ekspedisi)
 		&models.StatusPengantaran{},
 		&models.Ekspedisi{},
 		&models.Pengantaran{},
