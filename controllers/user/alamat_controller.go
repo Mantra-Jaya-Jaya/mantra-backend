@@ -1,4 +1,4 @@
-package customer
+package user
 
 import (
 	"net/http"
@@ -9,137 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetProfilCustomer handles fetching customer profile
-func GetProfilCustomer(c *gin.Context) {
-	// TODO: Ambil ID Customer dari context JWT jika middleware sudah aktif
-	customerID := uint(1)
-
-	var customer models.Customer
-	// Ambil data customer beserta user-nya
-	if err := config.DB.Preload("User").Where("id_customer = ?", customerID).First(&customer).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Data customer tidak ditemukan",
-		})
-		return
-	}
-
-	var alamat []models.Alamat
-	// Ambil semua alamat milik customer
-	config.DB.Where("id_customer = ?", customerID).Find(&alamat)
-
-	var responseAlamat []gin.H
-	for _, a := range alamat {
-		responseAlamat = append(responseAlamat, gin.H{
-			"id_alamat":        a.IdAlamat,
-			"label_alamat":     a.LabelAlamat,
-			"nama_penerima":    a.NamaPenerima,
-			"no_telp_penerima": a.NoTelpPenerima,
-			"alamat_lengkap":   a.AlamatLengkap,
-			"is_utama":         a.IsUtama,
-		})
-	}
-
-	if responseAlamat == nil {
-		responseAlamat = []gin.H{}
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Data profil berhasil diambil",
-		"data": gin.H{
-			"user": gin.H{
-				"nama_lengkap": customer.User.NamaLengkap,
-				"no_telp":      customer.NoTelp,
-				"email":        customer.User.Email,
-				"username":     customer.User.Username,
-			},
-			"daftar_alamat": responseAlamat,
-		},
-	})
-}
-
-// UpdateAkunCustomer handles updating customer account info
-func UpdateAkunCustomer(c *gin.Context) {
-	type UpdateAkunInput struct {
-		NamaLengkap string `json:"nama_lengkap"`
-		NoTelp      string `json:"no_telp"`
-		Email       string `json:"email"`
-		Username    string `json:"username"`
-	}
-
-	var input UpdateAkunInput
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "Input tidak valid",
-		})
-		return
-	}
-
-	// TODO: Ambil ID Customer dari context JWT jika middleware sudah aktif
-	customerID := uint(1)
-
-	var customer models.Customer
-	// Ambil data customer beserta user-nya
-	if err := config.DB.Preload("User").Where("id_customer = ?", customerID).First(&customer).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Data customer tidak ditemukan",
-		})
-		return
-	}
-
-	// Update field jika dikirim di JSON
-	if input.NoTelp != "" {
-		customer.NoTelp = input.NoTelp
-	}
-	if input.NamaLengkap != "" {
-		customer.User.NamaLengkap = input.NamaLengkap
-	}
-	if input.Email != "" {
-		customer.User.Email = input.Email
-	}
-	if input.Username != "" {
-		customer.User.Username = input.Username
-	}
-
-	// Mulai transaksi untuk mengupdate dua tabel
-	tx := config.DB.Begin()
-
-	if err := tx.Save(&customer).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal memperbarui data customer",
-		})
-		return
-	}
-
-	if err := tx.Save(&customer.User).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal memperbarui data user",
-		})
-		return
-	}
-
-	tx.Commit()
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Informasi akun berhasil diperbarui",
-		"data": gin.H{
-			"nama_lengkap": customer.User.NamaLengkap,
-			"no_telp":      customer.NoTelp,
-			"email":        customer.User.Email,
-			"username":     customer.User.Username,
-		},
-	})
-}
-
-// TambahAlamat handles adding new address
+// TambahAlamat menambahkan alamat pengiriman baru untuk customer yang sedang login.
+// Dipakai oleh: customer (POST /customer/alamat)
+// Auth: Wajib login, role customer
+// Ownership: id_customer diambil dari JWT (user_id), bukan dari body request
 func TambahAlamat(c *gin.Context) {
 	type TambahAlamatInput struct {
 		LabelAlamat    string  `json:"label_alamat" binding:"required"`
@@ -161,13 +34,21 @@ func TambahAlamat(c *gin.Context) {
 		return
 	}
 
-	// TODO: Ambil ID Customer dari context JWT jika middleware sudah aktif
-	customerID := uint(1)
+	userID := c.GetInt64("user_id")
 
-	// Mulai transaksi
+	var result struct{ IdCustomer uint }
+	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengidentifikasi customer",
+		})
+		return
+	}
+	customerID := result.IdCustomer
+
 	tx := config.DB.Begin()
 
-	// Jika alamat baru diset sebagai UTAMA, matikan status is_utama di alamat lain milik customer ini
+	// Jika alamat baru diset sebagai UTAMA, matikan status is_utama di alamat lain
 	if input.IsUtama {
 		if err := tx.Model(&models.Alamat{}).Where("id_customer = ?", customerID).Update("is_utama", false).Error; err != nil {
 			tx.Rollback()
@@ -213,7 +94,10 @@ func TambahAlamat(c *gin.Context) {
 	})
 }
 
-// UpdateAlamat handles updating address
+// UpdateAlamat memperbarui alamat pengiriman milik customer yang sedang login.
+// Dipakai oleh: customer (PUT /customer/alamat/:id_alamat)
+// Auth: Wajib login, role customer
+// Ownership: alamat harus milik customer yang login (id_customer dari JWT)
 func UpdateAlamat(c *gin.Context) {
 	idAlamat := c.Param("id_alamat")
 
@@ -237,23 +121,34 @@ func UpdateAlamat(c *gin.Context) {
 		return
 	}
 
-	// TODO: Ambil ID Customer dari context JWT jika middleware sudah aktif
-	customerID := uint(1)
+	userID := c.GetInt64("user_id")
+
+	var result struct{ IdCustomer uint }
+	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengidentifikasi customer",
+		})
+		return
+	}
+	customerID := result.IdCustomer
 
 	var alamat models.Alamat
-	// Cari alamat dan pastikan milik customer yang bersangkutan
 	if err := config.DB.Where("id_alamat = ? AND id_customer = ?", idAlamat, customerID).First(&alamat).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
+		// Ownership violation: selalu 403, bukan 404
+		c.JSON(http.StatusForbidden, gin.H{
 			"status":  "error",
-			"message": "Alamat tidak ditemukan",
+			"message": "Anda tidak memiliki akses ke resource ini",
+			"error": gin.H{
+				"code":   "AUTH_002",
+				"detail": "Alamat ini bukan milik Anda",
+			},
 		})
 		return
 	}
 
-	// Mulai transaksi
 	tx := config.DB.Begin()
 
-	// Jika alamat ini diubah menjadi UTAMA, matikan status is_utama di alamat lain
 	if input.IsUtama && !alamat.IsUtama {
 		if err := tx.Model(&models.Alamat{}).Where("id_customer = ?", customerID).Update("is_utama", false).Error; err != nil {
 			tx.Rollback()
@@ -265,7 +160,6 @@ func UpdateAlamat(c *gin.Context) {
 		}
 	}
 
-	// Update field jika dikirim
 	if input.LabelAlamat != "" {
 		alamat.LabelAlamat = input.LabelAlamat
 	}
@@ -311,17 +205,28 @@ func UpdateAlamat(c *gin.Context) {
 	})
 }
 
-// HapusAlamat handles deleting address
+// HapusAlamat menghapus alamat pengiriman milik customer yang sedang login.
+// Dipakai oleh: customer (DELETE /customer/alamat/:id_alamat)
+// Auth: Wajib login, role customer
+// Ownership: alamat harus milik customer yang login
 func HapusAlamat(c *gin.Context) {
 	idAlamat := c.Param("id_alamat")
 
-	// TODO: Ambil ID Customer dari context JWT jika middleware sudah aktif
-	customerID := uint(1)
+	userID := c.GetInt64("user_id")
 
-	// Hapus alamat jika cocok ID dan Customer ID
-	result := config.DB.Where("id_alamat = ? AND id_customer = ?", idAlamat, customerID).Delete(&models.Alamat{})
+	var result struct{ IdCustomer uint }
+	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengidentifikasi customer",
+		})
+		return
+	}
+	customerID := result.IdCustomer
 
-	if result.Error != nil {
+	deleteResult := config.DB.Where("id_alamat = ? AND id_customer = ?", idAlamat, customerID).Delete(&models.Alamat{})
+
+	if deleteResult.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal menghapus alamat",
@@ -329,11 +234,15 @@ func HapusAlamat(c *gin.Context) {
 		return
 	}
 
-	// Jika tidak ada baris yang terhapus, berarti alamat tidak ditemukan
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{
+	if deleteResult.RowsAffected == 0 {
+		// Ownership violation: selalu 403, bukan 404
+		c.JSON(http.StatusForbidden, gin.H{
 			"status":  "error",
-			"message": "Alamat tidak ditemukan",
+			"message": "Anda tidak memiliki akses ke resource ini",
+			"error": gin.H{
+				"code":   "AUTH_002",
+				"detail": "Alamat ini bukan milik Anda",
+			},
 		})
 		return
 	}
