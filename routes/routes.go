@@ -47,7 +47,7 @@ func SetupRoutes(r *gin.Engine) {
 			customerGroup.GET("/pesanan/:id_pesanan", transaksi.GetDetailPesanan)
 			customerGroup.GET("/pesanan/:id_pesanan/lacak", transaksi.LacakPesanan)
 			customerGroup.GET("/profil", user.GetProfilCustomer)
-			customerGroup.PUT("/akun", user.UpdateAkunCustomer)
+			customerGroup.PUT("/akun", user.EditAkunCustomer)
 			customerGroup.POST("/alamat", user.TambahAlamat)
 			customerGroup.PUT("/alamat/:id_alamat", user.UpdateAlamat)
 			customerGroup.DELETE("/alamat/:id_alamat", user.HapusAlamat)

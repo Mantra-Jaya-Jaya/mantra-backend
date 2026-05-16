@@ -9,10 +9,69 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// GetAlamat mengambil semua alamat milik customer yang sedang login.
+// Dipakai oleh: customer (GET /customer/alamat)
+// Auth: Wajib login, role customer
+func GetAlamat(c *gin.Context) {
+	uid, exists := getUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "User belum login",
+			"error":   gin.H{"code": "AUTH_001", "detail": "Token tidak valid"},
+		})
+		return
+	}
+
+	var result struct{ IdCustomer uint }
+	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", uid).Scan(&result).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengidentifikasi customer",
+			"error":   gin.H{"code": "SERVER_001", "detail": err.Error()},
+		})
+		return
+	}
+
+	var alamats []models.Alamat
+	if err := config.DB.Where("id_customer = ?", result.IdCustomer).Find(&alamats).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengambil daftar alamat",
+			"error":   gin.H{"code": "SERVER_001", "detail": err.Error()},
+		})
+		return
+	}
+
+	var data []gin.H
+	for _, a := range alamats {
+		data = append(data, gin.H{
+			"id_alamat":        a.IdAlamat,
+			"label_alamat":     a.LabelAlamat,
+			"nama_penerima":    a.NamaPenerima,
+			"no_telp_penerima": a.NoTelpPenerima,
+			"alamat_lengkap":   a.AlamatLengkap,
+			"latitude":         a.Latitude,
+			"longitude":        a.Longitude,
+			"catatan_lokasi":   a.CatatanLokasi,
+			"is_utama":         a.IsUtama,
+		})
+	}
+
+	if data == nil {
+		data = []gin.H{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Daftar alamat berhasil diambil",
+		"data":    data,
+	})
+}
+
 // TambahAlamat menambahkan alamat pengiriman baru untuk customer yang sedang login.
 // Dipakai oleh: customer (POST /customer/alamat)
 // Auth: Wajib login, role customer
-// Ownership: id_customer diambil dari JWT (user_id), bukan dari body request
 func TambahAlamat(c *gin.Context) {
 	type TambahAlamatInput struct {
 		LabelAlamat    string  `json:"label_alamat" binding:"required"`
@@ -27,20 +86,30 @@ func TambahAlamat(c *gin.Context) {
 
 	var input TambahAlamatInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+		c.JSON(http.StatusUnprocessableEntity, gin.H{
 			"status":  "error",
 			"message": "Input tidak valid, pastikan field label, nama, telepon, dan alamat lengkap diisi",
+			"error":   gin.H{"code": "VAL_001", "detail": "Validasi gagal"},
 		})
 		return
 	}
 
-	userID := c.GetInt64("user_id")
+	uid, exists := getUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "User belum login",
+			"error":   gin.H{"code": "AUTH_001", "detail": "Token tidak valid"},
+		})
+		return
+	}
 
 	var result struct{ IdCustomer uint }
-	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
+	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", uid).Scan(&result).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal mengidentifikasi customer",
+			"error":   gin.H{"code": "SERVER_001", "detail": err.Error()},
 		})
 		return
 	}
@@ -48,13 +117,13 @@ func TambahAlamat(c *gin.Context) {
 
 	tx := config.DB.Begin()
 
-	// Jika alamat baru diset sebagai UTAMA, matikan status is_utama di alamat lain
 	if input.IsUtama {
 		if err := tx.Model(&models.Alamat{}).Where("id_customer = ?", customerID).Update("is_utama", false).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "error",
 				"message": "Gagal memperbarui status alamat utama sebelumnya",
+				"error":   gin.H{"code": "SERVER_001", "detail": err.Error()},
 			})
 			return
 		}
@@ -77,6 +146,7 @@ func TambahAlamat(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal menambahkan alamat baru",
+			"error":   gin.H{"code": "SERVER_001", "detail": err.Error()},
 		})
 		return
 	}
@@ -97,7 +167,6 @@ func TambahAlamat(c *gin.Context) {
 // UpdateAlamat memperbarui alamat pengiriman milik customer yang sedang login.
 // Dipakai oleh: customer (PUT /customer/alamat/:id_alamat)
 // Auth: Wajib login, role customer
-// Ownership: alamat harus milik customer yang login (id_customer dari JWT)
 func UpdateAlamat(c *gin.Context) {
 	idAlamat := c.Param("id_alamat")
 
@@ -114,35 +183,47 @@ func UpdateAlamat(c *gin.Context) {
 
 	var input UpdateAlamatInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+		c.JSON(http.StatusUnprocessableEntity, gin.H{
 			"status":  "error",
 			"message": "Input tidak valid",
+			"error":   gin.H{"code": "VAL_001", "detail": "Validasi gagal"},
 		})
 		return
 	}
 
-	userID := c.GetInt64("user_id")
-
-	var result struct{ IdCustomer uint }
-	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+	uid, exists := getUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "error",
-			"message": "Gagal mengidentifikasi customer",
+			"message": "User belum login",
+			"error":   gin.H{"code": "AUTH_001", "detail": "Token tidak valid"},
 		})
 		return
 	}
-	customerID := result.IdCustomer
 
-	var alamat models.Alamat
-	if err := config.DB.Where("id_alamat = ? AND id_customer = ?", idAlamat, customerID).First(&alamat).Error; err != nil {
-		// Ownership violation: selalu 403, bukan 404
+	// Ownership check
+	var count int
+	err := config.DB.Raw(`
+		SELECT COUNT(*) FROM alamat a
+		JOIN customer c ON c.id_customer = a.id_customer
+		WHERE a.id_alamat = ? AND c.id_user = ?
+	`, idAlamat, uid).Scan(&count).Error
+
+	if err != nil || count == 0 {
 		c.JSON(http.StatusForbidden, gin.H{
 			"status":  "error",
 			"message": "Anda tidak memiliki akses ke resource ini",
-			"error": gin.H{
-				"code":   "AUTH_002",
-				"detail": "Alamat ini bukan milik Anda",
-			},
+			"error":   gin.H{"code": "AUTH_002", "detail": "Bukan milik user ini"},
+		})
+		return
+	}
+
+	var alamat models.Alamat
+	if err := config.DB.First(&alamat, idAlamat).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Alamat tidak ditemukan",
+			"error":   gin.H{"code": "DATA_004", "detail": "Data tidak ada di database"},
 		})
 		return
 	}
@@ -150,11 +231,12 @@ func UpdateAlamat(c *gin.Context) {
 	tx := config.DB.Begin()
 
 	if input.IsUtama && !alamat.IsUtama {
-		if err := tx.Model(&models.Alamat{}).Where("id_customer = ?", customerID).Update("is_utama", false).Error; err != nil {
+		if err := tx.Model(&models.Alamat{}).Where("id_customer = ?", alamat.CustomerId).Update("is_utama", false).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "error",
 				"message": "Gagal memperbarui status alamat utama sebelumnya",
+				"error":   gin.H{"code": "SERVER_001", "detail": err.Error()},
 			})
 			return
 		}
@@ -188,6 +270,7 @@ func UpdateAlamat(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal memperbarui alamat",
+			"error":   gin.H{"code": "SERVER_001", "detail": err.Error()},
 		})
 		return
 	}
@@ -208,41 +291,41 @@ func UpdateAlamat(c *gin.Context) {
 // HapusAlamat menghapus alamat pengiriman milik customer yang sedang login.
 // Dipakai oleh: customer (DELETE /customer/alamat/:id_alamat)
 // Auth: Wajib login, role customer
-// Ownership: alamat harus milik customer yang login
 func HapusAlamat(c *gin.Context) {
 	idAlamat := c.Param("id_alamat")
 
-	userID := c.GetInt64("user_id")
-
-	var result struct{ IdCustomer uint }
-	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+	uid, exists := getUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "error",
-			"message": "Gagal mengidentifikasi customer",
-		})
-		return
-	}
-	customerID := result.IdCustomer
-
-	deleteResult := config.DB.Where("id_alamat = ? AND id_customer = ?", idAlamat, customerID).Delete(&models.Alamat{})
-
-	if deleteResult.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal menghapus alamat",
+			"message": "User belum login",
+			"error":   gin.H{"code": "AUTH_001", "detail": "Token tidak valid"},
 		})
 		return
 	}
 
-	if deleteResult.RowsAffected == 0 {
-		// Ownership violation: selalu 403, bukan 404
+	// Ownership check
+	var count int
+	err := config.DB.Raw(`
+		SELECT COUNT(*) FROM alamat a
+		JOIN customer c ON c.id_customer = a.id_customer
+		WHERE a.id_alamat = ? AND c.id_user = ?
+	`, idAlamat, uid).Scan(&count).Error
+
+	if err != nil || count == 0 {
 		c.JSON(http.StatusForbidden, gin.H{
 			"status":  "error",
 			"message": "Anda tidak memiliki akses ke resource ini",
-			"error": gin.H{
-				"code":   "AUTH_002",
-				"detail": "Alamat ini bukan milik Anda",
-			},
+			"error":   gin.H{"code": "AUTH_002", "detail": "Bukan milik user ini"},
+		})
+		return
+	}
+
+	if err := config.DB.Delete(&models.Alamat{}, idAlamat).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal menghapus alamat",
+			"error":   gin.H{"code": "SERVER_001", "detail": err.Error()},
 		})
 		return
 	}
