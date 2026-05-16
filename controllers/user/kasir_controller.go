@@ -77,7 +77,7 @@ func GetDaftarKasir(c *gin.Context) {
 	search := c.Query("search")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	
+
 	if page < 1 {
 		page = 1
 	}
@@ -108,7 +108,7 @@ func GetDaftarKasir(c *gin.Context) {
 
 	var response []gin.H
 	baseURL := os.Getenv("BASE_URL")
-	
+
 	for _, k := range kasirs {
 		fotoProfil := k.User.FotoProfil
 		if fotoProfil != "" && !strings.HasPrefix(fotoProfil, "http") && baseURL != "" {
@@ -252,7 +252,7 @@ func TambahKasir(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	tx.Commit()
 
 	c.JSON(http.StatusCreated, gin.H{
@@ -490,6 +490,6 @@ func GetDaftarKaryawan(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Daftar karyawan belum diimplementasi sepenuhnya",
-		"data": []gin.H{},
+		"data":    []gin.H{},
 	})
 }

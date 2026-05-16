@@ -93,11 +93,11 @@ func IsOwnerOrAdmin(c *gin.Context, dataOwnerPublicID string) bool {
 	if strings.EqualFold(userRole, "admin") {
 		return true
 	}
-	
+
 	userPublicID := c.GetString("public_id")
 	if userPublicID == "" || dataOwnerPublicID == "" {
 		return false
 	}
-	
+
 	return userPublicID == dataOwnerPublicID
 }

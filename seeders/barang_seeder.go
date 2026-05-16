@@ -1,9 +1,9 @@
 package seeders
 
 import (
-	"fmt"
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"fmt"
 
 	"github.com/brianvoe/gofakeit/v7"
 )
@@ -34,7 +34,7 @@ func SeedBarang() {
 
 	for i := 0; i < sisaPerluDibuat; i++ {
 		barangBaru := models.Barang{
-			NamaBarang:   gofakeit.ProductName(),    
+			NamaBarang:   gofakeit.ProductName(),
 			GambarBarang: fmt.Sprintf("https://picsum.photos/seed/%d/400/400", gofakeit.Number(1, 1000)),
 			DiskonId:     diskon.IdDiskon,
 			SatuanId:     satuan.IdSatuan,

@@ -1,9 +1,9 @@
 package seeders
 
 import (
-	"fmt"
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"fmt"
 )
 
 func SeedDetailSpesifikasi() {
@@ -25,17 +25,17 @@ func SeedDetailSpesifikasi() {
 
 	// 3. Masukin Data Warna (Merah, Kuning, Hijau)
 	daftarWarna := []string{"Merah", "Kuning", "Hijau"}
-  for _, warna := range daftarWarna {
-    detailWarna := models.DetailSpesifikasi{
-      NamaDetailSpesifikasi: warna,
-      SpesifikasiID:         spekWarna.IdSpesifikasi, 
-    } // <--- INI DIA YANG HILANG BRO! NAMBAHIN INI DOANG WKWK
+	for _, warna := range daftarWarna {
+		detailWarna := models.DetailSpesifikasi{
+			NamaDetailSpesifikasi: warna,
+			SpesifikasiID:         spekWarna.IdSpesifikasi,
+		} // <--- INI DIA YANG HILANG BRO! NAMBAHIN INI DOANG WKWK
 
-    // FirstOrCreate biar gak dobel kalau Air restart
-    if err := config.DB.Where("nama_detail_spesifikasi = ? AND id_spesifikasi = ?", warna, spekWarna.IdSpesifikasi).FirstOrCreate(&detailWarna).Error; err != nil {
-      fmt.Println("Error", warna, ":", err)
-    }
-  }
+		// FirstOrCreate biar gak dobel kalau Air restart
+		if err := config.DB.Where("nama_detail_spesifikasi = ? AND id_spesifikasi = ?", warna, spekWarna.IdSpesifikasi).FirstOrCreate(&detailWarna).Error; err != nil {
+			fmt.Println("Error", warna, ":", err)
+		}
+	}
 
 	// 4. Masukin Data Ukuran (36 sampai 45) pakai looping
 	for i := 36; i <= 45; i++ {

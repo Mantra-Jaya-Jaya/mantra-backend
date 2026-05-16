@@ -17,5 +17,3 @@ type RefreshToken struct {
 	UserID uint `gorm:"column:id_user"`
 	User   User `gorm:"foreignKey:UserID;references:IdUser"`
 }
-
-

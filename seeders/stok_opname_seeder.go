@@ -1,10 +1,10 @@
 package seeders
 
 import (
-	"fmt"
-	"time"
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"fmt"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
 )
@@ -26,7 +26,7 @@ func SeedStokOpname() {
 		// Kita bikin 3 catatan riwayat per varian
 		for i := 0; i < 3; i++ {
 			status := gofakeit.Bool() // Acak: true (masuk) atau false (keluar)
-			
+
 			// Logika Harga Beli: biasanya lebih murah dari harga jual (sekitar 60-80%)
 			modal := int(float64(varian.HargaBarang) * gofakeit.Float64Range(0.6, 0.8))
 

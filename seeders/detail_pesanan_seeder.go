@@ -1,9 +1,9 @@
 package seeders
 
 import (
-	"fmt"
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"fmt"
 
 	"github.com/brianvoe/gofakeit/v7"
 )
@@ -37,11 +37,11 @@ func SeedDetailPesanan() {
 
 	// 4. Looping: Masukin 2 barang ke setiap Nota Pesanan
 	for _, pesanan := range daftarPesanan {
-		
+
 		// Beli Barang Pertama (Ambil varian index 0)
 		jumlahBeli1 := gofakeit.Number(1, 3)
 		hargaSatuan1 := daftarVarian[0].HargaBarang // Snapshot harga saat ini!
-		
+
 		detail1 := models.DetailPesanan{
 			Jumlah:              jumlahBeli1,
 			HargaSatuan:         hargaSatuan1,
@@ -53,7 +53,7 @@ func SeedDetailPesanan() {
 		// Beli Barang Kedua (Ambil varian index 1)
 		jumlahBeli2 := gofakeit.Number(1, 2)
 		hargaSatuan2 := daftarVarian[1].HargaBarang
-		
+
 		detail2 := models.DetailPesanan{
 			Jumlah:              jumlahBeli2,
 			HargaSatuan:         hargaSatuan2,
@@ -65,7 +65,7 @@ func SeedDetailPesanan() {
 		// Save ke database
 		config.DB.Create(&detail1)
 		config.DB.Create(&detail2)
-		
+
 		totalDetailDibuat += 2
 	}
 

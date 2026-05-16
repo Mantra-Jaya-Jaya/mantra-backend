@@ -427,7 +427,7 @@ func LacakPesanan(c *gin.Context) {
 			"id_pesanan": idPesanan,
 			"kurir": gin.H{
 				"nama":       pengantaran.Kurir.User.NamaLengkap,
-				"plat_nomor": "H 6582 TH", // Mock karena tidak ada di DB
+				"plat_nomor": "H 6582 TH",                                        // Mock karena tidak ada di DB
 				"foto":       "https://api.mantra.com/storage/kurir/ricardo.jpg", // Mock
 			},
 			"lokasi_kurir": gin.H{

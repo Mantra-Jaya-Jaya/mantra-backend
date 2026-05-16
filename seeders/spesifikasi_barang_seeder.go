@@ -1,9 +1,9 @@
 package seeders
 
 import (
-	"fmt"
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"fmt"
 
 	"github.com/brianvoe/gofakeit/v7"
 )
@@ -13,7 +13,7 @@ func SeedSpesifikasiBarang() {
 
 	gofakeit.Seed(0)
 
-	// 1. Tarik semua data Barang 
+	// 1. Tarik semua data Barang
 	var daftarBarang []models.Barang
 	if err := config.DB.Find(&daftarBarang).Error; err != nil || len(daftarBarang) == 0 {
 		fmt.Println("Barang masih kosong! Pastiin SeedBarang jalan duluan.")
@@ -39,18 +39,18 @@ func SeedSpesifikasiBarang() {
 
 			// Setup data varian, stok, dan harga
 			spekBarang := models.SpesifikasiBarang{
-				Jumlah:              gofakeit.Number(5, 150),      
-				HargaBarang:         gofakeit.Number(15000, 350000), 
+				Jumlah:              gofakeit.Number(5, 150),
+				HargaBarang:         gofakeit.Number(15000, 350000),
 				BarangID:            barang.IdBarang,
 				DetailSpesifikasiID: detailSpekAcak.IdDetailSpesifikasi,
 			}
 
-			// FirstOrCreate biar datanya gak dobel: 
+			// FirstOrCreate biar datanya gak dobel:
 			if err := config.DB.Where("id_barang = ? AND id_detail_spesifikasi = ?", spekBarang.BarangID, spekBarang.DetailSpesifikasiID).FirstOrCreate(&spekBarang).Error; err != nil {
 				fmt.Println("Error:", err)
 				continue
 			}
-			
+
 			totalVariasiDibuat++
 		}
 	}

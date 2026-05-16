@@ -1,10 +1,10 @@
 package seeders
 
 import (
-	"fmt"
-	"time"
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"fmt"
+	"time"
 )
 
 func SeedPesanan() {
@@ -45,7 +45,7 @@ func SeedPesanan() {
 		StatusPesanan:   "Dikemas",
 		CustomerId:      customer.IdCustomer,
 		KasirId:         kasir.IdKasir,
-		AlamatId:        &alamat.IdAlamat, 
+		AlamatId:        &alamat.IdAlamat,
 	}
 
 	// 4. Bikin Skenario 2: Pesanan Offline / Takeaway (Gak pakai alamat)

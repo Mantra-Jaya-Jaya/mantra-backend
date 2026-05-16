@@ -8,7 +8,7 @@ func (SpesifikasiBarang) TableName() string {
 // Barang tanpa varian tetap wajib punya 1 baris dengan detail "Default"
 type SpesifikasiBarang struct {
 	IdSpesifikasiBarang uint `gorm:"primaryKey;column:id_spesifikasi_barang" json:"id_spesifikasi_barang"`
-	Jumlah              int  `gorm:"column:jumlah" json:"jumlah"`       // Stok per varian
+	Jumlah              int  `gorm:"column:jumlah" json:"jumlah"`             // Stok per varian
 	HargaBarang         int  `gorm:"column:harga_barang" json:"harga_barang"` // Harga per varian dalam Rupiah (integer)
 
 	// Relasi ke Barang

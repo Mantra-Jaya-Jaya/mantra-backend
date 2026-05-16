@@ -17,15 +17,15 @@ func getUserIDFromContext(c *gin.Context) (uint, bool) {
 	if !exists {
 		return 0, false
 	}
-	
+
 	if uid, ok := userID.(uint); ok {
 		return uid, true
 	}
-	
+
 	if uidFloat, ok := userID.(float64); ok {
 		return uint(uidFloat), true
 	}
-	
+
 	return 0, false
 }
 

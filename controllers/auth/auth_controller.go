@@ -373,7 +373,7 @@ func ChangePassword(c *gin.Context) {
 	// Convert userID to uint
 	uid, ok := userID.(uint)
 	if !ok {
-		// Sometimes numbers from context/json are float64 if not parsed explicitly as uint, 
+		// Sometimes numbers from context/json are float64 if not parsed explicitly as uint,
 		// but since we parse it in middleware as uint or float64 from JWT, we need to handle it.
 		// In jwt-go, standard parsing returns float64 for numbers.
 		if uidFloat, ok := userID.(float64); ok {

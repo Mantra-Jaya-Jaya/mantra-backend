@@ -13,7 +13,7 @@ import (
 func OwnershipMiddleware(paramName string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRole := c.GetString("role")
-		
+
 		// Admin selalu memiliki akses (Bypass)
 		if strings.EqualFold(userRole, "admin") {
 			c.Next()
