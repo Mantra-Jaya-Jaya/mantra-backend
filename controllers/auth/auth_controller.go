@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -35,15 +36,21 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	fmt.Printf("[DEBUG] Login Attempt - Username: '%s', Password: '%s'\n", req.Username, req.Password)
+
 	var user models.User
 	// Cari user berdasarkan username
 	if err := config.DB.Preload("Role").Where("username = ?", req.Username).First(&user).Error; err != nil {
+		fmt.Printf("[DEBUG] User not found: %v\n", err)
 		RespondWithError(c, http.StatusUnauthorized, "Username atau password salah", "AUTH_001", "Credential tidak valid")
 		return
 	}
 
+	fmt.Printf("[DEBUG] User Found - Stored Hash: '%s'\n", user.Password)
+
 	// Cek password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		fmt.Printf("[DEBUG] Password Mismatch: %v\n", err)
 		RespondWithError(c, http.StatusUnauthorized, "Username atau password salah", "AUTH_001", "Credential tidak valid")
 		return
 	}
