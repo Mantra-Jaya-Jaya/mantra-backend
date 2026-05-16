@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
+	"net/mail"
+	"strings"
 	"time"
 
 	"backend-mantra/config"
@@ -22,8 +24,7 @@ import (
 // @Success 200 {object} map[string]interface{}
 // @Router /login [post]
 type LoginInput struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
+	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -35,18 +36,8 @@ func Login(c *gin.Context) {
 	}
 
 	var user models.User
-	// Cari user berdasarkan username atau email
-	var query = config.DB.Preload("Role")
-	if req.Username != "" {
-		query = query.Where("username = ?", req.Username)
-	} else if req.Email != "" {
-		query = query.Where("email = ?", req.Email)
-	} else {
-		RespondWithError(c, http.StatusBadRequest, "Username atau Email harus diisi", "REQ_001", "Field username atau email kosong")
-		return
-	}
-
-	if err := query.First(&user).Error; err != nil {
+	// Cari user berdasarkan username
+	if err := config.DB.Preload("Role").Where("username = ?", req.Username).First(&user).Error; err != nil {
 		RespondWithError(c, http.StatusUnauthorized, "Username atau password salah", "AUTH_001", "Credential tidak valid")
 		return
 	}
@@ -82,14 +73,14 @@ func Login(c *gin.Context) {
 	// Generate real JWT token
 	accessToken, err := GenerateJWT(user.IdUser, user.PublicId.String(), roleName)
 	if err != nil {
-		RespondWithError(c, http.StatusInternalServerError, "Gagal generate token", "SRV_001", err.Error())
+		RespondWithError(c, http.StatusInternalServerError, "Gagal generate token", "SERVER_001", err.Error())
 		return
 	}
 
 	// Generate random refresh token
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
-		RespondWithError(c, http.StatusInternalServerError, "Gagal generate refresh token", "SRV_002", err.Error())
+		RespondWithError(c, http.StatusInternalServerError, "Gagal generate refresh token", "SERVER_001", err.Error())
 		return
 	}
 	refreshTokenStr := hex.EncodeToString(b)
@@ -103,12 +94,16 @@ func Login(c *gin.Context) {
 	}
 
 	if err := config.DB.Create(&refreshToken).Error; err != nil {
-		RespondWithError(c, http.StatusInternalServerError, "Gagal menyimpan refresh token", "SRV_003", err.Error())
+		RespondWithError(c, http.StatusInternalServerError, "Gagal menyimpan refresh token", "SERVER_001", err.Error())
 		return
 	}
 
 	// Deteksi client type
-	clientType := c.GetHeader("X-Client-Type")
+	clientType := "nextjs"
+	authHeader := c.GetHeader("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		clientType = "flutter"
+	}
 
 	// Kirim response sukses sesuai client
 	RespondWithSuccess(c, clientType, user, roleName, profileID, accessToken, refreshTokenStr)
@@ -116,88 +111,126 @@ func Login(c *gin.Context) {
 
 // RefreshTokenInput is the DTO for refresh token request
 type RefreshTokenInput struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 // RefreshToken handles token refresh
 func RefreshToken(c *gin.Context) {
 	var req RefreshTokenInput
-	if err := c.ShouldBindJSON(&req); err != nil {
-		RespondWithError(c, http.StatusBadRequest, "Input tidak valid", "VAL_001", "Format request tidak sesuai")
+	_ = c.ShouldBindJSON(&req)
+
+	tokenStr := req.RefreshToken
+	clientType := "flutter"
+
+	if tokenStr == "" {
+		cookieToken, err := c.Cookie("refresh_token")
+		if err == nil && cookieToken != "" {
+			tokenStr = cookieToken
+			clientType = "nextjs"
+		}
+	}
+
+	if tokenStr == "" {
+		RespondWithError(c, http.StatusBadRequest, "Input tidak valid", "VAL_001", "Refresh token tidak ditemukan")
 		return
 	}
 
 	var storedToken models.RefreshToken
 	// Cari token di database
-	if err := config.DB.Where("token = ?", req.RefreshToken).First(&storedToken).Error; err != nil {
-		RespondWithError(c, http.StatusUnauthorized, "Sesi Anda telah berakhir, silakan login kembali", "AUTH_003", "Refresh token tidak valid")
-		return
-	}
-
-	// Cek apakah sudah expired
-	if storedToken.ExpiresAt.Before(time.Now()) {
-		RespondWithError(c, http.StatusUnauthorized, "Sesi Anda telah berakhir, silakan login kembali", "AUTH_003", "Refresh token expired")
-		return
-	}
-
-	// Cek apakah sudah direvoke
-	if storedToken.RevokedAt != nil {
-		RespondWithError(c, http.StatusUnauthorized, "Sesi Anda telah berakhir, silakan login kembali", "AUTH_003", "Refresh token sudah direvoke")
+	if err := config.DB.Where("token = ? AND expires_at > ? AND revoked_at IS NULL", tokenStr, time.Now()).First(&storedToken).Error; err != nil {
+		RespondWithError(c, http.StatusUnauthorized, "Sesi Anda telah berakhir, silakan login kembali", "AUTH_003", "Refresh token tidak valid atau expired")
 		return
 	}
 
 	// Cari user dan role
 	var user models.User
 	if err := config.DB.Preload("Role").First(&user, storedToken.UserID).Error; err != nil {
-		RespondWithError(c, http.StatusInternalServerError, "Gagal memproses token", "SRV_001", "User tidak ditemukan")
+		RespondWithError(c, http.StatusInternalServerError, "Gagal memproses token", "SERVER_001", "User tidak ditemukan")
 		return
 	}
 
 	// Jika valid, generate access token baru
 	newAccessToken, err := GenerateJWT(user.IdUser, user.PublicId.String(), user.Role.NamaRole)
 	if err != nil {
-		RespondWithError(c, http.StatusInternalServerError, "Gagal generate token baru", "SRV_001", err.Error())
+		RespondWithError(c, http.StatusInternalServerError, "Gagal generate token baru", "SERVER_001", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Token berhasil diperbarui",
-		"data": gin.H{
-			"access_token": newAccessToken,
-			"expires_in":   900,
-		},
-	})
+	if clientType == "nextjs" {
+		c.SetCookie("access_token", newAccessToken, 900, "/", "", true, true)
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"message": "Token berhasil diperbarui",
+		})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"message": "Token berhasil diperbarui",
+			"data": gin.H{
+				"access_token": newAccessToken,
+				"expires_in":   900,
+			},
+		})
+	}
 }
 
 // LogoutInput is the DTO for logout request
 type LogoutInput struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 // Logout handles user logout
 func Logout(c *gin.Context) {
 	var req LogoutInput
-	if err := c.ShouldBindJSON(&req); err != nil {
-		RespondWithError(c, http.StatusBadRequest, "Input tidak valid", "VAL_001", "Format request tidak sesuai")
+	_ = c.ShouldBindJSON(&req)
+
+	tokenStr := req.RefreshToken
+	clientType := "flutter"
+
+	if tokenStr == "" {
+		cookieToken, err := c.Cookie("refresh_token")
+		if err == nil && cookieToken != "" {
+			tokenStr = cookieToken
+			clientType = "nextjs"
+		}
+	}
+
+	if tokenStr == "" {
+		RespondWithError(c, http.StatusBadRequest, "Input tidak valid", "VAL_001", "Refresh token tidak ditemukan")
 		return
+	}
+
+	// Ambil ID User dari context JWT middleware
+	userID, exists := c.Get("user_id")
+	if !exists {
+		RespondWithError(c, http.StatusUnauthorized, "User belum login", "AUTH_001", "Token tidak valid")
+		return
+	}
+
+	uid, ok := userID.(uint)
+	if !ok {
+		if uidFloat, ok := userID.(float64); ok {
+			uid = uint(uidFloat)
+		} else {
+			RespondWithError(c, http.StatusInternalServerError, "Kesalahan sistem", "SERVER_001", "Format ID user tidak valid")
+			return
+		}
 	}
 
 	now := time.Now()
-	// Update RevokedAt untuk token yang bersangkutan
+	// Update RevokedAt untuk token yang bersangkutan & milik user tsb
 	result := config.DB.Model(&models.RefreshToken{}).
-		Where("token = ?", req.RefreshToken).
+		Where("token = ? AND id_user = ?", tokenStr, uid).
 		Update("revoked_at", &now)
 
 	if result.Error != nil {
-		RespondWithError(c, http.StatusInternalServerError, "Gagal melakukan logout", "SRV_001", result.Error.Error())
+		RespondWithError(c, http.StatusInternalServerError, "Gagal melakukan logout", "SERVER_001", result.Error.Error())
 		return
 	}
 
-	// Jika tidak ada baris yang terupdate, berarti token tidak ditemukan
-	if result.RowsAffected == 0 {
-		RespondWithError(c, http.StatusUnauthorized, "Token tidak valid atau sudah expired", "AUTH_001", "Token tidak ditemukan atau sudah direvoke")
-		return
+	if clientType == "nextjs" {
+		c.SetCookie("access_token", "", -1, "/", "", true, true)
+		c.SetCookie("refresh_token", "", -1, "/api/v1/auth/refresh", "", true, true)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -209,8 +242,8 @@ func Logout(c *gin.Context) {
 // RegisterCustomerInput is the DTO for register request
 type RegisterCustomerInput struct {
 	Username           string `json:"username" binding:"required"`
-	Email              string `json:"email" binding:"required,email"`
-	Password           string `json:"password" binding:"required,min=8"`
+	Email              string `json:"email" binding:"required"`
+	Password           string `json:"password" binding:"required"`
 	KonfirmasiPassword string `json:"konfirmasi_password" binding:"required"`
 	NamaLengkap        string `json:"nama_lengkap" binding:"required"`
 	NoTelp             string `json:"no_telp" binding:"required"`
@@ -224,39 +257,45 @@ func RegisterCustomer(c *gin.Context) {
 		return
 	}
 
-	if req.Password != req.KonfirmasiPassword {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{
-			"status":  "error",
-			"message": "Validasi gagal",
-			"error": gin.H{
-				"code":   "VAL_001",
-				"detail": "Input tidak memenuhi aturan validasi",
-			},
-			"errors": gin.H{
-				"konfirmasi_password": "Konfirmasi password tidak cocok",
-			},
-		})
+	if len(req.Password) < 8 {
+		RespondWithError(c, http.StatusUnprocessableEntity, "Validasi gagal", "VAL_001", "Password minimal 8 karakter")
 		return
 	}
 
-	// Cek apakah email atau username sudah terdaftar
+	if req.Password != req.KonfirmasiPassword {
+		RespondWithError(c, http.StatusUnprocessableEntity, "Validasi gagal", "VAL_002", "Konfirmasi password tidak cocok")
+		return
+	}
+
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		RespondWithError(c, http.StatusUnprocessableEntity, "Validasi gagal", "VAL_003", "Format email tidak valid")
+		return
+	}
+
+	// Cek duplikasi username
 	var existingUser models.User
-	if err := config.DB.Where("email = ? OR username = ?", req.Email, req.Username).First(&existingUser).Error; err == nil {
-		RespondWithError(c, http.StatusConflict, "Username sudah terdaftar", "CONF_001", "Duplicate entry pada kolom username atau email")
+	if err := config.DB.Where("username = ?", req.Username).First(&existingUser).Error; err == nil {
+		RespondWithError(c, http.StatusConflict, "Username sudah terdaftar", "CONF_001", "Username telah digunakan")
+		return
+	}
+
+	// Cek duplikasi email
+	if err := config.DB.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
+		RespondWithError(c, http.StatusConflict, "Email sudah terdaftar", "CONF_002", "Email telah digunakan")
 		return
 	}
 
 	// Cari Role "Customer"
 	var role models.Role
 	if err := config.DB.Where("nama_role = ?", "Customer").First(&role).Error; err != nil {
-		RespondWithError(c, http.StatusInternalServerError, "Role Customer tidak ditemukan di sistem", "SRV_001", "Role tidak ditemukan")
+		RespondWithError(c, http.StatusInternalServerError, "Role Customer tidak ditemukan di sistem", "SERVER_001", "Role tidak ditemukan")
 		return
 	}
 
 	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
 	if err != nil {
-		RespondWithError(c, http.StatusInternalServerError, "Gagal memproses password", "SRV_001", err.Error())
+		RespondWithError(c, http.StatusInternalServerError, "Gagal memproses password", "SERVER_001", err.Error())
 		return
 	}
 
@@ -273,7 +312,7 @@ func RegisterCustomer(c *gin.Context) {
 
 	if err := tx.Create(&newUser).Error; err != nil {
 		tx.Rollback()
-		RespondWithError(c, http.StatusInternalServerError, "Gagal membuat user baru", "SRV_001", err.Error())
+		RespondWithError(c, http.StatusInternalServerError, "Gagal membuat user baru", "SERVER_001", err.Error())
 		return
 	}
 
@@ -284,7 +323,7 @@ func RegisterCustomer(c *gin.Context) {
 
 	if err := tx.Create(&newCustomer).Error; err != nil {
 		tx.Rollback()
-		RespondWithError(c, http.StatusInternalServerError, "Gagal membuat data customer", "SRV_001", err.Error())
+		RespondWithError(c, http.StatusInternalServerError, "Gagal membuat data customer", "SERVER_001", err.Error())
 		return
 	}
 
@@ -340,7 +379,7 @@ func ChangePassword(c *gin.Context) {
 		if uidFloat, ok := userID.(float64); ok {
 			uid = uint(uidFloat)
 		} else {
-			RespondWithError(c, http.StatusInternalServerError, "Kesalahan sistem", "SRV_001", "Format ID user tidak valid")
+			RespondWithError(c, http.StatusInternalServerError, "Kesalahan sistem", "SERVER_001", "Format ID user tidak valid")
 			return
 		}
 	}
@@ -358,18 +397,34 @@ func ChangePassword(c *gin.Context) {
 	}
 
 	// Hash password baru
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.PasswordBaru), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.PasswordBaru), 12)
 	if err != nil {
-		RespondWithError(c, http.StatusInternalServerError, "Gagal memproses password baru", "SRV_001", err.Error())
+		RespondWithError(c, http.StatusInternalServerError, "Gagal memproses password baru", "SERVER_001", err.Error())
 		return
 	}
 
+	// Mulai transaksi
+	tx := config.DB.Begin()
+
 	// Update password
 	user.Password = string(hashedPassword)
-	if err := config.DB.Save(&user).Error; err != nil {
-		RespondWithError(c, http.StatusInternalServerError, "Gagal mengubah password", "SRV_001", err.Error())
+	if err := tx.Save(&user).Error; err != nil {
+		tx.Rollback()
+		RespondWithError(c, http.StatusInternalServerError, "Gagal mengubah password", "SERVER_001", err.Error())
 		return
 	}
+
+	// Revoke seluruh refresh token user (logout semua device)
+	now := time.Now()
+	if err := tx.Model(&models.RefreshToken{}).
+		Where("id_user = ? AND revoked_at IS NULL", uid).
+		Update("revoked_at", &now).Error; err != nil {
+		tx.Rollback()
+		RespondWithError(c, http.StatusInternalServerError, "Gagal me-revoke sesi lama", "SERVER_001", err.Error())
+		return
+	}
+
+	tx.Commit()
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
