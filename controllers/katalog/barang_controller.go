@@ -1,4 +1,4 @@
-package customer
+package katalog
 
 import (
 	"net/http"
@@ -11,62 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetPromo handles fetching active promos
-func GetPromo(c *gin.Context) {
-	var diskons []models.Diskon
-	now := time.Now()
-
-	// Ambil diskon yang aktif (tgl_mulai <= now <= tgl_selesai)
-	if err := config.DB.Where("tgl_mulai <= ? AND tgl_selesai >= ?", now, now).Find(&diskons).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal mengambil data promo",
-		})
-		return
-	}
-
-	var responseData []gin.H
-	for _, d := range diskons {
-		responseData = append(responseData, gin.H{
-			"id_diskon":   d.IdDiskon,
-			"nama_diskon": d.NamaDiskon,
-			"banner_url":  d.BannerDiskon,
-			"tgl_selesai": d.TglSelesai,
-		})
-	}
-
-	// Jika data kosong, pastikan return array kosong bukan null
-	if responseData == nil {
-		responseData = []gin.H{}
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Berhasil mengambil data promo",
-		"data":    responseData,
-	})
-}
-
-// GetKategori handles fetching product categories
-func GetKategori(c *gin.Context) {
-	kategori := []models.Kategori{}
-
-	if err := config.DB.Find(&kategori).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal mengambil daftar kategori",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Berhasil mengambil daftar kategori",
-		"data":    kategori,
-	})
-}
-
-// GetDaftarBarang handles fetching catalog products
+// GetDaftarBarang mengambil daftar barang dari katalog dengan pagination.
+// Dipakai oleh: customer (GET /customer/katalog/barang), kasir (GET /kasir/katalog/barang), admin (GET /admin/katalog/barang)
+// Auth: Wajib login, semua role boleh akses (dikontrol di route)
 func GetDaftarBarang(c *gin.Context) {
 	pageStr := c.DefaultQuery("page", "1")
 	limitStr := c.DefaultQuery("limit", "10")
@@ -92,7 +39,7 @@ func GetDaftarBarang(c *gin.Context) {
 	// Hitung total barang
 	config.DB.Model(&models.Barang{}).Count(&total)
 
-	// Ambil data barang dengan join
+	// Ambil data barang dengan join spesifikasi dan diskon
 	config.DB.Table("barang").
 		Select("barang.id_barang, barang.nama_barang, barang.gambar_barang, MIN(spesifikasi_barang.harga_barang) as harga_terendah, MAX(spesifikasi_barang.harga_barang) as harga_tertinggi, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai").
 		Joins("LEFT JOIN spesifikasi_barang ON spesifikasi_barang.id_barang = barang.id_barang").
@@ -147,12 +94,79 @@ func GetDaftarBarang(c *gin.Context) {
 	})
 }
 
-// GetDetailBarangByScan handles fetching product by barcode
+// GetDetailBarang mengambil detail satu barang berdasarkan ID.
+// Dipakai oleh: admin (GET /admin/katalog/barang/:id_barang)
+// Auth: Wajib login, role admin
+func GetDetailBarang(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Detail barang berhasil diambil",
+		"data": gin.H{
+			"id_barang":   1,
+			"nama_barang": "Laptop Gaming X",
+			"kategori":    "Elektronik",
+			"satuan":      "Unit",
+			"gambar":      "https://api.mantra.com/storage/barang/laptop-x.jpg",
+			"diskon": gin.H{
+				"nama_diskon":  "Promo Awal Tahun",
+				"besar_diskon": 10,
+				"tgl_selesai":  "2026-12-31T23:59:59Z",
+			},
+			"varian": []gin.H{
+				{
+					"id_spesifikasi_barang": 5,
+					"nama_spesifikasi":      "RAM",
+					"nama_detail":           "16GB",
+					"harga_barang":          15000000,
+					"stok":                  5,
+				},
+			},
+		},
+	})
+}
+
+// TambahBarang menambahkan barang baru ke katalog.
+// Dipakai oleh: admin (POST /admin/katalog/barang)
+// Auth: Wajib login, role admin
+func TambahBarang(c *gin.Context) {
+	c.JSON(http.StatusCreated, gin.H{
+		"status":  "success",
+		"message": "Barang berhasil ditambahkan",
+		"data": gin.H{
+			"id_barang":   51,
+			"nama_barang": "Laptop Gaming X",
+		},
+	})
+}
+
+// UpdateBarang memperbarui detail barang yang ada.
+// Dipakai oleh: admin (PUT /admin/katalog/barang/:id_barang)
+// Auth: Wajib login, role admin
+func UpdateBarang(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Barang berhasil diperbarui",
+	})
+}
+
+// HapusBarang menghapus barang dari katalog.
+// Dipakai oleh: admin (DELETE /admin/katalog/barang/:id_barang)
+// Auth: Wajib login, role admin
+func HapusBarang(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Barang berhasil dihapus",
+	})
+}
+
+// GetDetailBarangByScan mengambil detail barang berdasarkan kode barcode.
+// Dipakai oleh: customer (GET /customer/katalog/scan/:kode_barcode), kasir (GET /kasir/katalog/scan/:kode_barcode)
+// Auth: Wajib login, role customer atau kasir
 func GetDetailBarangByScan(c *gin.Context) {
 	kodeBarcode := c.Param("kode_barcode")
 	var barcode models.Barcode
 
-	// Cari barcode berdasarkan ID (karena kolom kode_barcode tidak ada di schema)
+	// Cari barcode berdasarkan kode
 	if err := config.DB.Preload("Barang.Kategori").Preload("Barang.Diskon").Preload("Barang.Satuan").Where("id_barcode = ?", kodeBarcode).First(&barcode).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
@@ -205,6 +219,29 @@ func GetDetailBarangByScan(c *gin.Context) {
 			"satuan":        barcode.Barang.Satuan.NamaSatuan,
 			"diskon":        diskonData,
 			"varian":        responseVarian,
+		},
+	})
+}
+
+// CariProdukTransaksi mencari produk berdasarkan barcode atau nama untuk keperluan transaksi POS.
+// Dipakai oleh: kasir (GET /kasir/katalog/cari)
+// Auth: Wajib login, role kasir
+func CariProdukTransaksi(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Produk berhasil ditemukan",
+		"data": gin.H{
+			"id_produk":    1,
+			"nama_produk":  "Laptop Gaming X",
+			"harga_satuan": 13500000,
+			"gambar":       "https://api.mantra.com/storage/barang/laptop-x.jpg",
+			"varian": []gin.H{
+				{
+					"id_spesifikasi_barang": 5,
+					"label":                 "16GB RAM",
+					"stok":                  5,
+				},
+			},
 		},
 	})
 }

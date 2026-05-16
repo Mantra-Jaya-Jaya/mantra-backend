@@ -1,4 +1,4 @@
-package customer
+package keranjang
 
 import (
 	"net/http"
@@ -9,7 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// TambahKeKeranjang handles adding items to cart
+// TambahKeKeranjang menambahkan item ke keranjang belanja customer yang sedang login.
+// Dipakai oleh: customer (POST /customer/keranjang)
+// Auth: Wajib login, role customer
+// Ownership: id_customer diambil dari JWT (user_id), bukan dari body request
 func TambahKeKeranjang(c *gin.Context) {
 	type TambahKeranjangInput struct {
 		IdSpesifikasiBarang uint `json:"id_spesifikasi_barang" binding:"required"`
@@ -25,12 +28,20 @@ func TambahKeKeranjang(c *gin.Context) {
 		return
 	}
 
-	// TODO: Ambil ID Customer dari context JWT jika middleware sudah aktif
-	// Untuk sementara kita hardcode ID Customer = 1
-	customerID := uint(1)
+	userID := c.GetInt64("user_id")
+
+	// Cari id_customer berdasarkan user_id dari JWT
+	var result struct{ IdCustomer uint }
+	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengidentifikasi customer",
+		})
+		return
+	}
+	customerID := result.IdCustomer
 
 	var keranjang models.Keranjang
-	// Cek apakah barang dengan varian tersebut sudah ada di keranjang
 	err := config.DB.Where("id_customer = ? AND id_spesifikasi_barang = ?", customerID, input.IdSpesifikasiBarang).First(&keranjang).Error
 
 	if err == nil {
@@ -65,7 +76,10 @@ func TambahKeKeranjang(c *gin.Context) {
 	})
 }
 
-// UpdateKeranjang handles updating cart item quantity
+// UpdateKeranjang memperbarui quantity item di keranjang belanja.
+// Dipakai oleh: customer (PATCH /customer/keranjang/:id_keranjang)
+// Auth: Wajib login, role customer
+// Ownership: item keranjang harus milik customer yang login
 func UpdateKeranjang(c *gin.Context) {
 	idKeranjang := c.Param("id_keranjang")
 
@@ -82,20 +96,32 @@ func UpdateKeranjang(c *gin.Context) {
 		return
 	}
 
-	// TODO: Ambil ID Customer dari context JWT jika middleware sudah aktif
-	customerID := uint(1)
+	userID := c.GetInt64("user_id")
+
+	var result struct{ IdCustomer uint }
+	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengidentifikasi customer",
+		})
+		return
+	}
+	customerID := result.IdCustomer
 
 	var keranjang models.Keranjang
-	// Cari item keranjang berdasarkan ID dan pastikan milik customer yang bersangkutan
 	if err := config.DB.Where("id_keranjang = ? AND id_customer = ?", idKeranjang, customerID).First(&keranjang).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
+		// Ownership violation: selalu 403, bukan 404
+		c.JSON(http.StatusForbidden, gin.H{
 			"status":  "error",
-			"message": "Item keranjang tidak ditemukan",
+			"message": "Anda tidak memiliki akses ke resource ini",
+			"error": gin.H{
+				"code":   "AUTH_002",
+				"detail": "Item keranjang ini bukan milik Anda",
+			},
 		})
 		return
 	}
 
-	// Update quantity
 	keranjang.Quantity = input.Quantity
 	if err := config.DB.Save(&keranjang).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -111,17 +137,28 @@ func UpdateKeranjang(c *gin.Context) {
 	})
 }
 
-// HapusItemKeranjang handles deleting item from cart
+// HapusItemKeranjang menghapus item dari keranjang belanja customer yang login.
+// Dipakai oleh: customer (DELETE /customer/keranjang/:id_keranjang)
+// Auth: Wajib login, role customer
+// Ownership: item keranjang harus milik customer yang login
 func HapusItemKeranjang(c *gin.Context) {
 	idKeranjang := c.Param("id_keranjang")
 
-	// TODO: Ambil ID Customer dari context JWT jika middleware sudah aktif
-	customerID := uint(1)
+	userID := c.GetInt64("user_id")
 
-	// Hapus item dari database jika ID dan Customer ID cocok
-	result := config.DB.Where("id_keranjang = ? AND id_customer = ?", idKeranjang, customerID).Delete(&models.Keranjang{})
+	var result struct{ IdCustomer uint }
+	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengidentifikasi customer",
+		})
+		return
+	}
+	customerID := result.IdCustomer
 
-	if result.Error != nil {
+	deleteResult := config.DB.Where("id_keranjang = ? AND id_customer = ?", idKeranjang, customerID).Delete(&models.Keranjang{})
+
+	if deleteResult.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal menghapus item dari keranjang",
@@ -129,11 +166,15 @@ func HapusItemKeranjang(c *gin.Context) {
 		return
 	}
 
-	// Jika tidak ada baris yang terhapus, berarti item tidak ditemukan atau bukan milik customer
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{
+	if deleteResult.RowsAffected == 0 {
+		// Ownership violation: selalu 403, bukan 404
+		c.JSON(http.StatusForbidden, gin.H{
 			"status":  "error",
-			"message": "Item keranjang tidak ditemukan",
+			"message": "Anda tidak memiliki akses ke resource ini",
+			"error": gin.H{
+				"code":   "AUTH_002",
+				"detail": "Item keranjang ini bukan milik Anda",
+			},
 		})
 		return
 	}
