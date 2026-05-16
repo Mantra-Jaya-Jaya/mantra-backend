@@ -167,7 +167,7 @@ func GetDetailBarangByScan(c *gin.Context) {
 	var barcode models.Barcode
 
 	// Cari barcode berdasarkan kode
-	if err := config.DB.Preload("Barang.Kategori").Preload("Barang.Diskon").Preload("Barang.Satuan").Where("id_barcode = ?", kodeBarcode).First(&barcode).Error; err != nil {
+	if err := config.DB.Preload("SpesifikasiBarang.Barang.Kategori").Preload("SpesifikasiBarang.Barang.Diskon").Preload("SpesifikasiBarang.Barang.Satuan").Where("id_barcode = ?", kodeBarcode).First(&barcode).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Data barang tidak ditemukan",
@@ -176,15 +176,15 @@ func GetDetailBarangByScan(c *gin.Context) {
 	}
 
 	var varians []models.SpesifikasiBarang
-	config.DB.Preload("DetailSpesifikasi.Spesifikasi").Where("id_barang = ?", barcode.BarangId).Find(&varians)
+	config.DB.Preload("DetailSpesifikasi.Spesifikasi").Where("id_barang = ?", barcode.SpesifikasiBarang.BarangID).Find(&varians)
 
 	var responseVarian []gin.H
 	now := time.Now()
 	for _, v := range varians {
 		hargaDiskon := v.HargaBarang
-		if barcode.Barang.DiskonId != 0 && barcode.Barang.Diskon.IdDiskon != 0 {
-			if barcode.Barang.Diskon.TglMulai.Before(now) && barcode.Barang.Diskon.TglSelesai.After(now) {
-				hargaDiskon = v.HargaBarang - (v.HargaBarang * barcode.Barang.Diskon.BesarDiskon / 100)
+		if barcode.SpesifikasiBarang.Barang.DiskonId != 0 && barcode.SpesifikasiBarang.Barang.Diskon.IdDiskon != 0 {
+			if barcode.SpesifikasiBarang.Barang.Diskon.TglMulai.Before(now) && barcode.SpesifikasiBarang.Barang.Diskon.TglSelesai.After(now) {
+				hargaDiskon = v.HargaBarang - (v.HargaBarang * barcode.SpesifikasiBarang.Barang.Diskon.BesarDiskon / 100)
 			}
 		}
 
@@ -199,11 +199,11 @@ func GetDetailBarangByScan(c *gin.Context) {
 	}
 
 	var diskonData interface{} = nil
-	if barcode.Barang.DiskonId != 0 && barcode.Barang.Diskon.IdDiskon != 0 {
+	if barcode.SpesifikasiBarang.Barang.DiskonId != 0 && barcode.SpesifikasiBarang.Barang.Diskon.IdDiskon != 0 {
 		diskonData = gin.H{
-			"nama_diskon":  barcode.Barang.Diskon.NamaDiskon,
-			"besar_diskon": barcode.Barang.Diskon.BesarDiskon,
-			"tgl_selesai":  barcode.Barang.Diskon.TglSelesai,
+			"nama_diskon":  barcode.SpesifikasiBarang.Barang.Diskon.NamaDiskon,
+			"besar_diskon": barcode.SpesifikasiBarang.Barang.Diskon.BesarDiskon,
+			"tgl_selesai":  barcode.SpesifikasiBarang.Barang.Diskon.TglSelesai,
 		}
 	}
 
@@ -211,12 +211,12 @@ func GetDetailBarangByScan(c *gin.Context) {
 		"status":  "success",
 		"message": "Data barang ditemukan",
 		"data": gin.H{
-			"id_barang":     barcode.BarangId,
-			"nama_barang":   barcode.Barang.NamaBarang,
+			"id_barang":     barcode.SpesifikasiBarang.BarangID,
+			"nama_barang":   barcode.SpesifikasiBarang.Barang.NamaBarang,
 			"kode_barcode":  kodeBarcode,
-			"gambar_barang": barcode.Barang.GambarBarang,
-			"kategori":      barcode.Barang.Kategori.NamaKategori,
-			"satuan":        barcode.Barang.Satuan.NamaSatuan,
+			"gambar_barang": barcode.SpesifikasiBarang.Barang.GambarBarang,
+			"kategori":      barcode.SpesifikasiBarang.Barang.Kategori.NamaKategori,
+			"satuan":        barcode.SpesifikasiBarang.Barang.Satuan.NamaSatuan,
 			"diskon":        diskonData,
 			"varian":        responseVarian,
 		},

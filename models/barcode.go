@@ -10,10 +10,10 @@ type Barcode struct {
 	IdBarcode uint `gorm:"primaryKey;column:id_barcode" json:"id_barcode"`
 	Kuantitas uint `gorm:"column:kuantitas" json:"kuantitas"`
 
-	//Relasi ke Barang
-	BarangId uint `gorm:"column:id_barang;unique" json:"id_barang"`
-	SatuanId uint `gorm:"column:id_satuan;unique" json:"id_satuan"`
+	//Relasi ke Spesifikasi Barang
+	SpesifikasiBarangId uint `gorm:"column:id_spesifikasi_barang;unique" json:"id_spesifikasi_barang"`
+	SatuanId            uint `gorm:"column:id_satuan;unique" json:"id_satuan"`
 
-	//Relasi  ke tabel barang
-	Barang Barang `gorm:"foreignKey:BarangId;references:IdBarang" json:"barang"`
+	//Relasi ke tabel spesifikasi barang
+	SpesifikasiBarang SpesifikasiBarang `gorm:"foreignKey:SpesifikasiBarangId;references:IdSpesifikasiBarang" json:"spesifikasi_barang"`
 }
