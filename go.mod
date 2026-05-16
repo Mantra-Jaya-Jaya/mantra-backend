@@ -2,6 +2,10 @@ module backend-mantra
 
 go 1.26.2
 
+require golang.org/x/crypto v0.51.0
+
+require gorm.io/gorm v1.25.10
+
 require (
 	github.com/brianvoe/gofakeit/v7 v7.14.1
 	github.com/bytedance/gopkg v0.1.4 // indirect
