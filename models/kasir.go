@@ -22,6 +22,8 @@ type Kasir struct {
 	Alamat             string    `gorm:"column:alamat" json:"alamat"`
 	PendidikanTerakhir string    `gorm:"column:pendidikan_terakhir" json:"pendidikan_terakhir"`
 	Nik                string    `gorm:"type:varchar(16);column:nik;unique;not null" json:"nik"`
+	Status             string    `gorm:"column:status" json:"status"`
+	Shift              string    `gorm:"column:shift" json:"shift"`
 
 	//Relasi ke User
 	UserId uint `gorm:"column:id_user;unique" json:"id_user"`

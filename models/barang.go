@@ -8,6 +8,7 @@ type Barang struct {
 	IdBarang     uint   `gorm:"primaryKey;column:id_barang" json:"id_barang"`
 	NamaBarang   string `gorm:"column:nama_barang" json:"nama_barang"`
 	GambarBarang string `gorm:"column:gambar_barang" json:"gambar_barang"`
+	Deskripsi    string `gorm:"column:deskripsi" json:"deskripsi"`
 
 	//Relasi
 	DiskonId   uint `gorm:"column:id_diskon;unique" json:"id_diskon"`
