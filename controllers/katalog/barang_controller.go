@@ -98,29 +98,79 @@ func GetDaftarBarang(c *gin.Context) {
 // Dipakai oleh: admin (GET /admin/katalog/barang/:id_barang)
 // Auth: Wajib login, role admin
 func GetDetailBarang(c *gin.Context) {
+	idBarangStr := c.Param("id_barang")
+	idBarang, err := strconv.Atoi(idBarangStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "ID barang tidak valid",
+		})
+		return
+	}
+
+	var barang models.Barang
+	if err := config.DB.
+		Preload("Kategori").
+		Preload("Satuan").
+		Preload("Diskon").
+		First(&barang, "id_barang = ?", idBarang).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Barang tidak ditemukan",
+		})
+		return
+	}
+
+	// Ambil semua varian (spesifikasi_barang) barang ini
+	var varians []models.SpesifikasiBarang
+	config.DB.
+		Preload("DetailSpesifikasi.Spesifikasi").
+		Where("id_barang = ?", idBarang).
+		Find(&varians)
+
+	now := time.Now()
+	var responseVarian []gin.H
+	for _, v := range varians {
+		hargaDiskon := v.HargaBarang
+		if barang.DiskonId != 0 && barang.Diskon.IdDiskon != 0 {
+			if barang.Diskon.TglMulai.Before(now) && barang.Diskon.TglSelesai.After(now) {
+				hargaDiskon = v.HargaBarang - (v.HargaBarang * barang.Diskon.BesarDiskon / 100)
+			}
+		}
+		responseVarian = append(responseVarian, gin.H{
+			"id_spesifikasi_barang": v.IdSpesifikasiBarang,
+			"nama_spesifikasi":      v.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi,
+			"nama_detail":           v.DetailSpesifikasi.NamaDetailSpesifikasi,
+			"harga_barang":          v.HargaBarang,
+			"harga_diskon":          hargaDiskon,
+			"stok":                  v.Jumlah,
+		})
+	}
+	if responseVarian == nil {
+		responseVarian = []gin.H{}
+	}
+
+	var diskonData interface{} = nil
+	if barang.DiskonId != 0 && barang.Diskon.IdDiskon != 0 {
+		diskonData = gin.H{
+			"nama_diskon":  barang.Diskon.NamaDiskon,
+			"besar_diskon": barang.Diskon.BesarDiskon,
+			"tgl_selesai":  barang.Diskon.TglSelesai,
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Detail barang berhasil diambil",
 		"data": gin.H{
-			"id_barang":   1,
-			"nama_barang": "Laptop Gaming X",
-			"kategori":    "Elektronik",
-			"satuan":      "Unit",
-			"gambar":      "https://api.mantra.com/storage/barang/laptop-x.jpg",
-			"diskon": gin.H{
-				"nama_diskon":  "Promo Awal Tahun",
-				"besar_diskon": 10,
-				"tgl_selesai":  "2026-12-31T23:59:59Z",
-			},
-			"varian": []gin.H{
-				{
-					"id_spesifikasi_barang": 5,
-					"nama_spesifikasi":      "RAM",
-					"nama_detail":           "16GB",
-					"harga_barang":          15000000,
-					"stok":                  5,
-				},
-			},
+			"id_barang":    barang.IdBarang,
+			"nama_barang":  barang.NamaBarang,
+			"deskripsi":    barang.Deskripsi,
+			"gambar_barang": barang.GambarBarang,
+			"kategori":     barang.Kategori.NamaKategori,
+			"satuan":       barang.Satuan.NamaSatuan,
+			"diskon":       diskonData,
+			"varian":       responseVarian,
 		},
 	})
 }
@@ -129,12 +179,46 @@ func GetDetailBarang(c *gin.Context) {
 // Dipakai oleh: admin (POST /admin/katalog/barang)
 // Auth: Wajib login, role admin
 func TambahBarang(c *gin.Context) {
+	var input struct {
+		NamaBarang   string `json:"nama_barang" binding:"required"`
+		GambarBarang string `json:"gambar_barang"`
+		Deskripsi    string `json:"deskripsi"`
+		KategoriId   uint   `json:"id_kategori" binding:"required"`
+		SatuanId     uint   `json:"id_satuan" binding:"required"`
+		DiskonId     uint   `json:"id_diskon"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Format inputan salah: " + err.Error(),
+		})
+		return
+	}
+
+	barang := models.Barang{
+		NamaBarang:   input.NamaBarang,
+		GambarBarang: input.GambarBarang,
+		Deskripsi:    input.Deskripsi,
+		KategoriId:   input.KategoriId,
+		SatuanId:     input.SatuanId,
+		DiskonId:     input.DiskonId,
+	}
+
+	if err := config.DB.Create(&barang).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal menyimpan data barang",
+		})
+		return
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"status":  "success",
 		"message": "Barang berhasil ditambahkan",
 		"data": gin.H{
-			"id_barang":   51,
-			"nama_barang": "Laptop Gaming X",
+			"id_barang":   barang.IdBarang,
+			"nama_barang": barang.NamaBarang,
 		},
 	})
 }
@@ -143,6 +227,70 @@ func TambahBarang(c *gin.Context) {
 // Dipakai oleh: admin (PUT /admin/katalog/barang/:id_barang)
 // Auth: Wajib login, role admin
 func UpdateBarang(c *gin.Context) {
+	idBarangStr := c.Param("id_barang")
+	idBarang, err := strconv.Atoi(idBarangStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "ID barang tidak valid",
+		})
+		return
+	}
+
+	var barang models.Barang
+	if err := config.DB.First(&barang, "id_barang = ?", idBarang).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Barang tidak ditemukan",
+		})
+		return
+	}
+
+	var input struct {
+		NamaBarang   string `json:"nama_barang"`
+		GambarBarang string `json:"gambar_barang"`
+		Deskripsi    string `json:"deskripsi"`
+		KategoriId   uint   `json:"id_kategori"`
+		SatuanId     uint   `json:"id_satuan"`
+		DiskonId     uint   `json:"id_diskon"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Format inputan salah: " + err.Error(),
+		})
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if input.NamaBarang != "" {
+		updates["nama_barang"] = input.NamaBarang
+	}
+	if input.GambarBarang != "" {
+		updates["gambar_barang"] = input.GambarBarang
+	}
+	if input.Deskripsi != "" {
+		updates["deskripsi"] = input.Deskripsi
+	}
+	if input.KategoriId != 0 {
+		updates["id_kategori"] = input.KategoriId
+	}
+	if input.SatuanId != 0 {
+		updates["id_satuan"] = input.SatuanId
+	}
+	if input.DiskonId != 0 {
+		updates["id_diskon"] = input.DiskonId
+	}
+
+	if err := config.DB.Model(&barang).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal memperbarui data barang",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Barang berhasil diperbarui",
@@ -153,6 +301,33 @@ func UpdateBarang(c *gin.Context) {
 // Dipakai oleh: admin (DELETE /admin/katalog/barang/:id_barang)
 // Auth: Wajib login, role admin
 func HapusBarang(c *gin.Context) {
+	idBarangStr := c.Param("id_barang")
+	idBarang, err := strconv.Atoi(idBarangStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "ID barang tidak valid",
+		})
+		return
+	}
+
+	var barang models.Barang
+	if err := config.DB.First(&barang, "id_barang = ?", idBarang).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Barang tidak ditemukan",
+		})
+		return
+	}
+
+	if err := config.DB.Delete(&barang).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal menghapus barang",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Barang berhasil dihapus",
@@ -227,21 +402,98 @@ func GetDetailBarangByScan(c *gin.Context) {
 // Dipakai oleh: kasir (GET /kasir/katalog/cari)
 // Auth: Wajib login, role kasir
 func CariProdukTransaksi(c *gin.Context) {
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Parameter pencarian 'q' wajib diisi",
+		})
+		return
+	}
+
+	// Cari di tabel barcode dulu (berdasarkan id_barcode = kode barcode)
+	var barcode models.Barcode
+	barcodeErr := config.DB.
+		Preload("SpesifikasiBarang.Barang.Diskon").
+		Preload("SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
+		Where("id_barcode = ?", query).
+		First(&barcode).Error
+
+	if barcodeErr == nil {
+		// Ditemukan via barcode
+		spek := barcode.SpesifikasiBarang
+		now := time.Now()
+		harga := spek.HargaBarang
+		if spek.Barang.DiskonId != 0 && spek.Barang.Diskon.IdDiskon != 0 {
+			if spek.Barang.Diskon.TglMulai.Before(now) && spek.Barang.Diskon.TglSelesai.After(now) {
+				harga = spek.HargaBarang - (spek.HargaBarang * spek.Barang.Diskon.BesarDiskon / 100)
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"message": "Produk berhasil ditemukan",
+			"data": gin.H{
+				"id_barang":             spek.BarangID,
+				"nama_barang":           spek.Barang.NamaBarang,
+				"gambar_barang":         spek.Barang.GambarBarang,
+				"id_spesifikasi_barang": spek.IdSpesifikasiBarang,
+				"label":                 spek.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi + " " + spek.DetailSpesifikasi.NamaDetailSpesifikasi,
+				"harga_barang":          spek.HargaBarang,
+				"harga_diskon":          harga,
+				"stok":                  spek.Jumlah,
+			},
+		})
+		return
+	}
+
+	// Cari berdasarkan nama barang (LIKE)
+	var barangList []models.Barang
+	config.DB.Where("nama_barang LIKE ?", "%"+query+"%").Limit(10).Find(&barangList)
+
+	if len(barangList) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Produk tidak ditemukan",
+		})
+		return
+	}
+
+	now := time.Now()
+	var responseData []gin.H
+	for _, b := range barangList {
+		var speks []models.SpesifikasiBarang
+		config.DB.Preload("DetailSpesifikasi.Spesifikasi").Where("id_barang = ?", b.IdBarang).Find(&speks)
+		config.DB.Preload("Diskon").First(&b, "id_barang = ?", b.IdBarang)
+
+		var varianList []gin.H
+		for _, v := range speks {
+			harga := v.HargaBarang
+			if b.DiskonId != 0 && b.Diskon.IdDiskon != 0 {
+				if b.Diskon.TglMulai.Before(now) && b.Diskon.TglSelesai.After(now) {
+					harga = v.HargaBarang - (v.HargaBarang * b.Diskon.BesarDiskon / 100)
+				}
+			}
+			varianList = append(varianList, gin.H{
+				"id_spesifikasi_barang": v.IdSpesifikasiBarang,
+				"label":                 v.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi + " " + v.DetailSpesifikasi.NamaDetailSpesifikasi,
+				"harga_barang":          v.HargaBarang,
+				"harga_diskon":          harga,
+				"stok":                  v.Jumlah,
+			})
+		}
+
+		responseData = append(responseData, gin.H{
+			"id_barang":     b.IdBarang,
+			"nama_barang":   b.NamaBarang,
+			"gambar_barang": b.GambarBarang,
+			"varian":        varianList,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Produk berhasil ditemukan",
-		"data": gin.H{
-			"id_produk":    1,
-			"nama_produk":  "Laptop Gaming X",
-			"harga_satuan": 13500000,
-			"gambar":       "https://api.mantra.com/storage/barang/laptop-x.jpg",
-			"varian": []gin.H{
-				{
-					"id_spesifikasi_barang": 5,
-					"label":                 "16GB RAM",
-					"stok":                  5,
-				},
-			},
-		},
+		"data":    responseData,
 	})
 }
