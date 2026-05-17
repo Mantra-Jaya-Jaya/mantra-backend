@@ -1,7 +1,7 @@
 // =============================================================================
 // MANTRA - Database Schema (DBML)
 // Version    : 1.1.0
-// Updated    : 2026-05-09
+// Updated    : 2026-05-17
 // =============================================================================
 //
 // CARA PAKAI FILE INI:
@@ -43,11 +43,13 @@ Table role {
 // Tabel utama autentikasi semua role
 Table user {
   id_user      int       [pk]
+  public_id    uuid      [note: 'gen_random_uuid()']
   id_role      int
   username     varchar
   email        varchar
   password     varchar   [note: 'bcrypt hashed, cost factor 12']
   nama_lengkap varchar
+  foto_profil  varchar
   created_at   timestamp
   updated_at   timestamp
 }
@@ -69,20 +71,26 @@ Table refresh_token {
 
 // Profil kasir. Dibuat oleh Admin
 Table kasir {
-  id_kasir      int       [pk]
-  id_user       int
-  no_telp       varchar
-  alamat        text
-  tanggal_lahir date
-  foto          varchar
-  shift         varchar   [note: 'Pagi | Siang | Malam']
-  created_at    timestamp
-  updated_at    timestamp
+  id_kasir            int       [pk]
+  public_id           uuid      [note: 'gen_random_uuid()']
+  id_user             int
+  no_telp             varchar
+  tempat_lahir        varchar
+  tanggal_lahir       date
+  jenis_kelamin       varchar
+  alamat              text
+  pendidikan_terakhir varchar
+  nik                 varchar
+  status              varchar
+  shift               varchar   [note: 'Pagi | Siang | Malam']
+  created_at          timestamp
+  updated_at          timestamp
 }
 
 // Profil customer. Dibuat saat register mandiri
 Table customer {
   id_customer int       [pk]
+  public_id   uuid      [note: 'gen_random_uuid()']
   id_user     int
   no_telp     varchar
   created_at  timestamp
@@ -91,14 +99,19 @@ Table customer {
 
 // Profil kurir internal. Endpoint belum diimplementasi - roadmap
 Table kurir {
-  id_kurir      int       [pk]
-  id_user       int
-  no_telp       varchar
-  alamat        text
-  tanggal_lahir date
-  foto          varchar
-  created_at    timestamp
-  updated_at    timestamp
+  id_kurir            int       [pk]
+  public_id           uuid      [note: 'gen_random_uuid()']
+  id_user             int
+  no_telp             varchar
+  tempat_lahir        varchar
+  tanggal_lahir       date
+  jenis_kelamin       varchar
+  alamat              text
+  pendidikan_terakhir varchar
+  nik                 varchar
+  status              varchar
+  created_at          timestamp
+  updated_at          timestamp
 }
 
 
@@ -159,6 +172,7 @@ Table barang {
   id_kategori   int
   nama_barang   varchar
   gambar_barang varchar
+  deskripsi     text
   created_at    timestamp
   updated_at    timestamp
 }
@@ -173,7 +187,6 @@ Table spesifikasi {
 Table detail_spesifikasi {
   id_detail_spesifikasi   int  [pk]
   id_spesifikasi          int
-  id_barang               int
   nama_detail_spesifikasi text
 }
 
@@ -189,11 +202,10 @@ Table spesifikasi_barang {
 
 // Pemetaan kode barcode ke barang. Satu barang bisa punya beberapa barcode
 Table barcode {
-  id_barcode   int     [pk]
-  id_barang    int
-  id_satuan    int
-  kode_barcode varchar [note: 'String bukan int agar support leading zero']
-  kuantitas    int     [note: 'Jumlah per scan, misal 1 dus = 12 pcs']
+  id_barcode            int     [pk]
+  id_spesifikasi_barang int
+  id_satuan             int
+  kuantitas             int     [note: 'Jumlah per scan, misal 1 dus = 12 pcs']
 }
 
 
@@ -204,6 +216,7 @@ Table barcode {
 // Tabel utama pesanan online (Flutter Customer) dan offline (Kasir POS)
 Table pesanan {
   id_pesanan       int       [pk]
+  public_id        uuid      [note: 'gen_random_uuid()']
   id_customer      int       [note: 'Null jika pesanan offline/walk-in']
   id_kasir         int       [note: 'Null jika pesanan online mandiri']
   id_alamat        int       [note: 'Null jika pesanan offline']
@@ -279,7 +292,6 @@ Table stok_opname {
   id_stok_opname        int       [pk]
   id_spesifikasi_barang int
   harga_beli            int       [note: 'Harga beli/modal dalam Rupiah']
-  harga_jual            int       [note: 'Harga jual dalam Rupiah']
   status                bool      [note: 'true = stok masuk, false = stok keluar']
   jumlah_stok           int
   keterangan            text
@@ -335,10 +347,9 @@ Ref: barang.id_diskon > diskon.id_diskon
 Ref: barang.id_satuan > satuan.id_satuan
 Ref: barang.id_kategori > kategori.id_kategori
 Ref: detail_spesifikasi.id_spesifikasi > spesifikasi.id_spesifikasi
-Ref: detail_spesifikasi.id_barang > barang.id_barang
 Ref: spesifikasi_barang.id_barang > barang.id_barang
 Ref: spesifikasi_barang.id_detail_spesifikasi > detail_spesifikasi.id_detail_spesifikasi
-Ref: barcode.id_barang > barang.id_barang
+Ref: barcode.id_spesifikasi_barang - spesifikasi_barang.id_spesifikasi_barang
 Ref: barcode.id_satuan > satuan.id_satuan
 
 // Transaksi & Pesanan
