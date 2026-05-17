@@ -444,31 +444,92 @@ func LacakPesanan(c *gin.Context) {
 // Dipakai oleh: kasir (GET /kasir/dashboard)
 // Auth: Wajib login, role kasir
 func GetDashboardKasir(c *gin.Context) {
+	userID := c.GetUint("user_id")
+
+	// Ambil nama kasir dari data user yang login
+	var kasir models.Kasir
+	if err := config.DB.Preload("User").Where("id_user = ?", userID).First(&kasir).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Data kasir tidak ditemukan",
+		})
+		return
+	}
+
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	// Hitung total pendapatan hari ini
+	var totalPendapatan struct{ Total int }
+	config.DB.Model(&models.Pesanan{}).
+		Select("COALESCE(SUM(total_pembayaran), 0) as total").
+		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
+		Scan(&totalPendapatan)
+
+	// Hitung jumlah transaksi hari ini
+	var jumlahTransaksi int64
+	config.DB.Model(&models.Pesanan{}).
+		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
+		Count(&jumlahTransaksi)
+
+	// Hitung total item terjual hari ini
+	var totalItemTerjual struct{ Total int }
+	config.DB.Model(&models.DetailPesanan{}).
+		Select("COALESCE(SUM(detail_pesanan.jumlah), 0) as total").
+		Joins("JOIN pesanan ON pesanan.id_pesanan = detail_pesanan.id_pesanan").
+		Where("pesanan.tanggal_pesanan >= ? AND pesanan.tanggal_pesanan < ?", startOfDay, endOfDay).
+		Scan(&totalItemTerjual)
+
+	// Ambil 5 aktivitas terkini hari ini
+	type AktivitasResult struct {
+		IdPesanan      uint
+		TanggalPesanan time.Time
+		TotalPembayaran int
+		PaymentType    string
+	}
+
+	var aktivitasRaw []AktivitasResult
+	config.DB.Table("pesanan").
+		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(pembayaran.payment_type, 'tunai') as payment_type").
+		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
+		Where("pesanan.tanggal_pesanan >= ? AND pesanan.tanggal_pesanan < ?", startOfDay, endOfDay).
+		Order("pesanan.tanggal_pesanan DESC").
+		Limit(5).
+		Scan(&aktivitasRaw)
+
+	var aktivitasTerkini []gin.H
+	for _, a := range aktivitasRaw {
+		aktivitasTerkini = append(aktivitasTerkini, gin.H{
+			"id_transaksi":       a.IdPesanan,
+			"nomor_invoice":      "INV-" + a.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(a.IdPesanan)),
+			"metode_pembayaran":  a.PaymentType,
+			"waktu":              a.TanggalPesanan.Format("15:04"),
+			"total_bayar":        a.TotalPembayaran,
+		})
+	}
+	if aktivitasTerkini == nil {
+		aktivitasTerkini = []gin.H{}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Data dashboard berhasil diambil",
 		"data": gin.H{
 			"user": gin.H{
-				"nama_kasir":        "Budi Santoso",
+				"nama_kasir":        kasir.User.NamaLengkap,
 				"status_notifikasi": true,
 			},
 			"statistik_hari_ini": gin.H{
-				"total_pendapatan":   1500000,
-				"jumlah_transaksi":   12,
-				"total_item_terjual": 35,
+				"total_pendapatan":   totalPendapatan.Total,
+				"jumlah_transaksi":   jumlahTransaksi,
+				"total_item_terjual": totalItemTerjual.Total,
 			},
-			"aktivitas_terkini": []gin.H{
-				{
-					"id_transaksi":      101,
-					"nomor_invoice":     "INV-20260509-001",
-					"metode_pembayaran": "cash",
-					"waktu":             "09:30",
-					"total_bayar":       125000,
-				},
-			},
+			"aktivitas_terkini": aktivitasTerkini,
 		},
 	})
 }
+
 
 // GetLaporanRingkasan mengambil ringkasan laporan penjualan.
 // Dipakai oleh: kasir (GET /kasir/laporan)

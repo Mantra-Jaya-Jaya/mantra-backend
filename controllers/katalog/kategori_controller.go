@@ -16,7 +16,17 @@ import (
 func GetKategori(c *gin.Context) {
 	kategori := []models.Kategori{}
 
-	if err := config.DB.Find(&kategori).Error; err != nil {
+	query := config.DB.Order("id_kategori ASC")
+
+	limitStr := c.Query("limit")
+	if limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err == nil && limit > 0 {
+			query = query.Limit(limit)
+		}
+	}
+
+	if err := query.Find(&kategori).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal mengambil daftar kategori",

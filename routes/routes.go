@@ -33,6 +33,7 @@ func SetupRoutes(r *gin.Engine) {
 
 		// Customer Routes
 		customerGroup := v1.Group("/customer")
+		customerGroup.Use(middleware.AuthMiddleware())
 		{
 			customerGroup.GET("/promo", katalog.GetPromo)
 			customerGroup.GET("/kategori", katalog.GetKategori)
@@ -48,6 +49,7 @@ func SetupRoutes(r *gin.Engine) {
 			customerGroup.GET("/pesanan/:id_pesanan/lacak", transaksi.LacakPesanan)
 			customerGroup.GET("/profil", user.GetProfilCustomer)
 			customerGroup.PUT("/akun", user.EditAkunCustomer)
+			customerGroup.GET("/alamat", user.GetAlamat)
 			customerGroup.POST("/alamat", user.TambahAlamat)
 			customerGroup.PUT("/alamat/:id_alamat", user.UpdateAlamat)
 			customerGroup.DELETE("/alamat/:id_alamat", user.HapusAlamat)
@@ -55,6 +57,7 @@ func SetupRoutes(r *gin.Engine) {
 
 		// Kasir Routes
 		kasirGroup := v1.Group("/kasir")
+		kasirGroup.Use(middleware.AuthMiddleware())
 		{
 			kasirGroup.GET("/dashboard", transaksi.GetDashboardKasir)
 			kasirGroup.GET("/laporan", transaksi.GetLaporanRingkasan)

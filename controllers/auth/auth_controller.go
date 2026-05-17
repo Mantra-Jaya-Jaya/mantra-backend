@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/mail"
-	"strings"
 	"time"
 
 	"backend-mantra/config"
@@ -105,10 +104,9 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// Deteksi client type
+	// Deteksi client type berdasarkan header khusus (lebih andal dari Authorization)
 	clientType := "nextjs"
-	authHeader := c.GetHeader("Authorization")
-	if strings.HasPrefix(authHeader, "Bearer ") {
+	if c.GetHeader("X-Client-Type") == "flutter" {
 		clientType = "flutter"
 	}
 
