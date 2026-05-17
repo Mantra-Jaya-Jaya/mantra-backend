@@ -1,59 +1,59 @@
-# MANTRA — Backend
+# Mantra Backend Service
 
-Backend service untuk aplikasi MANTRA. Dibangun dengan **Golang + Gin**, database **PostgreSQL**, autentikasi **JWT**.
-
----
-
-## Stack
-
-| Komponen       | Teknologi                        |
-|----------------|----------------------------------|
-| Language       | Go                               |
-| Framework      | Gin                              |
-| Database       | PostgreSQL                       |
-| Auth           | JWT (golang-jwt/jwt)             |
-| Payment        | Midtrans Snap                    |
-| Client Mobile  | Flutter (Customer & Kasir)       |
-| Client Web     | Next.js (Admin)                  |
+Backend service untuk aplikasi MANTRA. Dibangun dengan **Golang + Gin**, database **PostgreSQL**, dan autentikasi **JWT**.
 
 ---
 
-## Arsitektur Singkat
-
-- **Single-tenant** — satu instalasi = satu toko
-- **Stateless JWT** — access token 15 menit, refresh token 7 hari
-- **Flutter** pakai Bearer Token, **Next.js** pakai httpOnly Cookie
-- Semua nilai uang disimpan sebagai `int64` (Rupiah), formatting di sisi client
+## Daftar Isi
+- [1. Overview & Arsitektur](#1-overview--arsitektur)
+- [2. Struktur Folder & Domain](#2-struktur-folder--domain)
+  - [2.1 Penjelasan Direktori](#21-penjelasan-direktori)
+  - [2.2 Domain Controller](#22-domain-controller)
+- [3. Panduan Setup Lokal](#3-panduan-setup-lokal)
+  - [3.1 Prasyarat & Buat Database Kosong](#31-prasyarat--buat-database-kosong)
+  - [3.2 Konfigurasi Environment (.env)](#32-konfigurasi-environment-env)
+  - [3.3 Menjalankan Server](#33-menjalankan-server)
+- [4. Migrasi Database (Atlas CLI)](#4-migrasi-database-atlas-cli)
+  - [4.1 Instalasi Atlas](#41-instalasi-atlas)
+  - [4.2 Workflow Makefile](#42-workflow-makefile)
+- [5. Keamanan & Middleware](#5-keamanan--middleware)
+- [6. Referensi Dokumentasi](#6-referensi-dokumentasi)
 
 ---
 
-## Struktur Folder
+## 1. Overview & Arsitektur
 
-```
+- **Single-tenant:** Satu instalasi = satu toko. Tidak menggunakan multi-tenant.
+- **Stateless JWT:** Access token 15 menit (Bearer/Cookie), refresh token 7 hari.
+- **Multi-Client Support:** Flutter menggunakan Bearer Token, Next.js menggunakan httpOnly Cookie.
+- **Currency Handling:** Semua nilai uang disimpan sebagai `int64` (Rupiah), formatting di sisi client.
+
+---
+
+## 2. Struktur Folder & Domain
+
+### 2.1 Penjelasan Direktori
+
+```text
 backend/
+├── config/             # Konfigurasi koneksi database
 ├── controllers/        # Handler HTTP, diorganisir per domain (bukan per role)
-│   ├── auth/           # Login, logout, register, refresh token, change password
-│   ├── katalog/        # Barang, kategori, diskon, satuan, spesifikasi, barcode
-│   ├── transaksi/      # Pesanan, pembayaran, checkout (online & POS)
-│   ├── pengantaran/    # Pengantaran, ekspedisi, status pengantaran
-│   ├── stok/           # Stok opname, riwayat stok
-│   ├── user/           # Profil customer, kasir, kurir, alamat
-│   ├── notifikasi/     # Notifikasi semua role
-│   └── keranjang/      # Keranjang belanja customer
-├── middleware/         # Auth, Role, Ownership, RateLimit, CORS
-├── models/             # Struct database (sesuai ERD)
-├── routes/             # Definisi route + pemasangan middleware per role
 ├── db/                 # Koneksi dan inisialisasi database
-└── main.go
+├── docs/               # Schema database ERD lengkap (.dbml)
+├── middleware/         # Security checks (Auth, Role, Ownership, RateLimit, CORS)
+├── models/             # Struct database (Representasi tabel GORM)
+├── routes/             # Definisi route + pemasangan middleware per role
+├── seeders/            # Data awal (seeder) untuk database
+├── atlas.hcl           # Konfigurasi Atlas CLI
+├── Makefile            # Daftar perintah Atlas CLI
+└── main.go             # Entry point server Golang
 ```
 
-> **Penting:** Controller diorganisir per **domain bisnis**, bukan per role.
-> Satu function controller bisa dipakai oleh beberapa role sekaligus.
-> Yang mengontrol akses adalah middleware di layer `routes/`, bukan controller.
+> **Catatan Penting Tim:** Buat file struct (tabel) baru HANYA di dalam folder `models/`. Format nama struct wajib Kapital (contoh: `Keranjang`), dan nama field database wajib pakai tag column snake_case (contoh: `gorm:"column:id_kategori"`).
 
----
+### 2.2 Domain Controller
 
-## Domain Controller & Aksesnya
+Controller diorganisir per **domain bisnis**, bukan per role. Satu function controller bisa dipakai oleh beberapa role sekaligus. Yang mengontrol akses adalah middleware di layer `routes/`.
 
 | Domain         | Folder              | Diakses oleh                  |
 |----------------|---------------------|-------------------------------|
@@ -68,36 +68,29 @@ backend/
 
 ---
 
-## Middleware Stack
+## 3. Panduan Setup Lokal
 
-Urutan middleware untuk setiap request:
+Ikuti langkah-langkah di bawah ini secara berurutan agar server berjalan lancar di komputer lokal Anda.
 
-```
-Request → RateLimit → CORS → AuthMiddleware → RoleMiddleware → OwnershipMiddleware → Controller
-```
+### 3.1 Prasyarat & Buat Database Kosong
+1. Pastikan **PostgreSQL** sudah terinstall dan berjalan.
+2. Buat database baru bernama `mantra_db`.
+   ```sql
+   CREATE DATABASE mantra_db;
+   ```
+   *(Cukup bikin databasenya aja, GORM akan otomatis membuatkan tabelnya).*
 
-| Middleware           | Fungsi                                                    |
-|----------------------|-----------------------------------------------------------|
-| `RateLimit`          | Batasi request per IP (login 5/menit, global 60/menit)    |
-| `AuthMiddleware`     | Verifikasi JWT dari Bearer header atau httpOnly Cookie     |
-| `RoleMiddleware`     | Cek role dari JWT claims, tolak jika tidak sesuai         |
-| `OwnershipMiddleware`| Cek kepemilikan resource personal (pesanan, alamat, dll)  |
+### 3.2 Konfigurasi Environment (.env)
+1. Masuk ke folder backend: `cd backend`
+2. Download semua library: `go mod tidy`
+3. Sesuaikan konfigurasi koneksi database. Buka file `config/database.go`, cari baris DSN:
+   ```go
+   dsn := "host=localhost user=postgres password=123456 dbname=mantra_db port=5432 sslmode=disable"
+   ```
+   **WAJIB DIGANTI:** Ubah bagian `password=123456` menjadi password akun PostgreSQL di laptop Anda.
+   *(Nantinya, kita akan migrasi full ke `.env` file untuk hal ini).*
 
----
-
-## Autentikasi
-
-| Client      | Mekanisme                        | Token disimpan di             |
-|-------------|----------------------------------|-------------------------------|
-| Flutter     | `Authorization: Bearer <token>`  | `flutter_secure_storage`      |
-| Next.js     | `httpOnly Cookie`                | Cookie (tidak bisa diakses JS)|
-
-JWT Claims: `user_id`, `role`, `iat`, `exp`
-
----
-
-## Environment Variables
-
+Variabel environment standar yang digunakan:
 ```env
 DB_HOST=
 DB_PORT=
@@ -108,16 +101,62 @@ JWT_SECRET=
 JWT_REFRESH_SECRET=
 MIDTRANS_SERVER_KEY=
 MIDTRANS_CLIENT_KEY=
-ALLOWED_ORIGIN=        # domain Next.js untuk CORS
+ALLOWED_ORIGIN=
 ```
+
+### 3.3 Menjalankan Server
+Jalankan perintah ini di terminal:
+```bash
+go run main.go
+```
+Jika terminal menampilkan `Database Connected & Migrated Successfully!`, berarti API siap diakses di `http://localhost:8080`.
 
 ---
 
-## Dokumentasi Lengkap
+## 4. Migrasi Database (Atlas CLI)
 
-| Dokumen             | Isi                                              |
-|---------------------|--------------------------------------------------|
-| `api-contract.md`   | Semua endpoint, request/response, error codes    |
-| `security-rbac.md`  | JWT, middleware, RBAC, ownership rules           |
-| `mantra.dbml`       | Schema database lengkap (buka di dbdiagram.io)   |
-| `AGENTS.md`         | Panduan untuk AI agent mengerjakan codebase ini  |
+Atlas CLI adalah engine untuk menyinkronkan struktur tabel di PostgreSQL secara otomatis berdasarkan GORM Structs (Single Source of Truth).
+
+### 4.1 Instalasi Atlas
+1. Install Atlas CLI:
+   ```bash
+   curl -sSf https://atlasgo.sh | sh
+   ```
+2. Install Atlas Provider GORM:
+   ```bash
+   go install ariga.io/atlas-provider-gorm@latest
+   ```
+3. Buat database "sandbox" bernama `mantra_dev` di PostgreSQL untuk perbandingan skema:
+   ```sql
+   CREATE DATABASE mantra_dev;
+   ```
+
+### 4.2 Workflow Makefile
+Di folder `backend/`, gunakan perintah `make` untuk manajemen database:
+
+- `make db-diff`: Melihat deteksi perubahan skema tanpa mengeksekusi.
+- `make db-plan`: Simulasi *raw SQL* yang akan dieksekusi (Dry Run).
+- `make db-apply`: Menerapkan perubahan skema secara permanen ke `mantra_db`.
+- `make db-inspect`: Melihat representasi HCL/SQL dari tabel yang ada.
+- `make db-ui`: Membuka visualisasi relasi tabel interaktif di browser lokal.
+
+---
+
+## 5. Keamanan & Middleware
+
+Urutan eksekusi: `Request → RateLimit → CORS → AuthMiddleware → RoleMiddleware → OwnershipMiddleware → Controller`
+
+- **AuthMiddleware:** Verifikasi JWT dari header/cookie.
+- **RoleMiddleware:** Cek role (customer/kasir/admin/kurir).
+- **OwnershipMiddleware:** Cek kepemilikan resource (contoh: pesanan hanya bisa diakses pembeli terkait).
+- **ID Obfuscation:** Menggunakan UUID (`public_id`) untuk endpoint eksternal agar ID tidak bisa ditebak.
+
+---
+
+## 6. Referensi Dokumentasi
+
+| Dokumen                             | Kegunaan                                         |
+|-------------------------------------|--------------------------------------------------|
+| `../docs/api-contract.md`           | Semua endpoint API, request/response, dan error  |
+| `../docs/security-rbac.md`          | Kebijakan JWT, Rate limit, Middleware, RBAC      |
+| `docs/mantra.dbml`                  | Skema ERD Database                               |
