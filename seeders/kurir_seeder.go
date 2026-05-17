@@ -31,6 +31,7 @@ func SeedKurir() {
 		Alamat:             "Kecamatan Selogiri, Kabupaten Wonogiri",
 		PendidikanTerakhir: "SMA Negeri 1 Wonogiri",
 		Nik:                "3312" + gofakeit.DigitN(12), // 16 Digit NIK (Kode Wonogiri 3312)
+		Status:             "Aktif",
 		UserId:             user.IdUser,
 	}
 

@@ -11,9 +11,9 @@ type Barang struct {
 	Deskripsi    string `gorm:"column:deskripsi" json:"deskripsi"`
 
 	//Relasi
-	DiskonId   uint `gorm:"column:id_diskon;unique" json:"id_diskon"`
-	SatuanId   uint `gorm:"column:id_satuan;unique" json:"id_satuan"`
-	KategoriId uint `gorm:"column:id_kategori;unique" json:"id_kategori"`
+	DiskonId   uint `gorm:"column:id_diskon" json:"id_diskon"`
+	SatuanId   uint `gorm:"column:id_satuan" json:"id_satuan"`
+	KategoriId uint `gorm:"column:id_kategori" json:"id_kategori"`
 
 	// Relasi
 	Diskon   Diskon   `gorm:"foreignKey:DiskonId;references:IdDiskon" json:"diskon"`

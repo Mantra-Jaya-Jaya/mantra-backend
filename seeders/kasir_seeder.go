@@ -32,6 +32,8 @@ func SeedKasir() {
 		Alamat:             "Jl. Prof. Sudarto, Tembalang, Kota Semarang",
 		PendidikanTerakhir: "D3 Teknik Komputer",
 		Nik:                "3374" + gofakeit.DigitN(12),
+		Status:             "Aktif",
+		Shift:              "Pagi",
 		UserId:             user.IdUser,
 	}
 
