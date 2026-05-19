@@ -80,7 +80,7 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.GET("/dashboard", user.GetDashboardAdmin)
 			adminGroup.GET("/barang", katalog.GetDaftarBarang)
 			adminGroup.POST("/barang", katalog.TambahBarang)
-			adminGroup.GET("/barang/:id_barang", katalog.GetDetailBarang)
+			adminGroup.GET("/barang/detail/:public_id", katalog.GetDetailBarang)
 			adminGroup.PUT("/barang/:id_barang", katalog.UpdateBarang)
 			adminGroup.DELETE("/barang/:id_barang", katalog.HapusBarang)
 			adminGroup.POST("/barang/:id_barang/diskon", katalog.TambahDiskon)
