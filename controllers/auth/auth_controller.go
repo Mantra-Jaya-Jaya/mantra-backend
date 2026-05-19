@@ -127,7 +127,11 @@ func RefreshToken(c *gin.Context) {
 	tokenStr := req.RefreshToken
 	clientType := "flutter"
 
-	if tokenStr == "" {
+	if c.GetHeader("X-Client-Type") == "nextjs" {
+		clientType = "nextjs"
+	}
+
+	if tokenStr == "" || tokenStr == "token_kosong" {
 		cookieToken, err := c.Cookie("refresh_token")
 		if err == nil && cookieToken != "" {
 			tokenStr = cookieToken
@@ -192,7 +196,11 @@ func Logout(c *gin.Context) {
 	tokenStr := req.RefreshToken
 	clientType := "flutter"
 
-	if tokenStr == "" {
+	if c.GetHeader("X-Client-Type") == "nextjs" {
+		clientType = "nextjs"
+	}
+
+	if tokenStr == "" || tokenStr == "token_kosong" {
 		cookieToken, err := c.Cookie("refresh_token")
 		if err == nil && cookieToken != "" {
 			tokenStr = cookieToken
