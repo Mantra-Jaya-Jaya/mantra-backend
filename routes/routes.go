@@ -89,6 +89,7 @@ func SetupRoutes(r *gin.Engine) {
 		adminGroup := v1.Group("/admin")
 		{
 			adminGroup.GET("/dashboard", user.GetDashboardAdmin)
+			adminGroup.GET("/dashboard/chart", user.GetChartDashboardAdmin)
 			adminGroup.GET("/barang", katalog.GetDaftarBarang)
 			adminGroup.POST("/barang", katalog.TambahBarang)
 			adminGroup.GET("/barang/:id_barang", katalog.GetDetailBarang)
