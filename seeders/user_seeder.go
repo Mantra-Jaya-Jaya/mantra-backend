@@ -4,6 +4,7 @@ import (
 	"backend-mantra/config"
 	"backend-mantra/models"
 	"fmt"
+	"net/url"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -38,11 +39,28 @@ func SeedUser() {
 		// Hash password aslinya SATU PER SATU pas lagi di-loop
 		hashedPassword := hashPassword(data.PasswordAsli)
 
+		// Tentukan warna latar belakang foto profil berdasarkan role
+		bgColor := "fff" // default
+		switch data.NamaRole {
+		case "Admin":
+			bgColor = "6366f1"
+		case "Kasir":
+			bgColor = "10b981"
+		case "Kurir":
+			bgColor = "f59e0b"
+		case "Customer":
+			bgColor = "3b82f6"
+		}
+		
+		// Buat URL Foto Profil otomatis
+		fotoProfil := fmt.Sprintf("https://ui-avatars.com/api/?name=%s&background=%s&color=fff", url.QueryEscape(data.NamaLengkap), bgColor)
+
 		userBaru := models.User{
 			Username:    data.Username,
 			Email:       data.Email,
 			Password:    hashedPassword, // Yang disimpen tetep yang acak (Hashed)
 			NamaLengkap: data.NamaLengkap,
+			FotoProfil:  fotoProfil,
 			RoleID:      role.IdRole,
 		}
 

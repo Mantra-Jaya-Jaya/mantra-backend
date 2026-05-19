@@ -14,6 +14,8 @@ func RunAllSeeders() {
 	SeedDiskon()
 	SeedSatuan()
 	SeedSpesifikasi()
+	SeedEkspedisi()
+	SeedStatusPengantaran()
 
 	// Panggil seeder Child
 	SeedUser()
@@ -28,6 +30,10 @@ func RunAllSeeders() {
 	SeedStokOpname()
 	SeedPesanan()
 	SeedDetailPesanan()
+	SeedPembayaran()
+	SeedPengantaran()
+	SeedKeranjang()
+	SeedNotifikasi()
 
 	fmt.Println("======================================")
 	fmt.Println("SEMUA DATA BERHASIL DI-SEED!")
