@@ -12,10 +12,7 @@ type Barcode struct {
   SpesifikasiBarangId uint `gorm:"column:id_spesifikasi_barang" json:"id_spesifikasi_barang"`
   
   // Relasi ke Satuan (Diambil dari branch feat/flutter-auth-integration)
-  SatuanId            uint `gorm:"column:id_satuan" json:"id_satuan"`
-
-	// Relasi ke Satuan (Diambil dari branch feat/flutter-auth-integration)
-	SatuanId uint `gorm:"column:id_satuan;unique" json:"id_satuan"`
+  SatuanId            uint `gorm:"column:id_satuan;unique" json:"id_satuan"`
 
 	// Relasi ke Barang/SpesifikasiBarang (Mengikuti penamaan terbaru di branch dev)
 	SpesifikasiBarang SpesifikasiBarang `gorm:"foreignKey:SpesifikasiBarangId;references:IdSpesifikasiBarang" json:"spesifikasi_barang"`

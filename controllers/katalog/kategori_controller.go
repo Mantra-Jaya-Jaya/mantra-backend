@@ -45,17 +45,25 @@ func GetKategori(c *gin.Context) {
 // Dipakai oleh: admin (POST /admin/katalog/kategori)
 // Auth: Wajib login, role admin
 func TambahKategori(c *gin.Context) {
-	var inputKategori models.Kategori
+	var input struct {
+		NamaKategori string `json:"nama_kategori" binding:"required"`
+		IconKategori string `json:"icon_kategori"`
+	}
 
-	if err := c.ShouldBindJSON(&inputKategori); err != nil {
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
-			"message": "Format inputan salah, pastikan pakai JSON yang benar",
+			"message": "Format inputan salah atau data tidak lengkap: " + err.Error(),
 		})
 		return
 	}
 
-	if err := config.DB.Create(&inputKategori).Error; err != nil {
+	kategori := models.Kategori{
+		NamaKategori: input.NamaKategori,
+		IconKategori: input.IconKategori,
+	}
+
+	if err := config.DB.Create(&kategori).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal menyimpan data kategori ke database",
@@ -66,7 +74,7 @@ func TambahKategori(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"status":  "success",
 		"message": "Kategori berhasil ditambahkan",
-		"data":    inputKategori,
+		"data":    kategori,
 	})
 }
 
@@ -114,6 +122,14 @@ func UpdateKategori(c *gin.Context) {
 		updates["icon_kategori"] = input.IconKategori
 	}
 
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Tidak ada data yang diubah",
+		})
+		return
+	}
+
 	if err := config.DB.Model(&kategori).Updates(updates).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -148,6 +164,24 @@ func HapusKategori(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Kategori tidak ditemukan",
+		})
+		return
+	}
+
+	// Cek apakah kategori masih digunakan oleh barang
+	var count int64
+	if err := config.DB.Model(&models.Barang{}).Where("id_kategori = ?", idKategori).Count(&count).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal memeriksa keterkaitan barang dengan kategori",
+		})
+		return
+	}
+
+	if count > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Kategori tidak dapat dihapus karena masih digunakan oleh produk lain",
 		})
 		return
 	}
