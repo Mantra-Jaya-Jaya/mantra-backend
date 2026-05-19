@@ -2,6 +2,8 @@ package models
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func (Pengantaran) TableName() string {
@@ -10,6 +12,7 @@ func (Pengantaran) TableName() string {
 
 type Pengantaran struct {
 	IdPengantaran       uint      `gorm:"primaryKey;column:id_pengantaran" json:"id_pengantaran"`
+	PublicId            uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
 	WaktuPickup         time.Time `gorm:"column:waktu_pickup" json:"waktu_pickup"`
 	WaktuSampai         time.Time `gorm:"column:waktu_sampai" json:"waktu_sampai"`
 	LastLatitude        float64   `gorm:"column:last_latitude" json:"last_latitude"`

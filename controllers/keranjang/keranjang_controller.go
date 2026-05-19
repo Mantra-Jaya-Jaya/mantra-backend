@@ -110,7 +110,7 @@ func UpdateKeranjang(c *gin.Context) {
 	customerID := result.IdCustomer
 
 	var keranjang models.Keranjang
-	if err := config.DB.Where("id_keranjang = ? AND id_customer = ?", idKeranjang, customerID).First(&keranjang).Error; err != nil {
+	if err := config.DB.Where("public_id = ? AND id_customer = ?", idKeranjang, customerID).First(&keranjang).Error; err != nil {
 		// Ownership violation: selalu 403, bukan 404
 		c.JSON(http.StatusForbidden, gin.H{
 			"status":  "error",
@@ -157,7 +157,7 @@ func HapusItemKeranjang(c *gin.Context) {
 	}
 	customerID := result.IdCustomer
 
-	deleteResult := config.DB.Where("id_keranjang = ? AND id_customer = ?", idKeranjang, customerID).Delete(&models.Keranjang{})
+	deleteResult := config.DB.Where("public_id = ? AND id_customer = ?", idKeranjang, customerID).Delete(&models.Keranjang{})
 
 	if deleteResult.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -233,7 +233,7 @@ func GetKeranjang(c *gin.Context) {
 		}
 
 		responseData = append(responseData, gin.H{
-			"id_keranjang":          item.IdKeranjang,
+			"id_keranjang":          item.PublicId,
 			"id_spesifikasi_barang": item.SpesifikasiBarangID,
 			"nama_barang":           b.NamaBarang,
 			"varian":                item.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi + " " + item.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi,

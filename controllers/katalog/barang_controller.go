@@ -24,6 +24,7 @@ func GetDaftarBarang(c *gin.Context) {
 
 	type ProductResult struct {
 		IdBarang       uint
+		PublicId       string
 		NamaBarang     string
 		GambarBarang   string
 		HargaTerendah  int
@@ -44,11 +45,11 @@ func GetDaftarBarang(c *gin.Context) {
 	// Ambil data barang dengan join spesifikasi, diskon, dan kategori
 	config.DB.Table("barang").
 		// 🚀 2. SUNTIK SUM(spesifikasi_barang.jumlah) DI SELECT NYA
-		Select("barang.id_barang, barang.nama_barang, barang.gambar_barang, MIN(spesifikasi_barang.harga_barang) as harga_terendah, MAX(spesifikasi_barang.harga_barang) as harga_tertinggi, SUM(spesifikasi_barang.jumlah) as total_stok, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
+		Select("barang.id_barang, barang.public_id, barang.nama_barang, barang.gambar_barang, MIN(spesifikasi_barang.harga_barang) as harga_terendah, MAX(spesifikasi_barang.harga_barang) as harga_tertinggi, SUM(spesifikasi_barang.jumlah) as total_stok, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
 		Joins("LEFT JOIN spesifikasi_barang ON spesifikasi_barang.id_barang = barang.id_barang").
 		Joins("LEFT JOIN diskon ON diskon.id_diskon = barang.id_diskon").
 		Joins("LEFT JOIN kategori ON kategori.id_kategori = barang.id_kategori").
-		Group("barang.id_barang, barang.nama_barang, barang.gambar_barang, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
+		Group("barang.id_barang, barang.public_id, barang.nama_barang, barang.gambar_barang, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
 		Limit(limit).Offset(offset).
 		Scan(&results)
 
@@ -66,7 +67,7 @@ func GetDaftarBarang(c *gin.Context) {
 		}
 
 		responseData = append(responseData, gin.H{
-			"id_barang":       r.IdBarang,
+			"id_barang":       r.PublicId,
 			"nama_barang":     r.NamaBarang,
 			"harga_terendah":  r.HargaTerendah,
 			"harga_tertinggi": r.HargaTertinggi,
@@ -105,21 +106,13 @@ func GetDaftarBarang(c *gin.Context) {
 // Auth: Wajib login, role admin
 func GetDetailBarang(c *gin.Context) {
 	idBarangStr := c.Param("id_barang")
-	idBarang, err := strconv.Atoi(idBarangStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "ID barang tidak valid",
-		})
-		return
-	}
 
 	var barang models.Barang
 	if err := config.DB.
 		Preload("Kategori").
 		Preload("Satuan").
 		Preload("Diskon").
-		First(&barang, "id_barang = ?", idBarang).Error; err != nil {
+		First(&barang, "public_id = ?", idBarangStr).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Barang tidak ditemukan",
@@ -131,7 +124,7 @@ func GetDetailBarang(c *gin.Context) {
 	var varians []models.SpesifikasiBarang
 	config.DB.
 		Preload("DetailSpesifikasi.Spesifikasi").
-		Where("id_barang = ?", idBarang).
+		Where("id_barang = ?", barang.IdBarang).
 		Find(&varians)
 
 	now := time.Now()
@@ -169,7 +162,7 @@ func GetDetailBarang(c *gin.Context) {
 		"status":  "success",
 		"message": "Detail barang berhasil diambil",
 		"data": gin.H{
-			"id_barang":     barang.IdBarang,
+			"id_barang":     barang.PublicId,
 			"nama_barang":   barang.NamaBarang,
 			"deskripsi":     barang.Deskripsi,
 			"gambar_barang": barang.GambarBarang,
@@ -223,7 +216,7 @@ func TambahBarang(c *gin.Context) {
 		"status":  "success",
 		"message": "Barang berhasil ditambahkan",
 		"data": gin.H{
-			"id_barang":   barang.IdBarang,
+			"id_barang":   barang.PublicId,
 			"nama_barang": barang.NamaBarang,
 		},
 	})
@@ -234,17 +227,9 @@ func TambahBarang(c *gin.Context) {
 // Auth: Wajib login, role admin
 func UpdateBarang(c *gin.Context) {
 	idBarangStr := c.Param("id_barang")
-	idBarang, err := strconv.Atoi(idBarangStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "ID barang tidak valid",
-		})
-		return
-	}
 
 	var barang models.Barang
-	if err := config.DB.First(&barang, "id_barang = ?", idBarang).Error; err != nil {
+	if err := config.DB.First(&barang, "public_id = ?", idBarangStr).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Barang tidak ditemukan",
@@ -308,17 +293,9 @@ func UpdateBarang(c *gin.Context) {
 // Auth: Wajib login, role admin
 func HapusBarang(c *gin.Context) {
 	idBarangStr := c.Param("id_barang")
-	idBarang, err := strconv.Atoi(idBarangStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "ID barang tidak valid",
-		})
-		return
-	}
 
 	var barang models.Barang
-	if err := config.DB.First(&barang, "id_barang = ?", idBarang).Error; err != nil {
+	if err := config.DB.First(&barang, "public_id = ?", idBarangStr).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Barang tidak ditemukan",

@@ -86,7 +86,7 @@ func UpdateLokasiKurir(c *gin.Context) {
 
 	// 2. Cari data pengantaran dan periksa kepemilikan (ownership check)
 	var pengantaran models.Pengantaran
-	if err := config.DB.Where("id_pengantaran = ?", idPengantaran).First(&pengantaran).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", idPengantaran).First(&pengantaran).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Data pengantaran tidak ditemukan",

@@ -46,7 +46,7 @@ func GetAlamat(c *gin.Context) {
 	var data []gin.H
 	for _, a := range alamats {
 		data = append(data, gin.H{
-			"id_alamat":        a.IdAlamat,
+			"id_alamat":        a.PublicId,
 			"label_alamat":     a.LabelAlamat,
 			"nama_penerima":    a.NamaPenerima,
 			"no_telp_penerima": a.NoTelpPenerima,
@@ -157,7 +157,7 @@ func TambahAlamat(c *gin.Context) {
 		"status":  "success",
 		"message": "Alamat baru berhasil ditambahkan",
 		"data": gin.H{
-			"id_alamat":    newAlamat.IdAlamat,
+			"id_alamat":    newAlamat.PublicId,
 			"label_alamat": newAlamat.LabelAlamat,
 			"is_utama":     newAlamat.IsUtama,
 		},
@@ -206,7 +206,7 @@ func UpdateAlamat(c *gin.Context) {
 	err := config.DB.Raw(`
 		SELECT COUNT(*) FROM alamat a
 		JOIN customer c ON c.id_customer = a.id_customer
-		WHERE a.id_alamat = ? AND c.id_user = ?
+		WHERE a.public_id = ? AND c.id_user = ?
 	`, idAlamat, uid).Scan(&count).Error
 
 	if err != nil || count == 0 {
@@ -219,7 +219,7 @@ func UpdateAlamat(c *gin.Context) {
 	}
 
 	var alamat models.Alamat
-	if err := config.DB.First(&alamat, idAlamat).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", idAlamat).First(&alamat).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Alamat tidak ditemukan",
@@ -281,7 +281,7 @@ func UpdateAlamat(c *gin.Context) {
 		"status":  "success",
 		"message": "Alamat berhasil diperbarui",
 		"data": gin.H{
-			"id_alamat":    alamat.IdAlamat,
+			"id_alamat":    alamat.PublicId,
 			"label_alamat": alamat.LabelAlamat,
 			"is_utama":     alamat.IsUtama,
 		},
@@ -309,7 +309,7 @@ func HapusAlamat(c *gin.Context) {
 	err := config.DB.Raw(`
 		SELECT COUNT(*) FROM alamat a
 		JOIN customer c ON c.id_customer = a.id_customer
-		WHERE a.id_alamat = ? AND c.id_user = ?
+		WHERE a.public_id = ? AND c.id_user = ?
 	`, idAlamat, uid).Scan(&count).Error
 
 	if err != nil || count == 0 {
@@ -321,7 +321,7 @@ func HapusAlamat(c *gin.Context) {
 		return
 	}
 
-	if err := config.DB.Delete(&models.Alamat{}, idAlamat).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", idAlamat).Delete(&models.Alamat{}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal menghapus alamat",

@@ -91,7 +91,7 @@ func GetDaftarPesanan(c *gin.Context) {
 			items = []gin.H{}
 		}
 		responseData = append(responseData, gin.H{
-			"id_pesanan":    strconv.FormatUint(uint64(p.IdPesanan), 10),
+			"id_pesanan":    p.PublicId,
 			"status":        p.StatusPesanan,
 			"tanggal_pesan": p.TanggalPesanan,
 			"total_bayar":   p.TotalPembayaran,
@@ -128,7 +128,7 @@ func GetDetailPesanan(c *gin.Context) {
 	userID := c.GetInt64("user_id")
 
 	var pesanan models.Pesanan
-	query := config.DB.Preload("Alamat").Where("id_pesanan = ?", idPesanan)
+	query := config.DB.Preload("Alamat").Where("public_id = ?", idPesanan)
 
 	if role == "customer" {
 		// Ownership check: pesanan harus milik customer yang login
@@ -136,7 +136,7 @@ func GetDetailPesanan(c *gin.Context) {
 		config.DB.Raw(`
 			SELECT COUNT(*) FROM pesanan p
 			JOIN customer c ON c.id_customer = p.id_customer
-			WHERE p.id_pesanan = ? AND c.id_user = ?
+			WHERE p.public_id = ? AND c.id_user = ?
 		`, idPesanan, userID).Scan(&count)
 
 		if count == 0 {
@@ -203,7 +203,7 @@ func GetDetailPesanan(c *gin.Context) {
 		"status":  "success",
 		"message": "Detail pesanan berhasil diambil",
 		"data": gin.H{
-			"no_pesanan":         strconv.FormatUint(uint64(pesanan.IdPesanan), 10),
+			"no_pesanan":         pesanan.PublicId,
 			"status":             pesanan.StatusPesanan,
 			"tanggal_pesan":      pesanan.TanggalPesanan,
 			"items":              items,
@@ -339,7 +339,7 @@ func CheckoutPesanan(c *gin.Context) {
 		"status":  "success",
 		"message": "Pesanan berhasil dibuat",
 		"data": gin.H{
-			"id_pesanan":     strconv.FormatUint(uint64(pesanan.IdPesanan), 10),
+			"id_pesanan":     pesanan.PublicId,
 			"midtrans_token": "token-untuk-sdk-flutter",
 			"redirect_url":   "https://app.sandbox.midtrans.com/snap/v2/vtweb/...",
 		},
@@ -359,7 +359,7 @@ func BatalkanPesanan(c *gin.Context) {
 	config.DB.Raw(`
 		SELECT COUNT(*) FROM pesanan p
 		JOIN customer c ON c.id_customer = p.id_customer
-		WHERE p.id_pesanan = ? AND c.id_user = ?
+		WHERE p.public_id = ? AND c.id_user = ?
 	`, idPesanan, userID).Scan(&count)
 
 	if count == 0 {
@@ -375,7 +375,7 @@ func BatalkanPesanan(c *gin.Context) {
 	}
 
 	var pesanan models.Pesanan
-	if err := config.DB.Where("id_pesanan = ?", idPesanan).First(&pesanan).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", idPesanan).First(&pesanan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak ditemukan",
@@ -413,7 +413,10 @@ func LacakPesanan(c *gin.Context) {
 	idPesanan := c.Param("id_pesanan")
 
 	var pengantaran models.Pengantaran
-	if err := config.DB.Preload("Kurir.User").Where("id_pesanan = ?", idPesanan).First(&pengantaran).Error; err != nil {
+	if err := config.DB.Preload("Kurir.User").
+		Joins("JOIN pesanan ON pesanan.id_pesanan = pengantaran.id_pesanan").
+		Where("pesanan.public_id = ?", idPesanan).
+		First(&pengantaran).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Data pelacakan untuk pesanan ini tidak ditemukan",
@@ -636,7 +639,7 @@ func GetLaporanRingkasan(c *gin.Context) {
 func GetDetailLaporanProduk(c *gin.Context) {
 	idProdukStr := c.Param("id_produk")
 	var barang models.Barang
-	if err := config.DB.Preload("Kategori").First(&barang, "id_barang = ?", idProdukStr).Error; err != nil {
+	if err := config.DB.Preload("Kategori").First(&barang, "public_id = ?", idProdukStr).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Produk tidak ditemukan",
@@ -685,7 +688,7 @@ func GetDetailLaporanProduk(c *gin.Context) {
 		"message": "Detail produk berhasil diambil",
 		"data": gin.H{
 			"produk": gin.H{
-				"id_produk":   barang.IdBarang,
+				"id_produk":   barang.PublicId,
 				"nama_produk": barang.NamaBarang,
 				"kategori":    barang.Kategori.NamaKategori,
 				"gambar":      barang.GambarBarang,
@@ -707,7 +710,7 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 	idPesananStr := c.Param("id_pesanan")
 
 	var pesanan models.Pesanan
-	if err := config.DB.Preload("Customer.User").Preload("Alamat").First(&pesanan, "id_pesanan = ?", idPesananStr).Error; err != nil {
+	if err := config.DB.Preload("Customer.User").Preload("Alamat").First(&pesanan, "public_id = ?", idPesananStr).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak ditemukan",

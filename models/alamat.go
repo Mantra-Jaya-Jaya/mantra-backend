@@ -1,11 +1,16 @@
 package models
 
+import (
+	"github.com/google/uuid"
+)
+
 func (Alamat) TableName() string {
 	return "alamat"
 }
 
 type Alamat struct {
-	IdAlamat       uint    `gorm:"primaryKey;column:id_alamat" json:"id_alamat"`
+	IdAlamat       uint      `gorm:"primaryKey;column:id_alamat" json:"id_alamat"`
+	PublicId       uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
 	CustomerId     uint    `gorm:"column:id_customer" json:"id_customer"`
 	NamaPenerima   string  `gorm:"column:nama_penerima" json:"nama_penerima"`
 	LabelAlamat    string  `gorm:"column:label_alamat" json:"label_alamat"`

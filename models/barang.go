@@ -1,12 +1,17 @@
 package models
 
+import (
+	"github.com/google/uuid"
+)
+
 func (Barang) TableName() string {
 	return "barang"
 }
 
 type Barang struct {
-	IdBarang     uint   `gorm:"primaryKey;column:id_barang" json:"id_barang"`
-	NamaBarang   string `gorm:"column:nama_barang" json:"nama_barang"`
+	IdBarang     uint      `gorm:"primaryKey;column:id_barang" json:"id_barang"`
+	PublicId     uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
+	NamaBarang   string    `gorm:"column:nama_barang" json:"nama_barang"`
 	GambarBarang string `gorm:"column:gambar_barang" json:"gambar_barang"`
 	Deskripsi    string `gorm:"column:deskripsi" json:"deskripsi"`
 

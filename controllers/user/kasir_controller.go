@@ -272,7 +272,7 @@ func GetDetailKasir(c *gin.Context) {
 	idKasir := c.Param("id_kasir")
 
 	var kasir models.Kasir
-	if err := config.DB.Preload("User").Where("id_kasir = ?", idKasir).First(&kasir).Error; err != nil {
+	if err := config.DB.Preload("User").Where("public_id = ?", idKasir).First(&kasir).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Detail kasir tidak ditemukan",
@@ -293,7 +293,7 @@ func GetDetailKasir(c *gin.Context) {
 		"status":  "success",
 		"message": "Detail kasir berhasil diambil",
 		"data": gin.H{
-			"id_kasir":            kasir.IdKasir,
+			"id_kasir":            kasir.PublicId,
 			"public_id":           kasir.PublicId,
 			"no_telp":             kasir.NoTelp,
 			"tempat_lahir":        kasir.TempatLahir,
@@ -340,7 +340,7 @@ func UpdateKasir(c *gin.Context) {
 	}
 
 	var kasir models.Kasir
-	if err := config.DB.Preload("User").Where("id_kasir = ?", idKasir).First(&kasir).Error; err != nil {
+	if err := config.DB.Preload("User").Where("public_id = ?", idKasir).First(&kasir).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Data kasir tidak ditemukan",
@@ -428,7 +428,7 @@ func HapusKasir(c *gin.Context) {
 	idKasir := c.Param("id_kasir")
 
 	var kasir models.Kasir
-	if err := config.DB.Where("id_kasir = ?", idKasir).First(&kasir).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", idKasir).First(&kasir).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Data kasir tidak ditemukan",
