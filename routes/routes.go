@@ -5,6 +5,8 @@ import (
 	"backend-mantra/controllers/katalog"
 	"backend-mantra/controllers/keranjang"
 	"backend-mantra/controllers/notifikasi"
+	"backend-mantra/controllers/pengantaran"
+	"backend-mantra/controllers/stok"
 	"backend-mantra/controllers/transaksi"
 	"backend-mantra/controllers/user"
 	"backend-mantra/middleware"
@@ -75,6 +77,14 @@ func SetupRoutes(r *gin.Engine) {
 			kasirGroup.GET("/notifikasi", notifikasi.GetNotifikasi)
 		}
 
+		// Kurir Routes
+		kurirGroup := v1.Group("/kurir")
+		kurirGroup.Use(middleware.AuthMiddleware())
+		{
+			kurirGroup.GET("/pengantaran", pengantaran.GetDaftarPengantaran)
+			kurirGroup.PATCH("/pengantaran/:id_pengantaran/lokasi", pengantaran.UpdateLokasiKurir)
+		}
+
 		// Admin Routes
 		adminGroup := v1.Group("/admin")
 		{
@@ -97,8 +107,11 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.PUT("/karyawan/kurir/:id_kurir", user.UpdateKurir)
 			adminGroup.DELETE("/karyawan/kurir/:id_kurir", user.HapusKurir)
 			adminGroup.GET("/notifikasi", notifikasi.GetNotifikasiAdmin)
+			adminGroup.GET("/pengantaran", pengantaran.GetDaftarPengantaran)
 			adminGroup.GET("/profil", user.GetProfilAdmin)
 			adminGroup.PUT("/profil", user.UpdateProfilAdmin)
+			adminGroup.GET("/stok/riwayat", stok.GetRiwayatStok)
+			adminGroup.POST("/stok/opname", stok.OpnameStok)
 		}
 	}
 }
