@@ -127,7 +127,11 @@ func RefreshToken(c *gin.Context) {
 	tokenStr := req.RefreshToken
 	clientType := "flutter"
 
-	if tokenStr == "" {
+	if c.GetHeader("X-Client-Type") == "nextjs" {
+		clientType = "nextjs"
+	}
+
+	if tokenStr == "" || tokenStr == "token_kosong" {
 		cookieToken, err := c.Cookie("refresh_token")
 		if err == nil && cookieToken != "" {
 			tokenStr = cookieToken
@@ -192,7 +196,11 @@ func Logout(c *gin.Context) {
 	tokenStr := req.RefreshToken
 	clientType := "flutter"
 
-	if tokenStr == "" {
+	if c.GetHeader("X-Client-Type") == "nextjs" {
+		clientType = "nextjs"
+	}
+
+	if tokenStr == "" || tokenStr == "token_kosong" {
 		cookieToken, err := c.Cookie("refresh_token")
 		if err == nil && cookieToken != "" {
 			tokenStr = cookieToken
@@ -200,7 +208,7 @@ func Logout(c *gin.Context) {
 		}
 	}
 
-	if tokenStr == "" {
+	if tokenStr == "" && clientType != "nextjs" {
 		RespondWithError(c, http.StatusBadRequest, "Input tidak valid", "VAL_001", "Refresh token tidak ditemukan")
 		return
 	}
@@ -222,19 +230,23 @@ func Logout(c *gin.Context) {
 		}
 	}
 
-	now := time.Now()
-	// Update RevokedAt untuk token yang bersangkutan & milik user tsb
-	result := config.DB.Model(&models.RefreshToken{}).
-		Where("token = ? AND id_user = ?", tokenStr, uid).
-		Update("revoked_at", &now)
+	if tokenStr != "" {
+		now := time.Now()
+		// Update RevokedAt untuk token yang bersangkutan & milik user tsb
+		result := config.DB.Model(&models.RefreshToken{}).
+			Where("token = ? AND id_user = ?", tokenStr, uid).
+			Update("revoked_at", &now)
 
-	if result.Error != nil {
-		RespondWithError(c, http.StatusInternalServerError, "Gagal melakukan logout", "SERVER_001", result.Error.Error())
-		return
+		if result.Error != nil {
+			RespondWithError(c, http.StatusInternalServerError, "Gagal melakukan logout", "SERVER_001", result.Error.Error())
+			return
+		}
 	}
 
 	if clientType == "nextjs" {
 		c.SetCookie("access_token", "", -1, "/", "", true, true)
+		c.SetCookie("refresh_token", "", -1, "/", "", true, true)
+		// Juga bersihkan path lama jika user masih menyimpannya
 		c.SetCookie("refresh_token", "", -1, "/api/v1/auth/refresh", "", true, true)
 	}
 

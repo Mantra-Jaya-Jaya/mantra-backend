@@ -38,7 +38,7 @@ func RespondWithSuccess(c *gin.Context, clientType string, user models.User, rol
 		// Set cookie sesuai kontrak: HttpOnly; Secure; SameSite=Strict
 		// Gin SetCookie params: name, value string, maxAge int, path, domain string, secure, httpOnly bool
 		c.SetCookie("access_token", accessToken, 900, "/", "", true, true)
-		c.SetCookie("refresh_token", refreshToken, 604800, "/api/v1/auth/refresh", "", true, true)
+		c.SetCookie("refresh_token", refreshToken, 604800, "/", "", true, true)
 
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",

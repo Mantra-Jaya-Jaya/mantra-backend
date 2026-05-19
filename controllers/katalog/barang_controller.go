@@ -40,11 +40,24 @@ func GetDaftarBarang(c *gin.Context) {
   var results []ProductResult
   var total int64
 
+  kategoriIdStr := c.Query("id_kategori")
+
+  queryCount := config.DB.Model(&models.Barang{})
+  querySelect := config.DB.Table("barang")
+
+  if kategoriIdStr != "" {
+    kategoriId, err := strconv.Atoi(kategoriIdStr)
+    if err == nil && kategoriId > 0 {
+      queryCount = queryCount.Where("id_kategori = ?", kategoriId)
+      querySelect = querySelect.Where("barang.id_kategori = ?", kategoriId)
+    }
+  }
+
   // Hitung total barang
-  config.DB.Model(&models.Barang{}).Count(&total)
+  queryCount.Count(&total)
 
   // Ambil data barang dengan join spesifikasi, diskon, dan kategori
-  config.DB.Table("barang").
+  querySelect.
     // 2. MASUKKIN barang.public_id KE DALAM SELECT
     Select("barang.id_barang, barang.public_id, barang.nama_barang, barang.gambar_barang, MIN(spesifikasi_barang.harga_barang) as harga_terendah, MAX(spesifikasi_barang.harga_barang) as harga_tertinggi, SUM(spesifikasi_barang.jumlah) as total_stok, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
     Joins("LEFT JOIN spesifikasi_barang ON spesifikasi_barang.id_barang = barang.id_barang").
