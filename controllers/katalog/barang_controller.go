@@ -7,6 +7,7 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -614,4 +615,27 @@ func CariProdukTransaksi(c *gin.Context) {
 		"message": "Produk berhasil ditemukan",
 		"data":    responseData,
 	})
+}
+
+
+// UploadGambarBarang handle proses upload dari Next.js ke MinIO
+// Dipakai oleh: POST /api/v1/admin/upload
+func UploadGambarBarang(c *gin.Context) {
+  // 1. Panggil helper sakti yang kita buat kemarin
+  // Kita set fileKey-nya "gambar" dan folderTarget-nya "produk"
+  fileUrl, err := utils.UploadFileToMinio(c, "gambar", "produk")
+  if err != nil {
+    c.JSON(http.StatusBadRequest, gin.H{
+      "status":  "error",
+      "message": "Gagal mengunggah gambar: " + err.Error(),
+    })
+    return
+  }
+
+  // 2. Kembalikan URL publik MinIO ke Next.js
+  c.JSON(http.StatusOK, gin.H{
+    "status":  "success",
+    "message": "Gambar berhasil diunggah ke server storage",
+    "url":     fileUrl, // URL ini yang nanti dikirim Next.js ke TambahBarang
+  })
 }

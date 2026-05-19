@@ -19,6 +19,9 @@ func main() {
 	// Seed data ke tabel
 	seeders.RunAllSeeders()
 
+	// Inisialisasi MinIO
+	config.InitMinio()
+
 	// Inisialisasi Gin router
 	r := gin.Default()
 
