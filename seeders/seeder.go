@@ -24,6 +24,7 @@ func RunAllSeeders() {
 	SeedBarang()
 	SeedDetailSpesifikasi()
 	SeedSpesifikasiBarang()
+	SeedBarcode()
 	SeedStokOpname()
 	SeedPesanan()
 	SeedDetailPesanan()
