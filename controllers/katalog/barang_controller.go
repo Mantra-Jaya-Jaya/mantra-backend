@@ -15,89 +15,89 @@ import (
 // Dipakai oleh: customer (GET /customer/katalog/barang), kasir (GET /kasir/katalog/barang), admin (GET /admin/katalog/barang)
 // Auth: Wajib login, semua role boleh akses (dikontrol di route)
 func GetDaftarBarang(c *gin.Context) {
-  pageStr := c.DefaultQuery("page", "1")
-  limitStr := c.DefaultQuery("limit", "10")
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "10")
 
-  page, _ := strconv.Atoi(pageStr)
-  limit, _ := strconv.Atoi(limitStr)
-  offset := (page - 1) * limit
+	page, _ := strconv.Atoi(pageStr)
+	limit, _ := strconv.Atoi(limitStr)
+	offset := (page - 1) * limit
 
-  type ProductResult struct {
-    IdBarang       uint
-    NamaBarang     string
-    GambarBarang   string
-    HargaTerendah  int
-    HargaTertinggi int
-    BesarDiskon    int
-    TglMulai       *time.Time
-    TglSelesai     *time.Time
-    NamaKategori   string
-    TotalStok      int // 🚀 1. TAMBAH KEY BUAT NAMPUNG TOTAL STOK GABUNGAN
-  }
+	type ProductResult struct {
+		IdBarang       uint
+		NamaBarang     string
+		GambarBarang   string
+		HargaTerendah  int
+		HargaTertinggi int
+		BesarDiskon    int
+		TglMulai       *time.Time
+		TglSelesai     *time.Time
+		NamaKategori   string
+		TotalStok      int // 🚀 1. TAMBAH KEY BUAT NAMPUNG TOTAL STOK GABUNGAN
+	}
 
-  var results []ProductResult
-  var total int64
+	var results []ProductResult
+	var total int64
 
-  // Hitung total barang
-  config.DB.Model(&models.Barang{}).Count(&total)
+	// Hitung total barang
+	config.DB.Model(&models.Barang{}).Count(&total)
 
-  // Ambil data barang dengan join spesifikasi, diskon, dan kategori
-  config.DB.Table("barang").
-    // 🚀 2. SUNTIK SUM(spesifikasi_barang.jumlah) DI SELECT NYA
-    Select("barang.id_barang, barang.nama_barang, barang.gambar_barang, MIN(spesifikasi_barang.harga_barang) as harga_terendah, MAX(spesifikasi_barang.harga_barang) as harga_tertinggi, SUM(spesifikasi_barang.jumlah) as total_stok, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
-    Joins("LEFT JOIN spesifikasi_barang ON spesifikasi_barang.id_barang = barang.id_barang").
-    Joins("LEFT JOIN diskon ON diskon.id_diskon = barang.id_diskon").
-    Joins("LEFT JOIN kategori ON kategori.id_kategori = barang.id_kategori").
-    Group("barang.id_barang, barang.nama_barang, barang.gambar_barang, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
-    Limit(limit).Offset(offset).
-    Scan(&results)
+	// Ambil data barang dengan join spesifikasi, diskon, dan kategori
+	config.DB.Table("barang").
+		// 🚀 2. SUNTIK SUM(spesifikasi_barang.jumlah) DI SELECT NYA
+		Select("barang.id_barang, barang.nama_barang, barang.gambar_barang, MIN(spesifikasi_barang.harga_barang) as harga_terendah, MAX(spesifikasi_barang.harga_barang) as harga_tertinggi, SUM(spesifikasi_barang.jumlah) as total_stok, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
+		Joins("LEFT JOIN spesifikasi_barang ON spesifikasi_barang.id_barang = barang.id_barang").
+		Joins("LEFT JOIN diskon ON diskon.id_diskon = barang.id_diskon").
+		Joins("LEFT JOIN kategori ON kategori.id_kategori = barang.id_kategori").
+		Group("barang.id_barang, barang.nama_barang, barang.gambar_barang, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
+		Limit(limit).Offset(offset).
+		Scan(&results)
 
-  var responseData []gin.H
-  now := time.Now()
-  for _, r := range results {
-    punyaDiskon := false
-    hargaDiskon := r.HargaTerendah
+	var responseData []gin.H
+	now := time.Now()
+	for _, r := range results {
+		punyaDiskon := false
+		hargaDiskon := r.HargaTerendah
 
-    if r.BesarDiskon > 0 && r.TglMulai != nil && r.TglSelesai != nil {
-      if r.TglMulai.Before(now) && r.TglSelesai.After(now) {
-        punyaDiskon = true
-        hargaDiskon = r.HargaTerendah - (r.HargaTerendah * r.BesarDiskon / 100)
-      }
-    }
+		if r.BesarDiskon > 0 && r.TglMulai != nil && r.TglSelesai != nil {
+			if r.TglMulai.Before(now) && r.TglSelesai.After(now) {
+				punyaDiskon = true
+				hargaDiskon = r.HargaTerendah - (r.HargaTerendah * r.BesarDiskon / 100)
+			}
+		}
 
-    responseData = append(responseData, gin.H{
-      "id_barang":       r.IdBarang,
-      "nama_barang":     r.NamaBarang,
-      "harga_terendah":  r.HargaTerendah,
-      "harga_tertinggi": r.HargaTertinggi,
-      "harga_diskon":    hargaDiskon,
-      "punya_diskon":    punyaDiskon,
-      "gambar_barang":   r.GambarBarang,
-      "kategori":        r.NamaKategori,
-      "stok":            r.TotalStok, // 🚀 3. OPER DATA STOK ASLI KE JSON FRONTEND
-    })
-  }
+		responseData = append(responseData, gin.H{
+			"id_barang":       r.IdBarang,
+			"nama_barang":     r.NamaBarang,
+			"harga_terendah":  r.HargaTerendah,
+			"harga_tertinggi": r.HargaTertinggi,
+			"harga_diskon":    hargaDiskon,
+			"punya_diskon":    punyaDiskon,
+			"gambar_barang":   r.GambarBarang,
+			"kategori":        r.NamaKategori,
+			"stok":            r.TotalStok, // 🚀 3. OPER DATA STOK ASLI KE JSON FRONTEND
+		})
+	}
 
-  if responseData == nil {
-    responseData = []gin.H{}
-  }
+	if responseData == nil {
+		responseData = []gin.H{}
+	}
 
-  totalPages := int(total) / limit
-  if int(total)%limit != 0 {
-    totalPages++
-  }
+	totalPages := int(total) / limit
+	if int(total)%limit != 0 {
+		totalPages++
+	}
 
-  c.JSON(http.StatusOK, gin.H{
-    "status":  "success",
-    "message": "Berhasil mengambil daftar barang",
-    "data":    responseData,
-    "meta": gin.H{
-      "page":        page,
-      "limit":       limit,
-      "total":       total,
-      "total_pages": totalPages,
-    },
-  })
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Berhasil mengambil daftar barang",
+		"data":    responseData,
+		"meta": gin.H{
+			"page":        page,
+			"limit":       limit,
+			"total":       total,
+			"total_pages": totalPages,
+		},
+	})
 }
 
 // GetDetailBarang mengambil detail satu barang berdasarkan ID.
@@ -169,14 +169,14 @@ func GetDetailBarang(c *gin.Context) {
 		"status":  "success",
 		"message": "Detail barang berhasil diambil",
 		"data": gin.H{
-			"id_barang":    barang.IdBarang,
-			"nama_barang":  barang.NamaBarang,
-			"deskripsi":    barang.Deskripsi,
+			"id_barang":     barang.IdBarang,
+			"nama_barang":   barang.NamaBarang,
+			"deskripsi":     barang.Deskripsi,
 			"gambar_barang": barang.GambarBarang,
-			"kategori":     barang.Kategori.NamaKategori,
-			"satuan":       barang.Satuan.NamaSatuan,
-			"diskon":       diskonData,
-			"varian":       responseVarian,
+			"kategori":      barang.Kategori.NamaKategori,
+			"satuan":        barang.Satuan.NamaSatuan,
+			"diskon":        diskonData,
+			"varian":        responseVarian,
 		},
 	})
 }
