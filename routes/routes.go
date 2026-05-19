@@ -80,14 +80,11 @@ func SetupRoutes(r *gin.Engine) {
 		adminGroup.Use(middleware.AuthMiddleware())
 		{
 			adminGroup.GET("/dashboard", user.GetDashboardAdmin)
-<<<<<<< HEAD
-=======
 			adminGroup.GET("/dashboard/chart", user.GetChartDashboardAdmin)
 			adminGroup.GET("/kategori", katalog.GetKategori)
 			adminGroup.POST("/kategori", katalog.TambahKategori)
 			adminGroup.PUT("/kategori/:id_kategori", katalog.UpdateKategori)
 			adminGroup.DELETE("/kategori/:id_kategori", katalog.HapusKategori)
->>>>>>> c7388ad36c44b06dee7d3b6348a99f5903761e59
 			adminGroup.GET("/barang", katalog.GetDaftarBarang)
 			adminGroup.POST("/barang", katalog.TambahBarang)
 			adminGroup.GET("/barang/detail/:public_id", katalog.GetDetailBarang)
