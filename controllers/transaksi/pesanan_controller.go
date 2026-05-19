@@ -1,6 +1,7 @@
 package transaksi
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -90,7 +91,7 @@ func GetDaftarPesanan(c *gin.Context) {
 			items = []gin.H{}
 		}
 		responseData = append(responseData, gin.H{
-			"id_pesanan":    strconv.FormatUint(uint64(p.IdPesanan), 10),
+			"id_pesanan":    p.PublicId,
 			"status":        p.StatusPesanan,
 			"tanggal_pesan": p.TanggalPesanan,
 			"total_bayar":   p.TotalPembayaran,
@@ -127,7 +128,7 @@ func GetDetailPesanan(c *gin.Context) {
 	userID := c.GetInt64("user_id")
 
 	var pesanan models.Pesanan
-	query := config.DB.Preload("Alamat").Where("id_pesanan = ?", idPesanan)
+	query := config.DB.Preload("Alamat").Where("public_id = ?", idPesanan)
 
 	if role == "customer" {
 		// Ownership check: pesanan harus milik customer yang login
@@ -135,7 +136,7 @@ func GetDetailPesanan(c *gin.Context) {
 		config.DB.Raw(`
 			SELECT COUNT(*) FROM pesanan p
 			JOIN customer c ON c.id_customer = p.id_customer
-			WHERE p.id_pesanan = ? AND c.id_user = ?
+			WHERE p.public_id = ? AND c.id_user = ?
 		`, idPesanan, userID).Scan(&count)
 
 		if count == 0 {
@@ -202,7 +203,7 @@ func GetDetailPesanan(c *gin.Context) {
 		"status":  "success",
 		"message": "Detail pesanan berhasil diambil",
 		"data": gin.H{
-			"no_pesanan":         strconv.FormatUint(uint64(pesanan.IdPesanan), 10),
+			"no_pesanan":         pesanan.PublicId,
 			"status":             pesanan.StatusPesanan,
 			"tanggal_pesan":      pesanan.TanggalPesanan,
 			"items":              items,
@@ -338,7 +339,7 @@ func CheckoutPesanan(c *gin.Context) {
 		"status":  "success",
 		"message": "Pesanan berhasil dibuat",
 		"data": gin.H{
-			"id_pesanan":     strconv.FormatUint(uint64(pesanan.IdPesanan), 10),
+			"id_pesanan":     pesanan.PublicId,
 			"midtrans_token": "token-untuk-sdk-flutter",
 			"redirect_url":   "https://app.sandbox.midtrans.com/snap/v2/vtweb/...",
 		},
@@ -358,7 +359,7 @@ func BatalkanPesanan(c *gin.Context) {
 	config.DB.Raw(`
 		SELECT COUNT(*) FROM pesanan p
 		JOIN customer c ON c.id_customer = p.id_customer
-		WHERE p.id_pesanan = ? AND c.id_user = ?
+		WHERE p.public_id = ? AND c.id_user = ?
 	`, idPesanan, userID).Scan(&count)
 
 	if count == 0 {
@@ -374,7 +375,7 @@ func BatalkanPesanan(c *gin.Context) {
 	}
 
 	var pesanan models.Pesanan
-	if err := config.DB.Where("id_pesanan = ?", idPesanan).First(&pesanan).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", idPesanan).First(&pesanan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak ditemukan",
@@ -412,7 +413,10 @@ func LacakPesanan(c *gin.Context) {
 	idPesanan := c.Param("id_pesanan")
 
 	var pengantaran models.Pengantaran
-	if err := config.DB.Preload("Kurir.User").Where("id_pesanan = ?", idPesanan).First(&pengantaran).Error; err != nil {
+	if err := config.DB.Preload("Kurir.User").
+		Joins("JOIN pesanan ON pesanan.id_pesanan = pengantaran.id_pesanan").
+		Where("pesanan.public_id = ?", idPesanan).
+		First(&pengantaran).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Data pelacakan untuk pesanan ini tidak ditemukan",
@@ -483,10 +487,10 @@ func GetDashboardKasir(c *gin.Context) {
 
 	// Ambil 5 aktivitas terkini hari ini
 	type AktivitasResult struct {
-		IdPesanan      uint
-		TanggalPesanan time.Time
+		IdPesanan       uint
+		TanggalPesanan  time.Time
 		TotalPembayaran int
-		PaymentType    string
+		PaymentType     string
 	}
 
 	var aktivitasRaw []AktivitasResult
@@ -501,11 +505,11 @@ func GetDashboardKasir(c *gin.Context) {
 	var aktivitasTerkini []gin.H
 	for _, a := range aktivitasRaw {
 		aktivitasTerkini = append(aktivitasTerkini, gin.H{
-			"id_transaksi":       a.IdPesanan,
-			"nomor_invoice":      "INV-" + a.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(a.IdPesanan)),
-			"metode_pembayaran":  a.PaymentType,
-			"waktu":              a.TanggalPesanan.Format("15:04"),
-			"total_bayar":        a.TotalPembayaran,
+			"id_transaksi":      a.IdPesanan,
+			"nomor_invoice":     "INV-" + a.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(a.IdPesanan)),
+			"metode_pembayaran": a.PaymentType,
+			"waktu":             a.TanggalPesanan.Format("15:04"),
+			"total_bayar":       a.TotalPembayaran,
 		})
 	}
 	if aktivitasTerkini == nil {
@@ -530,39 +534,101 @@ func GetDashboardKasir(c *gin.Context) {
 	})
 }
 
-
 // GetLaporanRingkasan mengambil ringkasan laporan penjualan.
 // Dipakai oleh: kasir (GET /kasir/laporan)
 // Auth: Wajib login, role kasir
 func GetLaporanRingkasan(c *gin.Context) {
+	var totalPendapatan int64
+	config.DB.Model(&models.Pesanan{}).Where("status_pesanan = ?", "Selesai").Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&totalPendapatan)
+
+	var totalTransaksi int64
+	config.DB.Model(&models.Pesanan{}).Where("status_pesanan = ?", "Selesai").Count(&totalTransaksi)
+
+	var rataRataPesanan int64
+	if totalTransaksi > 0 {
+		rataRataPesanan = totalPendapatan / totalTransaksi
+	}
+
+	// Grafik hourly sales untuk hari ini
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	type HourlySale struct {
+		Hour  int
+		Total int
+	}
+	var hourlySales []HourlySale
+	config.DB.Model(&models.Pesanan{}).
+		Select("EXTRACT(HOUR FROM tanggal_pesanan) as hour, SUM(total_pembayaran) as total").
+		Where("status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", "Selesai", startOfDay, endOfDay).
+		Group("hour").
+		Order("hour ASC").
+		Scan(&hourlySales)
+
+	grafikData := []gin.H{}
+	for _, hs := range hourlySales {
+		label := fmt.Sprintf("%02d:00", hs.Hour)
+		grafikData = append(grafikData, gin.H{
+			"label":        label,
+			"nilai":        hs.Total,
+			"is_highlight": false,
+		})
+	}
+	if len(grafikData) == 0 {
+		grafikData = append(grafikData, gin.H{
+			"label":        "08:00",
+			"nilai":        0,
+			"is_highlight": false,
+		})
+	}
+
+	// 5 produk terlaris
+	type TopProduct struct {
+		IdBarang      uint
+		NamaBarang    string
+		Deskripsi     string
+		GambarBarang  string
+		JumlahTerjual int64
+	}
+
+	var topProducts []TopProduct
+	config.DB.Table("detail_pesanan").
+		Select("barang.id_barang, barang.nama_barang, barang.deskripsi, barang.gambar_barang, SUM(detail_pesanan.jumlah) as jumlah_terjual").
+		Joins("JOIN spesifikasi_barang ON spesifikasi_barang.id_spesifikasi_barang = detail_pesanan.id_spesifikasi_barang").
+		Joins("JOIN barang ON barang.id_barang = spesifikasi_barang.id_barang").
+		Joins("JOIN pesanan ON pesanan.id_pesanan = detail_pesanan.id_pesanan").
+		Where("pesanan.status_pesanan = ?", "Selesai").
+		Group("barang.id_barang, barang.nama_barang, barang.deskripsi, barang.gambar_barang").
+		Order("jumlah_terjual DESC").
+		Limit(5).
+		Scan(&topProducts)
+
+	produkTerlaris := []gin.H{}
+	for _, tp := range topProducts {
+		produkTerlaris = append(produkTerlaris, gin.H{
+			"id_produk":      tp.IdBarang,
+			"nama_produk":    tp.NamaBarang,
+			"deskripsi":      tp.Deskripsi,
+			"jumlah_terjual": tp.JumlahTerjual,
+			"gambar":         tp.GambarBarang,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Data laporan berhasil diambil",
 		"data": gin.H{
 			"header_statistik": gin.H{
-				"total_pendapatan":               5000000,
-				"persentase_kenaikan_pendapatan": 12.5,
-				"total_transaksi":                40,
-				"persentase_kenaikan_transaksi":  5.0,
-				"rata_rata_pesanan":              125000,
-				"status_rata_rata":               "naik",
+				"total_pendapatan":               totalPendapatan,
+				"persentase_kenaikan_pendapatan": 0.0, // Default/Mock
+				"total_transaksi":                totalTransaksi,
+				"persentase_kenaikan_transaksi":  0.0,
+				"rata_rata_pesanan":              rataRataPesanan,
+				"status_rata_rata":               "stabil",
 			},
-			"grafik_pendapatan": []gin.H{
-				{
-					"label":        "08:00",
-					"nilai":        250000,
-					"is_highlight": false,
-				},
-			},
-			"produk_terlaris": []gin.H{
-				{
-					"id_produk":      1,
-					"nama_produk":    "Laptop Gaming X",
-					"deskripsi":      "16GB RAM, 1TB SSD",
-					"jumlah_terjual": 15,
-					"gambar":         "https://api.mantra.com/storage/barang/laptop-x.jpg",
-				},
-			},
+			"grafik_pendapatan": grafikData,
+			"produk_terlaris":   produkTerlaris,
 		},
 	})
 }
@@ -571,67 +637,138 @@ func GetLaporanRingkasan(c *gin.Context) {
 // Dipakai oleh: kasir (GET /kasir/laporan/produk/:id_produk)
 // Auth: Wajib login, role kasir
 func GetDetailLaporanProduk(c *gin.Context) {
+	idProdukStr := c.Param("id_produk")
+	var barang models.Barang
+	if err := config.DB.Preload("Kategori").First(&barang, "public_id = ?", idProdukStr).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Produk tidak ditemukan",
+		})
+		return
+	}
+
+	var totalTerjual int64
+	config.DB.Model(&models.DetailPesanan{}).
+		Joins("JOIN spesifikasi_barang ON spesifikasi_barang.id_spesifikasi_barang = detail_pesanan.id_spesifikasi_barang").
+		Joins("JOIN pesanan ON pesanan.id_pesanan = detail_pesanan.id_pesanan").
+		Where("pesanan.status_pesanan = ? AND spesifikasi_barang.id_barang = ?", "Selesai", barang.IdBarang).
+		Select("COALESCE(SUM(detail_pesanan.jumlah), 0)").
+		Scan(&totalTerjual)
+
+	type TxHistory struct {
+		IdPesanan      uint
+		TanggalPesanan time.Time
+		HargaSatuan    int
+		Jumlah         int
+		Subtotal       int
+	}
+
+	var txHistory []TxHistory
+	config.DB.Table("detail_pesanan").
+		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, detail_pesanan.harga_satuan, detail_pesanan.jumlah, detail_pesanan.subtotal").
+		Joins("JOIN pesanan ON pesanan.id_pesanan = detail_pesanan.id_pesanan").
+		Joins("JOIN spesifikasi_barang ON spesifikasi_barang.id_spesifikasi_barang = detail_pesanan.id_spesifikasi_barang").
+		Where("pesanan.status_pesanan = ? AND spesifikasi_barang.id_barang = ?", "Selesai", barang.IdBarang).
+		Order("pesanan.tanggal_pesanan DESC").
+		Scan(&txHistory)
+
+	riwayatTransaksi := []gin.H{}
+	for _, tx := range txHistory {
+		riwayatTransaksi = append(riwayatTransaksi, gin.H{
+			"id_transaksi":  tx.IdPesanan,
+			"nomor_invoice": "INV-" + tx.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(tx.IdPesanan)),
+			"tanggal_waktu": tx.TanggalPesanan,
+			"subtotal":      tx.Subtotal,
+			"quantity":      tx.Jumlah,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Detail produk berhasil diambil",
 		"data": gin.H{
 			"produk": gin.H{
-				"id_produk":   1,
-				"nama_produk": "Laptop Gaming X",
-				"kategori":    "Elektronik",
-				"gambar":      "https://api.mantra.com/storage/barang/laptop-x.jpg",
+				"id_produk":   barang.PublicId,
+				"nama_produk": barang.NamaBarang,
+				"kategori":    barang.Kategori.NamaKategori,
+				"gambar":      barang.GambarBarang,
 			},
 			"statistik_produk": gin.H{
-				"total_terjual":       50,
-				"terjual_periode_ini": 15,
-				"label_periode":       "mingguan",
+				"total_terjual":       totalTerjual,
+				"terjual_periode_ini": totalTerjual,
+				"label_periode":       "semua",
 			},
-			"riwayat_transaksi": []gin.H{
-				{
-					"id_transaksi":  101,
-					"nomor_invoice": "INV-20260509-001",
-					"tanggal_waktu": "2026-05-09T09:30:00Z",
-					"subtotal":      13500000,
-					"quantity":      1,
-				},
-			},
+			"riwayat_transaksi": riwayatTransaksi,
 		},
 	})
 }
 
 // GetDetailPesananDariLaporan mengambil detail satu pesanan dari view laporan kasir.
-// Dipakai oleh: kasir (GET /kasir/laporan/pesanan/:id_pesanan)
+// Dipakai oleh: kasir (GET /kasir/laporan/produk/:id_produk/:id_pesanan)
 // Auth: Wajib login, role kasir
 func GetDetailPesananDariLaporan(c *gin.Context) {
+	idPesananStr := c.Param("id_pesanan")
+
+	var pesanan models.Pesanan
+	if err := config.DB.Preload("Customer.User").Preload("Alamat").First(&pesanan, "public_id = ?", idPesananStr).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Pesanan tidak ditemukan",
+		})
+		return
+	}
+
+	var details []models.DetailPesanan
+	config.DB.Preload("SpesifikasiBarang.Barang").Where("id_pesanan = ?", pesanan.IdPesanan).Find(&details)
+
+	var daftarItem []gin.H
+	for _, d := range details {
+		daftarItem = append(daftarItem, gin.H{
+			"id_produk":        d.SpesifikasiBarang.BarangID,
+			"nama_produk":      d.SpesifikasiBarang.Barang.NamaBarang,
+			"qty":              d.Jumlah,
+			"total_harga_item": d.Subtotal,
+		})
+	}
+
+	var pembayaran models.Pembayaran
+	config.DB.Where("id_pesanan = ?", pesanan.IdPesanan).First(&pembayaran)
+	metodePembayaran := pembayaran.PaymentType
+	if metodePembayaran == "" {
+		metodePembayaran = "tunai"
+	}
+
+	customerNama := "Walk-in Customer"
+	customerAlamat := "-"
+	if pesanan.CustomerId != 0 && pesanan.Customer.IdCustomer != 0 {
+		customerNama = pesanan.Customer.User.NamaLengkap
+	}
+	if pesanan.Alamat != nil {
+		customerAlamat = pesanan.Alamat.AlamatLengkap
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Detail pesanan berhasil diambil",
 		"data": gin.H{
 			"order_info": gin.H{
-				"nomor_order":   "ORD-20260509-001",
-				"tanggal_waktu": "2026-05-09T09:30:00Z",
+				"nomor_order":   "ORD-" + pesanan.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(pesanan.IdPesanan)),
+				"tanggal_waktu": pesanan.TanggalPesanan,
 				"status_order": gin.H{
-					"kode":  "selesai",
-					"label": "Selesai",
+					"kode":  pesanan.StatusPesanan,
+					"label": pesanan.StatusPesanan,
 				},
 			},
 			"pelanggan": gin.H{
-				"nama":   "Aarav Lysander",
-				"alamat": "Jl. Cempaka Putih No. 12",
+				"nama":   customerNama,
+				"alamat": customerAlamat,
 			},
-			"daftar_item": []gin.H{
-				{
-					"id_produk":        1,
-					"nama_produk":      "Laptop Gaming X",
-					"qty":              1,
-					"total_harga_item": 13500000,
-				},
-			},
+			"daftar_item": daftarItem,
 			"rincian_pembayaran": gin.H{
-				"metode":        "qris",
-				"subtotal":      13500000,
-				"pajak_nominal": 1485000,
-				"total_akhir":   14985000,
+				"metode":        metodePembayaran,
+				"subtotal":      pesanan.TotalPembayaran,
+				"pajak_nominal": 0,
+				"total_akhir":   pesanan.TotalPembayaran,
 			},
 		},
 	})

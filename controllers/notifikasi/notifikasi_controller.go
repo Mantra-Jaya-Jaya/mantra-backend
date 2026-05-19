@@ -2,6 +2,7 @@ package notifikasi
 
 import (
 	"net/http"
+	"time"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -37,23 +38,69 @@ func GetNotifikasi(c *gin.Context) {
 }
 
 // GetNotifikasiAdmin mengambil notifikasi khusus admin (stok menipis, dll).
-// Dipakai oleh: admin (GET /admin/notifikasi/stok)
+// Dipakai oleh: admin (GET /admin/notifikasi)
 // Auth: Wajib login, role admin
 func GetNotifikasiAdmin(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+
+	var responseData []gin.H
+
+	// 1. Ambil riwayat notifikasi admin dari database
+	var notifikasis []models.Notifikasi
+	if err := config.DB.Where("id_user = ?", userID).Find(&notifikasis).Error; err == nil {
+		for _, n := range notifikasis {
+			responseData = append(responseData, gin.H{
+				"id_notifikasi": n.IdNotifikasi,
+				"id_barang":     nil,
+				"nama_barang":   nil,
+				"varian":        nil,
+				"stok_saat_ini": nil,
+				"batas_minimum": nil,
+				"pesan":         n.Pesan,
+				"judul":         n.Judul,
+				"status":        n.Status,
+				"created_at":    time.Now().Add(-1 * time.Hour).Format(time.RFC3339), // Fallback time
+			})
+		}
+	}
+
+	// 2. Ambil barang-barang dengan stok menipis (jumlah <= 5) secara dinamis
+	var lowStockItems []models.SpesifikasiBarang
+	if err := config.DB.
+		Preload("Barang").
+		Preload("DetailSpesifikasi.Spesifikasi").
+		Where("jumlah <= 5").
+		Find(&lowStockItems).Error; err == nil {
+		for _, item := range lowStockItems {
+			varianName := ""
+			if item.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi != "" {
+				varianName = item.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi + " " + item.DetailSpesifikasi.NamaDetailSpesifikasi
+			} else {
+				varianName = "Default"
+			}
+
+			responseData = append(responseData, gin.H{
+				"id_notifikasi": item.IdSpesifikasiBarang + 1000, // Offset agar tidak bentrok ID-nya
+				"id_barang":     item.BarangID,
+				"nama_barang":   item.Barang.NamaBarang,
+				"varian":        varianName,
+				"stok_saat_ini": item.Jumlah,
+				"batas_minimum": 5,
+				"pesan":         "Stok " + item.Barang.NamaBarang + " (" + varianName + ") hampir habis",
+				"judul":         "Stok Menipis",
+				"status":        "aktif",
+				"created_at":    time.Now().Format(time.RFC3339),
+			})
+		}
+	}
+
+	if responseData == nil {
+		responseData = []gin.H{}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Notifikasi admin berhasil diambil",
-		"data": []gin.H{
-			{
-				"id_notifikasi": 1,
-				"id_barang":     1,
-				"nama_barang":   "Laptop Gaming X",
-				"varian":        "16GB RAM",
-				"stok_saat_ini": 3,
-				"batas_minimum": 5,
-				"pesan":         "Stok Laptop Gaming X (16GB RAM) hampir habis",
-				"created_at":    "2026-05-09T08:00:00Z",
-			},
-		},
+		"data":    responseData,
 	})
 }

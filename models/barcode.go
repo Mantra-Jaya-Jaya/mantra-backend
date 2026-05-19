@@ -2,7 +2,7 @@ package models
 
 // Memaksa nama tabel
 func (Barcode) TableName() string {
-  return "barcode"
+	return "barcode"
 }
 
 type Barcode struct {

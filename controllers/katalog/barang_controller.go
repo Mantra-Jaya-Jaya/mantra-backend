@@ -15,164 +15,188 @@ import (
 // Dipakai oleh: customer (GET /customer/katalog/barang), kasir (GET /kasir/katalog/barang), admin (GET /admin/katalog/barang)
 // Auth: Wajib login, semua role boleh akses (dikontrol di route)
 func GetDaftarBarang(c *gin.Context) {
-	pageStr := c.DefaultQuery("page", "1")
-	limitStr := c.DefaultQuery("limit", "10")
+  pageStr := c.DefaultQuery("page", "1")
+  limitStr := c.DefaultQuery("limit", "10")
 
-	page, _ := strconv.Atoi(pageStr)
-	limit, _ := strconv.Atoi(limitStr)
-	offset := (page - 1) * limit
+  page, _ := strconv.Atoi(pageStr)
+  limit, _ := strconv.Atoi(limitStr)
+  offset := (page - 1) * limit
 
-	type ProductResult struct {
-		IdBarang       uint
-		NamaBarang     string
-		GambarBarang   string
-		HargaTerendah  int
-		HargaTertinggi int
-		BesarDiskon    int
-		TglMulai       *time.Time
-		TglSelesai     *time.Time
-	}
+  type ProductResult struct {
+    IdBarang       uint
+    PublicId       string // 🚀 1. SUNTIK KEY INI BUAT NAMPUNG UUID DARI DATABASE
+    NamaBarang     string
+    GambarBarang   string
+    HargaTerendah  int
+    HargaTertinggi int
+    BesarDiskon    int
+    TglMulai       *time.Time
+    TglSelesai     *time.Time
+    NamaKategori   string
+    TotalStok      int 
+  }
 
-	var results []ProductResult
-	var total int64
+  var results []ProductResult
+  var total int64
 
-	// Hitung total barang
-	config.DB.Model(&models.Barang{}).Count(&total)
+  // Hitung total barang
+  config.DB.Model(&models.Barang{}).Count(&total)
 
-	// Ambil data barang dengan join spesifikasi dan diskon
-	config.DB.Table("barang").
-		Select("barang.id_barang, barang.nama_barang, barang.gambar_barang, MIN(spesifikasi_barang.harga_barang) as harga_terendah, MAX(spesifikasi_barang.harga_barang) as harga_tertinggi, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai").
-		Joins("LEFT JOIN spesifikasi_barang ON spesifikasi_barang.id_barang = barang.id_barang").
-		Joins("LEFT JOIN diskon ON diskon.id_diskon = barang.id_diskon").
-		Group("barang.id_barang, barang.nama_barang, barang.gambar_barang, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai").
-		Limit(limit).Offset(offset).
-		Scan(&results)
+  // Ambil data barang dengan join spesifikasi, diskon, dan kategori
+  config.DB.Table("barang").
+    // 2. MASUKKIN barang.public_id KE DALAM SELECT
+    Select("barang.id_barang, barang.public_id, barang.nama_barang, barang.gambar_barang, MIN(spesifikasi_barang.harga_barang) as harga_terendah, MAX(spesifikasi_barang.harga_barang) as harga_tertinggi, SUM(spesifikasi_barang.jumlah) as total_stok, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
+    Joins("LEFT JOIN spesifikasi_barang ON spesifikasi_barang.id_barang = barang.id_barang").
+    Joins("LEFT JOIN diskon ON diskon.id_diskon = barang.id_diskon").
+    Joins("LEFT JOIN kategori ON kategori.id_kategori = barang.id_kategori").
+    Group("barang.id_barang, barang.public_id, barang.nama_barang, barang.gambar_barang, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
+    Limit(limit).Offset(offset).
+    Scan(&results)
 
-	var responseData []gin.H
-	now := time.Now()
-	for _, r := range results {
-		punyaDiskon := false
-		hargaDiskon := r.HargaTerendah
+  var responseData []gin.H
+  now := time.Now()
+  for _, r := range results {
+    punyaDiskon := false
+    hargaDiskon := r.HargaTerendah
 
-		if r.BesarDiskon > 0 && r.TglMulai != nil && r.TglSelesai != nil {
-			if r.TglMulai.Before(now) && r.TglSelesai.After(now) {
-				punyaDiskon = true
-				hargaDiskon = r.HargaTerendah - (r.HargaTerendah * r.BesarDiskon / 100)
-			}
-		}
+    if r.BesarDiskon > 0 && r.TglMulai != nil && r.TglSelesai != nil {
+      if r.TglMulai.Before(now) && r.TglSelesai.After(now) {
+        punyaDiskon = true
+        hargaDiskon = r.HargaTerendah - (r.HargaTerendah * r.BesarDiskon / 100)
+      }
+    }
 
-		responseData = append(responseData, gin.H{
-			"id_barang":       r.IdBarang,
-			"nama_barang":     r.NamaBarang,
-			"harga_terendah":  r.HargaTerendah,
-			"harga_tertinggi": r.HargaTertinggi,
-			"harga_diskon":    hargaDiskon,
-			"punya_diskon":    punyaDiskon,
-			"gambar_barang":   r.GambarBarang,
-		})
-	}
+    responseData = append(responseData, gin.H{
+      "id_barang":       r.IdBarang,
+      "public_id":       r.PublicId, 
+      "nama_barang":     r.NamaBarang,
+      "harga_terendah":  r.HargaTerendah,
+      "harga_tertinggi": r.HargaTertinggi,
+      "harga_diskon":    hargaDiskon,
+      "punya_diskon":    punyaDiskon,
+      "gambar_barang":   r.GambarBarang,
+      "kategori":        r.NamaKategori,
+      "stok":            r.TotalStok, 
+    })
+  }
 
-	if responseData == nil {
-		responseData = []gin.H{}
-	}
+  if responseData == nil {
+    responseData = []gin.H{}
+  }
 
-	totalPages := int(total) / limit
-	if int(total)%limit != 0 {
-		totalPages++
-	}
+  totalPages := int(total) / limit
+  if int(total)%limit != 0 {
+    totalPages++
+  }
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Berhasil mengambil daftar barang",
-		"data":    responseData,
-		"meta": gin.H{
-			"page":        page,
-			"limit":       limit,
-			"total":       total,
-			"total_pages": totalPages,
-		},
-	})
+  c.JSON(http.StatusOK, gin.H{
+    "status":  "success",
+    "message": "Berhasil mengambil daftar barang",
+    "data":    responseData,
+    "meta": gin.H{
+      "page":        page,
+      "limit":       limit,
+      "total":       total,
+      "total_pages": totalPages,
+    },
+  })
 }
 
 // GetDetailBarang mengambil detail satu barang berdasarkan ID.
 // Dipakai oleh: admin (GET /admin/katalog/barang/:id_barang)
 // Auth: Wajib login, role admin
 func GetDetailBarang(c *gin.Context) {
-	idBarangStr := c.Param("id_barang")
-	idBarang, err := strconv.Atoi(idBarangStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "ID barang tidak valid",
-		})
-		return
-	}
+  // 🚀 1. Ambil param public_id (String/UUID)
+  publicId := c.Param("public_id")
 
-	var barang models.Barang
-	if err := config.DB.
-		Preload("Kategori").
-		Preload("Satuan").
-		Preload("Diskon").
-		First(&barang, "id_barang = ?", idBarang).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Barang tidak ditemukan",
-		})
-		return
-	}
+  var barang models.Barang
+  // 🚀 2. Cari berdasarkan kolom public_id
+  if err := config.DB.
+    Preload("Kategori").
+    Preload("Satuan").
+    Preload("Diskon").
+    First(&barang, "public_id = ?", publicId).Error; err != nil {
+    c.JSON(http.StatusNotFound, gin.H{
+      "status":  "error",
+      "message": "Barang tidak ditemukan",
+    })
+    return
+  }
 
-	// Ambil semua varian (spesifikasi_barang) barang ini
-	var varians []models.SpesifikasiBarang
-	config.DB.
-		Preload("DetailSpesifikasi.Spesifikasi").
-		Where("id_barang = ?", idBarang).
-		Find(&varians)
+  // 🚀 3. Ambil semua varian
+  var varians []models.SpesifikasiBarang
+  config.DB.
+    Preload("DetailSpesifikasi.Spesifikasi").
+    Where("id_barang = ?", barang.IdBarang).
+    Find(&varians)
 
-	now := time.Now()
-	var responseVarian []gin.H
-	for _, v := range varians {
-		hargaDiskon := v.HargaBarang
-		if barang.DiskonId != 0 && barang.Diskon.IdDiskon != 0 {
-			if barang.Diskon.TglMulai.Before(now) && barang.Diskon.TglSelesai.After(now) {
-				hargaDiskon = v.HargaBarang - (v.HargaBarang * barang.Diskon.BesarDiskon / 100)
-			}
-		}
-		responseVarian = append(responseVarian, gin.H{
-			"id_spesifikasi_barang": v.IdSpesifikasiBarang,
-			"nama_spesifikasi":      v.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi,
-			"nama_detail":           v.DetailSpesifikasi.NamaDetailSpesifikasi,
-			"harga_barang":          v.HargaBarang,
-			"harga_diskon":          hargaDiskon,
-			"stok":                  v.Jumlah,
-		})
-	}
-	if responseVarian == nil {
-		responseVarian = []gin.H{}
-	}
+  now := time.Now()
+  var responseVarian []gin.H
+  for _, v := range varians {
+    hargaDiskon := v.HargaBarang
+    if barang.DiskonId != 0 && barang.Diskon.IdDiskon != 0 {
+      if barang.Diskon.TglMulai.Before(now) && barang.Diskon.TglSelesai.After(now) {
+        hargaDiskon = v.HargaBarang - (v.HargaBarang * barang.Diskon.BesarDiskon / 100)
+      }
+    }
 
-	var diskonData interface{} = nil
-	if barang.DiskonId != 0 && barang.Diskon.IdDiskon != 0 {
-		diskonData = gin.H{
-			"nama_diskon":  barang.Diskon.NamaDiskon,
-			"besar_diskon": barang.Diskon.BesarDiskon,
-			"tgl_selesai":  barang.Diskon.TglSelesai,
-		}
-	}
+    // 🚀 4. Ambil Barcode untuk varian ini
+    var barcodes []models.Barcode
+    // Pastikan nama field string "id_spesifikasi_barang" sesuai dengan nama kolom di database Postgres lu
+    config.DB.Where("id_spesifikasi_barang = ?", v.IdSpesifikasiBarang).Find(&barcodes)
+    
+    var responseBarcodes []gin.H
+    for _, b := range barcodes {
+      responseBarcodes = append(responseBarcodes, gin.H{
+        "id_barcode":   b.IdBarcode,
+        "kode_barcode": b.KodeBarcode, // 🔥 WAJIB ADA: Biar frontend bisa nampilin teks barcodenya
+        "kuantitas":    b.Kuantitas,   // 🔥 FIX: Hapus SatuanId karena emang gak ada di tabel barcode
+      })
+    }
+    if responseBarcodes == nil {
+      responseBarcodes = []gin.H{}
+    }
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Detail barang berhasil diambil",
-		"data": gin.H{
-			"id_barang":    barang.IdBarang,
-			"nama_barang":  barang.NamaBarang,
-			"deskripsi":    barang.Deskripsi,
-			"gambar_barang": barang.GambarBarang,
-			"kategori":     barang.Kategori.NamaKategori,
-			"satuan":       barang.Satuan.NamaSatuan,
-			"diskon":       diskonData,
-			"varian":       responseVarian,
-		},
-	})
+    responseVarian = append(responseVarian, gin.H{
+      "id_spesifikasi_barang": v.IdSpesifikasiBarang,
+      "nama_spesifikasi":      v.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi,
+      "nama_detail":           v.DetailSpesifikasi.NamaDetailSpesifikasi,
+      "harga_barang":          v.HargaBarang,
+      "harga_diskon":          hargaDiskon,
+      "stok":                  v.Jumlah,
+      "barcodes":              responseBarcodes, // 🔥 SUNTIKKAN BARCODE KE DALAM VARIAN
+    })
+  }
+  
+  if responseVarian == nil {
+    responseVarian = []gin.H{}
+  }
+
+  var diskonData interface{} = nil
+  if barang.DiskonId != 0 && barang.Diskon.IdDiskon != 0 {
+    diskonData = gin.H{
+      "nama_diskon":  barang.Diskon.NamaDiskon,
+      "besar_diskon": barang.Diskon.BesarDiskon,
+      "tgl_selesai":  barang.Diskon.TglSelesai,
+    }
+  }
+
+  // 🚀 5. Kirim response balik
+  c.JSON(http.StatusOK, gin.H{
+    "status":  "success",
+    "message": "Detail barang berhasil diambil",
+    "data": gin.H{
+      "id_barang":     barang.IdBarang,
+      "public_id":     barang.PublicId,
+      "nama_barang":   barang.NamaBarang,
+      "deskripsi":     barang.Deskripsi,
+      "gambar_barang": barang.GambarBarang,
+      "kategori":      barang.Kategori.NamaKategori,
+      "satuan":        barang.Satuan.NamaSatuan,
+      "diskon":        diskonData,
+      "varian":        responseVarian,
+    },
+  })
 }
 
 // TambahBarang menambahkan barang baru ke katalog.
@@ -338,17 +362,9 @@ func TambahBarang(c *gin.Context) {
 // Auth: Wajib login, role admin
 func UpdateBarang(c *gin.Context) {
 	idBarangStr := c.Param("id_barang")
-	idBarang, err := strconv.Atoi(idBarangStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "ID barang tidak valid",
-		})
-		return
-	}
 
 	var barang models.Barang
-	if err := config.DB.First(&barang, "id_barang = ?", idBarang).Error; err != nil {
+	if err := config.DB.First(&barang, "public_id = ?", idBarangStr).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Barang tidak ditemukan",
@@ -412,17 +428,9 @@ func UpdateBarang(c *gin.Context) {
 // Auth: Wajib login, role admin
 func HapusBarang(c *gin.Context) {
 	idBarangStr := c.Param("id_barang")
-	idBarang, err := strconv.Atoi(idBarangStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "ID barang tidak valid",
-		})
-		return
-	}
 
 	var barang models.Barang
-	if err := config.DB.First(&barang, "id_barang = ?", idBarang).Error; err != nil {
+	if err := config.DB.First(&barang, "public_id = ?", idBarangStr).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Barang tidak ditemukan",

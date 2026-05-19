@@ -272,7 +272,7 @@ func GetDetailKasir(c *gin.Context) {
 	idKasir := c.Param("id_kasir")
 
 	var kasir models.Kasir
-	if err := config.DB.Preload("User").Where("id_kasir = ?", idKasir).First(&kasir).Error; err != nil {
+	if err := config.DB.Preload("User").Where("public_id = ?", idKasir).First(&kasir).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Detail kasir tidak ditemukan",
@@ -293,7 +293,7 @@ func GetDetailKasir(c *gin.Context) {
 		"status":  "success",
 		"message": "Detail kasir berhasil diambil",
 		"data": gin.H{
-			"id_kasir":            kasir.IdKasir,
+			"id_kasir":            kasir.PublicId,
 			"public_id":           kasir.PublicId,
 			"no_telp":             kasir.NoTelp,
 			"tempat_lahir":        kasir.TempatLahir,
@@ -340,7 +340,7 @@ func UpdateKasir(c *gin.Context) {
 	}
 
 	var kasir models.Kasir
-	if err := config.DB.Preload("User").Where("id_kasir = ?", idKasir).First(&kasir).Error; err != nil {
+	if err := config.DB.Preload("User").Where("public_id = ?", idKasir).First(&kasir).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Data kasir tidak ditemukan",
@@ -428,7 +428,7 @@ func HapusKasir(c *gin.Context) {
 	idKasir := c.Param("id_kasir")
 
 	var kasir models.Kasir
-	if err := config.DB.Where("id_kasir = ?", idKasir).First(&kasir).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", idKasir).First(&kasir).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Data kasir tidak ditemukan",
@@ -487,9 +487,100 @@ func HapusKasir(c *gin.Context) {
 // Dipakai oleh: admin (GET /admin/user/karyawan)
 // Auth: Wajib login, role admin
 func GetDaftarKaryawan(c *gin.Context) {
+	search := c.Query("search")
+
+	var kasirs []models.Kasir
+	var kurirs []models.Kurir
+
+	// 1. Ambil Kasir
+	kasirQuery := config.DB.Preload("User")
+	if search != "" {
+		kasirQuery = kasirQuery.Joins("User").Where("User.nama_lengkap ILIKE ? OR User.username ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+	if err := kasirQuery.Find(&kasirs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengambil data kasir",
+			"error":   gin.H{"code": "SERVER_001", "detail": err.Error()},
+		})
+		return
+	}
+
+	// 2. Ambil Kurir
+	kurirQuery := config.DB.Preload("User")
+	if search != "" {
+		kurirQuery = kurirQuery.Joins("User").Where("User.nama_lengkap ILIKE ? OR User.username ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+	if err := kurirQuery.Find(&kurirs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengambil data kurir",
+			"error":   gin.H{"code": "SERVER_001", "detail": err.Error()},
+		})
+		return
+	}
+
+	// 3. Gabungkan dan format data
+	type KaryawanResponse struct {
+		IdKaryawan   uint   `json:"id_karyawan"`
+		IdUser       uint   `json:"id_user"`
+		NamaLengkap  string `json:"nama_lengkap"`
+		Username     string `json:"username"`
+		Role         string `json:"role"`
+		NoTelp       string `json:"no_telp"`
+		Alamat       string `json:"alamat"`
+		JenisKelamin string `json:"jenis_kelamin"`
+		FotoProfil   string `json:"foto_profil"`
+	}
+
+	var response []KaryawanResponse
+	baseURL := os.Getenv("BASE_URL")
+
+	for _, k := range kasirs {
+		fotoProfil := k.User.FotoProfil
+		if fotoProfil != "" && !strings.HasPrefix(fotoProfil, "http") && baseURL != "" {
+			fotoProfil = strings.TrimRight(baseURL, "/") + "/" + strings.TrimLeft(fotoProfil, "/")
+		}
+
+		response = append(response, KaryawanResponse{
+			IdKaryawan:   k.IdKasir,
+			IdUser:       k.User.IdUser,
+			NamaLengkap:  k.User.NamaLengkap,
+			Username:     k.User.Username,
+			Role:         "Kasir",
+			NoTelp:       k.NoTelp,
+			Alamat:       k.Alamat,
+			JenisKelamin: k.JenisKelamin,
+			FotoProfil:   fotoProfil,
+		})
+	}
+
+	for _, k := range kurirs {
+		fotoProfil := k.User.FotoProfil
+		if fotoProfil != "" && !strings.HasPrefix(fotoProfil, "http") && baseURL != "" {
+			fotoProfil = strings.TrimRight(baseURL, "/") + "/" + strings.TrimLeft(fotoProfil, "/")
+		}
+
+		response = append(response, KaryawanResponse{
+			IdKaryawan:   k.IdKurir,
+			IdUser:       k.User.IdUser,
+			NamaLengkap:  k.User.NamaLengkap,
+			Username:     k.User.Username,
+			Role:         "Kurir",
+			NoTelp:       k.NoTelp,
+			Alamat:       k.Alamat,
+			JenisKelamin: k.JenisKelamin,
+			FotoProfil:   fotoProfil,
+		})
+	}
+
+	if response == nil {
+		response = []KaryawanResponse{}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Daftar karyawan belum diimplementasi sepenuhnya",
-		"data":    []gin.H{},
+		"message": "Daftar karyawan berhasil diambil",
+		"data":    response,
 	})
 }

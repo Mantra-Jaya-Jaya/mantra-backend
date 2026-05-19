@@ -2,6 +2,7 @@ package keranjang
 
 import (
 	"net/http"
+	"time"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -109,7 +110,7 @@ func UpdateKeranjang(c *gin.Context) {
 	customerID := result.IdCustomer
 
 	var keranjang models.Keranjang
-	if err := config.DB.Where("id_keranjang = ? AND id_customer = ?", idKeranjang, customerID).First(&keranjang).Error; err != nil {
+	if err := config.DB.Where("public_id = ? AND id_customer = ?", idKeranjang, customerID).First(&keranjang).Error; err != nil {
 		// Ownership violation: selalu 403, bukan 404
 		c.JSON(http.StatusForbidden, gin.H{
 			"status":  "error",
@@ -156,7 +157,7 @@ func HapusItemKeranjang(c *gin.Context) {
 	}
 	customerID := result.IdCustomer
 
-	deleteResult := config.DB.Where("id_keranjang = ? AND id_customer = ?", idKeranjang, customerID).Delete(&models.Keranjang{})
+	deleteResult := config.DB.Where("public_id = ? AND id_customer = ?", idKeranjang, customerID).Delete(&models.Keranjang{})
 
 	if deleteResult.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -182,5 +183,77 @@ func HapusItemKeranjang(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Item keranjang berhasil dihapus",
+	})
+}
+
+// GetKeranjang mengambil daftar item di keranjang belanja customer yang sedang login.
+// Dipakai oleh: customer (GET /customer/keranjang)
+// Auth: Wajib login, role customer
+// Ownership: id_customer diambil dari JWT (user_id), bukan dari body request
+func GetKeranjang(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+
+	// Cari id_customer berdasarkan user_id dari JWT
+	var result struct{ IdCustomer uint }
+	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengidentifikasi customer",
+		})
+		return
+	}
+	customerID := result.IdCustomer
+
+	var keranjangItems []models.Keranjang
+	if err := config.DB.
+		Preload("SpesifikasiBarang.Barang.Diskon").
+		Preload("SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
+		Where("id_customer = ?", customerID).
+		Find(&keranjangItems).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengambil isi keranjang",
+		})
+		return
+	}
+
+	var responseData []gin.H
+	now := time.Now()
+	for _, item := range keranjangItems {
+		hargaAsli := item.SpesifikasiBarang.HargaBarang
+		hargaDiskon := hargaAsli
+		punyaDiskon := false
+		b := item.SpesifikasiBarang.Barang
+
+		if b.DiskonId != 0 && b.Diskon.IdDiskon != 0 {
+			if b.Diskon.TglMulai.Before(now) && b.Diskon.TglSelesai.After(now) {
+				punyaDiskon = true
+				hargaDiskon = hargaAsli - (hargaAsli * b.Diskon.BesarDiskon / 100)
+			}
+		}
+
+		responseData = append(responseData, gin.H{
+			"id_keranjang":          item.PublicId,
+			"id_spesifikasi_barang": item.SpesifikasiBarangID,
+			"nama_barang":           b.NamaBarang,
+			"varian":                item.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi + " " + item.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi,
+			"harga_barang":          hargaAsli,
+			"harga_diskon":          hargaDiskon,
+			"punya_diskon":          punyaDiskon,
+			"besar_diskon":          b.Diskon.BesarDiskon,
+			"gambar_barang":         b.GambarBarang,
+			"quantity":              item.Quantity,
+			"subtotal":              item.Quantity * hargaDiskon,
+		})
+	}
+
+	if responseData == nil {
+		responseData = []gin.H{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Isi keranjang berhasil diambil",
+		"data":    responseData,
 	})
 }

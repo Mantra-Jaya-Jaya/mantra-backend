@@ -272,7 +272,7 @@ func GetDetailKurir(c *gin.Context) {
 	idKurir := c.Param("id_kurir")
 
 	var kurir models.Kurir
-	if err := config.DB.Preload("User").Where("id_kurir = ?", idKurir).First(&kurir).Error; err != nil {
+	if err := config.DB.Preload("User").Where("public_id = ?", idKurir).First(&kurir).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Detail kurir tidak ditemukan",
@@ -293,7 +293,7 @@ func GetDetailKurir(c *gin.Context) {
 		"status":  "success",
 		"message": "Detail kurir berhasil diambil",
 		"data": gin.H{
-			"id_kurir":            kurir.IdKurir,
+			"id_kurir":            kurir.PublicId,
 			"public_id":           kurir.PublicId,
 			"no_telp":             kurir.NoTelp,
 			"tempat_lahir":        kurir.TempatLahir,
@@ -340,7 +340,7 @@ func UpdateKurir(c *gin.Context) {
 	}
 
 	var kurir models.Kurir
-	if err := config.DB.Preload("User").Where("id_kurir = ?", idKurir).First(&kurir).Error; err != nil {
+	if err := config.DB.Preload("User").Where("public_id = ?", idKurir).First(&kurir).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Data kurir tidak ditemukan",
@@ -428,7 +428,7 @@ func HapusKurir(c *gin.Context) {
 	idKurir := c.Param("id_kurir")
 
 	var kurir models.Kurir
-	if err := config.DB.Where("id_kurir = ?", idKurir).First(&kurir).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", idKurir).First(&kurir).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Data kurir tidak ditemukan",

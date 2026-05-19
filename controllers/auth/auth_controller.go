@@ -38,10 +38,10 @@ func Login(c *gin.Context) {
 	fmt.Printf("[DEBUG] Login Attempt - Username: '%s', Password: '%s'\n", req.Username, req.Password)
 
 	var user models.User
-	// Cari user berdasarkan username
-	if err := config.DB.Preload("Role").Where("username = ?", req.Username).First(&user).Error; err != nil {
+	// Cari user berdasarkan username atau email
+	if err := config.DB.Preload("Role").Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error; err != nil {
 		fmt.Printf("[DEBUG] User not found: %v\n", err)
-		RespondWithError(c, http.StatusUnauthorized, "Username atau password salah", "AUTH_001", "Credential tidak valid")
+		RespondWithError(c, http.StatusUnauthorized, "Username/Email atau password salah", "AUTH_001", "Credential tidak valid")
 		return
 	}
 
@@ -50,7 +50,7 @@ func Login(c *gin.Context) {
 	// Cek password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		fmt.Printf("[DEBUG] Password Mismatch: %v\n", err)
-		RespondWithError(c, http.StatusUnauthorized, "Username atau password salah", "AUTH_001", "Credential tidak valid")
+		RespondWithError(c, http.StatusUnauthorized, "Username/Email atau password salah", "AUTH_001", "Credential tidak valid")
 		return
 	}
 
