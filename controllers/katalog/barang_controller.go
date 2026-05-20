@@ -16,104 +16,110 @@ import (
 // Dipakai oleh: customer (GET /customer/katalog/barang), kasir (GET /kasir/katalog/barang), admin (GET /admin/katalog/barang)
 // Auth: Wajib login, semua role boleh akses (dikontrol di route)
 func GetDaftarBarang(c *gin.Context) {
-  pageStr := c.DefaultQuery("page", "1")
-  limitStr := c.DefaultQuery("limit", "10")
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "50")
 
-  page, _ := strconv.Atoi(pageStr)
-  limit, _ := strconv.Atoi(limitStr)
-  offset := (page - 1) * limit
+	page, _ := strconv.Atoi(pageStr)
+	limit, _ := strconv.Atoi(limitStr)
+	offset := (page - 1) * limit
 
-  type ProductResult struct {
-    IdBarang       uint
-    PublicId       string // 🚀 1. SUNTIK KEY INI BUAT NAMPUNG UUID DARI DATABASE
-    NamaBarang     string
-    GambarBarang   string
-    HargaTerendah  int
-    HargaTertinggi int
-    BesarDiskon    int
-    TglMulai       *time.Time
-    TglSelesai     *time.Time
-    NamaKategori   string
-    TotalStok      int 
-  }
+	// 🔥 Struct yang sudah di-upgrade kebal Badai NULL
+	type ProductResult struct {
+		IdBarang       uint       `gorm:"column:id_barang"`
+		PublicId       string     `gorm:"column:public_id"`
+		NamaBarang     string     `gorm:"column:nama_barang"`
+		GambarBarang   *string    `gorm:"column:gambar_barang"` // Pakai pointer biar aman dari NULL
+		HargaTerendah  int        `gorm:"column:harga_terendah"`
+		HargaTertinggi int        `gorm:"column:harga_tertinggi"`
+		BesarDiskon    int        `gorm:"column:besar_diskon"`
+		TglMulai       *time.Time `gorm:"column:tgl_mulai"`
+		TglSelesai     *time.Time `gorm:"column:tgl_selesai"`
+		NamaKategori   string     `gorm:"column:nama_kategori"`
+		TotalStok      int        `gorm:"column:total_stok"`
+	}
 
-  var results []ProductResult
-  var total int64
+	var results []ProductResult
+	var total int64
 
-  kategoriIdStr := c.Query("id_kategori")
+	kategoriIdStr := c.Query("id_kategori")
 
-  queryCount := config.DB.Model(&models.Barang{})
-  querySelect := config.DB.Table("barang")
+	queryCount := config.DB.Model(&models.Barang{})
+	querySelect := config.DB.Table("barang")
 
-  if kategoriIdStr != "" {
-    kategoriId, err := strconv.Atoi(kategoriIdStr)
-    if err == nil && kategoriId > 0 {
-      queryCount = queryCount.Where("id_kategori = ?", kategoriId)
-      querySelect = querySelect.Where("barang.id_kategori = ?", kategoriId)
-    }
-  }
+	if kategoriIdStr != "" {
+		kategoriId, err := strconv.Atoi(kategoriIdStr)
+		if err == nil && kategoriId > 0 {
+			queryCount = queryCount.Where("id_kategori = ?", kategoriId)
+			querySelect = querySelect.Where("barang.id_kategori = ?", kategoriId)
+		}
+	}
 
-  // Hitung total barang
-  queryCount.Count(&total)
+	// Hitung total barang
+	queryCount.Count(&total)
 
-  // Ambil data barang dengan join spesifikasi, diskon, dan kategori
-  querySelect.
-    // 2. MASUKKIN barang.public_id KE DALAM SELECT
-    Select("barang.id_barang, barang.public_id, barang.nama_barang, barang.gambar_barang, MIN(spesifikasi_barang.harga_barang) as harga_terendah, MAX(spesifikasi_barang.harga_barang) as harga_tertinggi, SUM(spesifikasi_barang.jumlah) as total_stok, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
-    Joins("LEFT JOIN spesifikasi_barang ON spesifikasi_barang.id_barang = barang.id_barang").
-    Joins("LEFT JOIN diskon ON diskon.id_diskon = barang.id_diskon").
-    Joins("LEFT JOIN kategori ON kategori.id_kategori = barang.id_kategori").
-    Group("barang.id_barang, barang.public_id, barang.nama_barang, barang.gambar_barang, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
-    Limit(limit).Offset(offset).
-    Scan(&results)
+	// Ambil data barang dengan join spesifikasi, diskon, dan kategori
+	querySelect.
+		Select("barang.id_barang, barang.public_id, barang.nama_barang, barang.gambar_barang, MIN(spesifikasi_barang.harga_barang) as harga_terendah, MAX(spesifikasi_barang.harga_barang) as harga_tertinggi, SUM(spesifikasi_barang.jumlah) as total_stok, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
+		Joins("LEFT JOIN spesifikasi_barang ON spesifikasi_barang.id_barang = barang.id_barang").
+		Joins("LEFT JOIN diskon ON diskon.id_diskon = barang.id_diskon").
+		Joins("LEFT JOIN kategori ON kategori.id_kategori = barang.id_kategori").
+		Group("barang.id_barang, barang.public_id, barang.nama_barang, barang.gambar_barang, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
+		Limit(limit).Offset(offset).
+		Scan(&results)
 
-  var responseData []gin.H
-  now := time.Now()
-  for _, r := range results {
-    punyaDiskon := false
-    hargaDiskon := r.HargaTerendah
+	var responseData []gin.H
+	now := time.Now()
+	for _, r := range results {
+		punyaDiskon := false
+		hargaDiskon := r.HargaTerendah
 
-    if r.BesarDiskon > 0 && r.TglMulai != nil && r.TglSelesai != nil {
-      if r.TglMulai.Before(now) && r.TglSelesai.After(now) {
-        punyaDiskon = true
-        hargaDiskon = r.HargaTerendah - (r.HargaTerendah * r.BesarDiskon / 100)
-      }
-    }
+		if r.BesarDiskon > 0 && r.TglMulai != nil && r.TglSelesai != nil {
+			if r.TglMulai.Before(now) && r.TglSelesai.After(now) {
+				punyaDiskon = true
+				hargaDiskon = r.HargaTerendah - (r.HargaTerendah * r.BesarDiskon / 100)
+			}
+		}
 
-    responseData = append(responseData, gin.H{
-      "id_barang":       r.IdBarang,
-      "public_id":       r.PublicId, 
-      "nama_barang":     r.NamaBarang,
-      "harga_terendah":  r.HargaTerendah,
-      "harga_tertinggi": r.HargaTertinggi,
-      "harga_diskon":    hargaDiskon,
-      "punya_diskon":    punyaDiskon,
-      "gambar_barang":   r.GambarBarang,
-      "kategori":        r.NamaKategori,
-      "stok":            r.TotalStok, 
-    })
-  }
+		// 🔥 Ekstrak URL gambar dengan aman dari Pointer
+		gambarValid := ""
+		if r.GambarBarang != nil {
+			gambarValid = *r.GambarBarang
+		}
 
-  if responseData == nil {
-    responseData = []gin.H{}
-  }
+		responseData = append(responseData, gin.H{
+			"id_barang":       r.IdBarang,
+			"public_id":       r.PublicId,
+			"nama_barang":     r.NamaBarang,
+			"harga_terendah":  r.HargaTerendah,
+			"harga_tertinggi": r.HargaTertinggi,
+			"harga_diskon":    hargaDiskon,
+			"punya_diskon":    punyaDiskon,
+			"gambar_barang":   gambarValid,
+			"kategori":        r.NamaKategori,
+			"stok":            r.TotalStok,
+		})
+	}
 
-  totalPages := int(total) / limit
-  if int(total)%limit != 0 {
-    totalPages++
-  }
+	if responseData == nil {
+		responseData = []gin.H{}
+	}
 
-  c.JSON(http.StatusOK, gin.H{
-    "status":  "success",
-    "message": "Berhasil mengambil daftar barang",
-    "data":    responseData,
-    "meta": gin.H{
-      "page":        page,
-      "limit":       limit,
-      "total":       total,
-      "total_pages": totalPages,
-    },
-  })
+	totalPages := int(total) / limit
+	if int(total)%limit != 0 {
+		totalPages++
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Berhasil mengambil daftar barang",
+		"data":    responseData,
+		"meta": gin.H{
+			"page":        page,
+			"limit":       limit,
+			"total":       total,
+			"total_pages": totalPages,
+		},
+	})
 }
 
 // GetDetailBarang mengambil detail satu barang berdasarkan ID.
@@ -148,7 +154,7 @@ func GetDetailBarang(c *gin.Context) {
   var responseVarian []gin.H
   for _, v := range varians {
     hargaDiskon := v.HargaBarang
-    if barang.DiskonId != 0 && barang.Diskon.IdDiskon != 0 {
+    if barang.DiskonId != nil && barang.Diskon.IdDiskon != 0 {
       if barang.Diskon.TglMulai.Before(now) && barang.Diskon.TglSelesai.After(now) {
         hargaDiskon = v.HargaBarang - (v.HargaBarang * barang.Diskon.BesarDiskon / 100)
       }
@@ -187,7 +193,7 @@ func GetDetailBarang(c *gin.Context) {
   }
 
   var diskonData interface{} = nil
-  if barang.DiskonId != 0 && barang.Diskon.IdDiskon != 0 {
+  if barang.DiskonId != nil && barang.Diskon.IdDiskon != 0 {
     diskonData = gin.H{
       "nama_diskon":  barang.Diskon.NamaDiskon,
       "besar_diskon": barang.Diskon.BesarDiskon,
@@ -489,7 +495,7 @@ func GetDetailBarangByScan(c *gin.Context) {
 	now := time.Now()
 	for _, v := range varians {
 		hargaDiskon := v.HargaBarang
-		if barcode.SpesifikasiBarang.Barang.DiskonId != 0 && barcode.SpesifikasiBarang.Barang.Diskon.IdDiskon != 0 {
+		if barcode.SpesifikasiBarang.Barang.DiskonId != nil && barcode.SpesifikasiBarang.Barang.Diskon.IdDiskon != 0 {
 			if barcode.SpesifikasiBarang.Barang.Diskon.TglMulai.Before(now) && barcode.SpesifikasiBarang.Barang.Diskon.TglSelesai.After(now) {
 				hargaDiskon = v.HargaBarang - (v.HargaBarang * barcode.SpesifikasiBarang.Barang.Diskon.BesarDiskon / 100)
 			}
@@ -506,7 +512,7 @@ func GetDetailBarangByScan(c *gin.Context) {
 	}
 
 	var diskonData interface{} = nil
-	if barcode.SpesifikasiBarang.Barang.DiskonId != 0 && barcode.SpesifikasiBarang.Barang.Diskon.IdDiskon != 0 {
+	if barcode.SpesifikasiBarang.Barang.DiskonId != nil && barcode.SpesifikasiBarang.Barang.Diskon.IdDiskon != 0 {
 		diskonData = gin.H{
 			"nama_diskon":  barcode.SpesifikasiBarang.Barang.Diskon.NamaDiskon,
 			"besar_diskon": barcode.SpesifikasiBarang.Barang.Diskon.BesarDiskon,
@@ -556,7 +562,7 @@ func CariProdukTransaksi(c *gin.Context) {
 		spek := barcode.SpesifikasiBarang
 		now := time.Now()
 		harga := spek.HargaBarang
-		if spek.Barang.DiskonId != 0 && spek.Barang.Diskon.IdDiskon != 0 {
+		if spek.Barang.DiskonId != nil && spek.Barang.Diskon.IdDiskon != 0 {
 			if spek.Barang.Diskon.TglMulai.Before(now) && spek.Barang.Diskon.TglSelesai.After(now) {
 				harga = spek.HargaBarang - (spek.HargaBarang * spek.Barang.Diskon.BesarDiskon / 100)
 			}
@@ -601,7 +607,7 @@ func CariProdukTransaksi(c *gin.Context) {
 		var varianList []gin.H
 		for _, v := range speks {
 			harga := v.HargaBarang
-			if b.DiskonId != 0 && b.Diskon.IdDiskon != 0 {
+			if b.DiskonId != nil && b.Diskon.IdDiskon != 0 {
 				if b.Diskon.TglMulai.Before(now) && b.Diskon.TglSelesai.After(now) {
 					harga = v.HargaBarang - (v.HargaBarang * b.Diskon.BesarDiskon / 100)
 				}

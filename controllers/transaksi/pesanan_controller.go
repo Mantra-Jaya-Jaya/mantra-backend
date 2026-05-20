@@ -270,7 +270,7 @@ func CheckoutPesanan(c *gin.Context) {
 		hargaSatuan := item.SpesifikasiBarang.HargaBarang
 		b := item.SpesifikasiBarang.Barang
 
-		if b.DiskonId != 0 && b.Diskon.IdDiskon != 0 {
+		if b.DiskonId != nil && b.Diskon.IdDiskon != 0 {
 			if b.Diskon.TglMulai.Before(now) && b.Diskon.TglSelesai.After(now) {
 				hargaSatuan = item.SpesifikasiBarang.HargaBarang - (item.SpesifikasiBarang.HargaBarang * b.Diskon.BesarDiskon / 100)
 			}

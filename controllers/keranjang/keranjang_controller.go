@@ -225,7 +225,7 @@ func GetKeranjang(c *gin.Context) {
 		punyaDiskon := false
 		b := item.SpesifikasiBarang.Barang
 
-		if b.DiskonId != 0 && b.Diskon.IdDiskon != 0 {
+		if b.DiskonId != nil && b.Diskon.IdDiskon != 0 {
 			if b.Diskon.TglMulai.Before(now) && b.Diskon.TglSelesai.After(now) {
 				punyaDiskon = true
 				hargaDiskon = hargaAsli - (hargaAsli * b.Diskon.BesarDiskon / 100)

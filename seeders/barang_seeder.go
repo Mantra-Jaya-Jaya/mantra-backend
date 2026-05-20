@@ -37,7 +37,7 @@ func SeedBarang() {
 			NamaBarang:   gofakeit.ProductName(),
 			GambarBarang: fmt.Sprintf("https://picsum.photos/seed/%d/400/400", gofakeit.Number(1, 1000)),
 			Deskripsi:    gofakeit.Sentence(10),
-			DiskonId:     diskon.IdDiskon,
+			DiskonId:     &diskon.IdDiskon,
 			SatuanId:     satuan.IdSatuan,
 			KategoriId:   kategori.IdKategori,
 		}
