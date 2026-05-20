@@ -5,22 +5,25 @@ import (
 	"backend-mantra/models"
 	"fmt"
 
-	"github.com/brianvoe/gofakeit/v7"
+	fake "github.com/brianvoe/gofakeit/v7"
 )
 
 func SeedSpesifikasiBarang() {
 	fmt.Println("⏳ Menyiapkan stok dan harga tiap varian barang...")
 
-	gofakeit.Seed(0)
+	var count int64
+	config.DB.Model(&models.SpesifikasiBarang{}).Count(&count)
+	if count >= 30 {
+		fmt.Println("Tabel spesifikasi_barang udah punya cukup data, proses seeding dilewati.")
+		return
+	}
 
-	// 1. Tarik semua data Barang
 	var daftarBarang []models.Barang
-	if err := config.DB.Find(&daftarBarang).Error; err != nil || len(daftarBarang) == 0 {
+	if err := config.DB.Preload("Kategori").Find(&daftarBarang).Error; err != nil || len(daftarBarang) == 0 {
 		fmt.Println("Barang masih kosong! Pastiin SeedBarang jalan duluan.")
 		return
 	}
 
-	// 2. Tarik semua data Detail Spesifikasi
 	var daftarDetailSpek []models.DetailSpesifikasi
 	if err := config.DB.Find(&daftarDetailSpek).Error; err != nil || len(daftarDetailSpek) == 0 {
 		fmt.Println("Detail Spesifikasi kosong! Pastiin SeedDetailSpesifikasi jalan.")
@@ -28,32 +31,47 @@ func SeedSpesifikasiBarang() {
 	}
 
 	totalVariasiDibuat := 0
-
-	// 3. Looping ke setiap barang buat dikasih varian
 	for _, barang := range daftarBarang {
-		// Kita kasih masing-masing barang 3 varian secara random
-		for i := 0; i < 3; i++ {
-			// Ambil detail spesifikasi acak dari list
-			randomIndex := gofakeit.Number(0, len(daftarDetailSpek)-1)
-			detailSpekAcak := daftarDetailSpek[randomIndex]
+		baseMin, baseMax := 10000, 100000
+		kat := barang.Kategori.NamaKategori
+		
+		if kat == "Elektronik" {
+			baseMin, baseMax = 1500000, 15000000
+		} else if kat == "Fashion" {
+			baseMin, baseMax = 150000, 800000
+		} else if kat == "Makanan & Minuman" {
+			baseMin, baseMax = 5000, 200000
+		} else if kat == "Kesehatan" {
+			baseMin, baseMax = 15000, 150000
+		} else if kat == "Olahraga" {
+			baseMin, baseMax = 50000, 500000
+		}
 
-			// Setup data varian, stok, dan harga
+		for i := 0; i < 2; i++ {
+			// Pilih ID spesifikasi yang unik per barang
+			detailIdx := (i + int(barang.IdBarang)) % len(daftarDetailSpek)
+			detail := daftarDetailSpek[detailIdx]
+
+			// Buat beberapa barang memiliki stok menipis (<10) atau kritis (<=5)
+			jumlahStok := fake.IntRange(15, 50)
+			if totalVariasiDibuat%5 == 0 {
+				jumlahStok = fake.IntRange(1, 5) // Kritis
+			} else if totalVariasiDibuat%7 == 0 {
+				jumlahStok = fake.IntRange(6, 10) // Warning
+			}
+
 			spekBarang := models.SpesifikasiBarang{
-				Jumlah:              gofakeit.Number(5, 150),
-				HargaBarang:         gofakeit.Number(15000, 350000),
+				Jumlah:              jumlahStok,
+				HargaBarang:         fake.IntRange(baseMin, baseMax),
 				BarangID:            barang.IdBarang,
-				DetailSpesifikasiID: detailSpekAcak.IdDetailSpesifikasi,
+				DetailSpesifikasiID: detail.IdDetailSpesifikasi,
 			}
 
-			// FirstOrCreate biar datanya gak dobel:
-			if err := config.DB.Where("id_barang = ? AND id_detail_spesifikasi = ?", spekBarang.BarangID, spekBarang.DetailSpesifikasiID).FirstOrCreate(&spekBarang).Error; err != nil {
-				fmt.Println("Error:", err)
-				continue
+			if err := config.DB.Where("id_barang = ? AND id_detail_spesifikasi = ?", spekBarang.BarangID, spekBarang.DetailSpesifikasiID).FirstOrCreate(&spekBarang).Error; err == nil {
+				totalVariasiDibuat++
 			}
-
-			totalVariasiDibuat++
 		}
 	}
 
-	fmt.Printf("Yeyy, Berhasil seed spesifikasi barang!")
+	fmt.Printf("Yeyy, Berhasil seed spesifikasi barang (%d varian)!\n", totalVariasiDibuat)
 }

@@ -4,28 +4,34 @@ import (
 	"backend-mantra/config"
 	"backend-mantra/models"
 	"fmt"
-
-	"github.com/brianvoe/gofakeit/v7"
+	"net/url"
 )
 
 func SeedKategori() {
-	gofakeit.Seed(0)
+	fmt.Println("⏳ Menyiapkan data kategori...")
 
-	// Bikin 10 data
-	for i := 0; i < 10; i++ {
+	kategoris := []string{
+		"Elektronik",
+		"Fashion",
+		"Makanan & Minuman",
+		"Kesehatan",
+		"Olahraga",
+		"Peralatan Rumah",
+		"Buku & Alat Tulis",
+		"Kecantikan",
+	}
+
+	for _, nama := range kategoris {
 		kategori := models.Kategori{
-			// Pakai ProductCategory() dari docs biar namanya beneran kayak "Electronics", "Clothing", bukan kata random aneh
-			NamaKategori: gofakeit.ProductCategory(),
-
-			// (Karena di v7 fungsi Image() balikin byte, kita pakai trik URL kucing lucu aja)
-			IconKategori: fmt.Sprintf("https://cataas.com/cat?width=100&height=100&random=%s", gofakeit.UUID()),
+			NamaKategori: nama,
+			IconKategori: fmt.Sprintf("https://placehold.co/64x64?text=%s", url.QueryEscape(nama)),
 		}
 
-		if err := config.DB.Create(&kategori).Error; err != nil {
-			fmt.Println("Hadehh error:", err)
-			return
+		if err := config.DB.Where("nama_kategori = ?", nama).FirstOrCreate(&kategori).Error; err != nil {
+			fmt.Println("Hadehh error insert kategori:", err)
+			continue
 		}
 	}
 
-	fmt.Println("yeeyyy, berhasil seed kategori!")
+	fmt.Println("Yeyy, berhasil seed kategori!")
 }

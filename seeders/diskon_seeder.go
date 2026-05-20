@@ -4,41 +4,42 @@ import (
 	"backend-mantra/config"
 	"backend-mantra/models"
 	"fmt"
+	"net/url"
 	"time"
 )
 
 func SeedDiskon() {
-	// buat 3 data diskon
-	daftarDiskon := []models.Diskon{
-		{
-			NamaDiskon:   "Promo Back to Campus",
-			BesarDiskon:  15,
-			BannerDiskon: "https://cataas.com/cat?text=Promo+Kampus&width=400&height=200",
+	fmt.Println("⏳ Menyiapkan data diskon...")
 
-			TglMulai:   time.Date(2026, time.May, 1, 0, 0, 0, 0, time.Local),
-			TglSelesai: time.Date(2026, time.May, 31, 0, 0, 0, 0, time.Local),
+	now := time.Now()
+
+	diskons := []models.Diskon{
+		{
+			NamaDiskon:   "Flash Sale Elektronik",
+			BesarDiskon:  15,
+			BannerDiskon: fmt.Sprintf("https://placehold.co/800x300?text=%s", url.QueryEscape("Flash Sale Elektronik")),
+			TglMulai:     now,
+			TglSelesai:   now.AddDate(0, 0, 30),
 		},
 		{
-			NamaDiskon:   "Flash Sale Mahasiswa Polines",
-			BesarDiskon:  50, // Diskon gila-gilaan 50%
-			BannerDiskon: "https://cataas.com/cat?text=Flash+Sale&width=400&height=200",
-			// Promo super singkat (misal: 10 - 15 Mei 2026)
-			TglMulai:   time.Date(2026, time.May, 10, 0, 0, 0, 0, time.Local),
-			TglSelesai: time.Date(2026, time.May, 15, 0, 0, 0, 0, time.Local),
+			NamaDiskon:   "Promo Akhir Bulan",
+			BesarDiskon:  20,
+			BannerDiskon: fmt.Sprintf("https://placehold.co/800x300?text=%s", url.QueryEscape("Promo Akhir Bulan")),
+			TglMulai:     now,
+			TglSelesai:   now.AddDate(0, 0, 14),
 		},
 		{
-			NamaDiskon:   "Diskon Akhir Tahun",
-			BesarDiskon:  25,
-			BannerDiskon: "https://cataas.com/cat?text=Akhir+Tahun&width=400&height=200",
-			// Promo buat akhir tahun nanti
-			TglMulai:   time.Date(2026, time.December, 1, 0, 0, 0, 0, time.Local),
-			TglSelesai: time.Date(2026, time.December, 31, 0, 0, 0, 0, time.Local),
+			NamaDiskon:   "Diskon Member Baru",
+			BesarDiskon:  10,
+			BannerDiskon: fmt.Sprintf("https://placehold.co/800x300?text=%s", url.QueryEscape("Diskon Member Baru")),
+			TglMulai:     now,
+			TglSelesai:   now.AddDate(0, 0, 60),
 		},
 	}
 
-	for _, diskon := range daftarDiskon {
-		if err := config.DB.Where("nama_diskon = ?", diskon.NamaDiskon).FirstOrCreate(&diskon).Error; err != nil {
-			fmt.Println("Error insert data diskon", diskon.NamaDiskon, ":", err)
+	for _, d := range diskons {
+		if err := config.DB.Where("nama_diskon = ?", d.NamaDiskon).FirstOrCreate(&d).Error; err != nil {
+			fmt.Println("Error insert data diskon", d.NamaDiskon, ":", err)
 			continue
 		}
 	}

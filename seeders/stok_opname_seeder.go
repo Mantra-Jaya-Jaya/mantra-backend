@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v7"
+	fake "github.com/brianvoe/gofakeit/v7"
 )
 
 func SeedStokOpname() {
 	fmt.Println("⏳ Menyiapkan data riwayat pergerakan stok (Stok Opname)...")
 
-	// 1. Ambil semua data SpesifikasiBarang yang udah dibuat
 	var daftarVarian []models.SpesifikasiBarang
 	if err := config.DB.Find(&daftarVarian).Error; err != nil || len(daftarVarian) == 0 {
 		fmt.Println("Gak bisa bikin stok opname karena data varian barang kosong!")
@@ -20,38 +19,38 @@ func SeedStokOpname() {
 	}
 
 	totalRiwayat := 0
+	keteranganList := []string{"Stok masuk dari supplier", "Stok keluar penjualan", "Retur barang", "Stok opname bulanan"}
 
-	// 2. Looping setiap varian barang
 	for _, varian := range daftarVarian {
-		// Kita bikin 3 catatan riwayat per varian
+		var count int64
+		config.DB.Model(&models.StokOpname{}).Where("id_spesifikasi_barang = ?", varian.IdSpesifikasiBarang).Count(&count)
+		if count >= 3 {
+			continue // Sudah memiliki minimal 3 log
+		}
+
 		for i := 0; i < 3; i++ {
-			status := gofakeit.Bool() // Acak: true (masuk) atau false (keluar)
-
-			// Logika Harga Beli: biasanya lebih murah dari harga jual (sekitar 60-80%)
-			modal := int(float64(varian.HargaBarang) * gofakeit.Float64Range(0.6, 0.8))
-
-			keterangan := "Restock barang dari supplier"
-			if !status {
-				keterangan = "Penyesuaian stok / barang rusak"
+			status := (i%2 == 0) // Mix true and false
+			
+			// Modal selalu lebih murah dari harga jual
+			modal := varian.HargaBarang - fake.IntRange(1000, 15000)
+			if modal < 0 {
+				modal = varian.HargaBarang
 			}
 
 			stokOpname := models.StokOpname{
 				HargaBeli:           modal,
 				Status:              status,
-				JumlahStok:          gofakeit.Number(5, 50),
-				Keterangan:          keterangan,
-				Tanggal:             gofakeit.DateRange(time.Now().AddDate(0, 0, -30), time.Now()),
+				JumlahStok:          fake.IntRange(10, 100),
+				Keterangan:          fake.RandomString(keteranganList),
+				Tanggal:             time.Now().AddDate(0, 0, -fake.IntRange(1, 30)),
 				SpesifikasiBarangID: varian.IdSpesifikasiBarang,
 			}
 
-			// Tambahkan Datanya ke database
-			if err := config.DB.Create(&stokOpname).Error; err != nil {
-				fmt.Println("Error:", err)
-				continue
+			if err := config.DB.Create(&stokOpname).Error; err == nil {
+				totalRiwayat++
 			}
-			totalRiwayat++
 		}
 	}
 
-	fmt.Printf("Yeyy, Berhasil Seed Stok Opname!")
+	fmt.Printf("Yeyy, Berhasil seed %d Stok Opname!\n", totalRiwayat)
 }
