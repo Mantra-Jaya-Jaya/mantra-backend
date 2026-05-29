@@ -6,6 +6,7 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -197,5 +198,26 @@ func HapusKategori(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Kategori berhasil dihapus",
+	})
+}
+
+// UploadIconKategori mengunggah gambar/icon kategori ke MinIO.
+// Dipakai oleh: admin (POST /admin/kategori/upload)
+// Auth: Wajib login, role admin
+func UploadIconKategori(c *gin.Context) {
+	fileUrl, err := utils.UploadFileToMinio(c, "icon", "kategori")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Gagal mengunggah icon kategori: " + err.Error(),
+		})
+		return
+	}
+
+	// 2. Kembalikan URL publik MinIO ke Next.js
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Icon berhasil diunggah ke server storage",
+		"url":     fileUrl, // URL ini yang nanti dikirim Next.js
 	})
 }
