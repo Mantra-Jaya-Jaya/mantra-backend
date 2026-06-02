@@ -44,6 +44,7 @@ func ConnectDatabase() {
 		&models.User{},
 		&models.RefreshToken{},
 		&models.Customer{},
+		&models.Karyawan{},
 		&models.Kasir{},
 		&models.Kurir{},
 		// Alamat (butuh Customer)

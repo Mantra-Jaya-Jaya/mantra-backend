@@ -165,7 +165,7 @@ func GetDetailPesanan(c *gin.Context) {
 	config.DB.Preload("SpesifikasiBarang.Barang").Preload("SpesifikasiBarang.DetailSpesifikasi").Where("id_pesanan = ?", pesanan.IdPesanan).Find(&details)
 
 	var pengantaran models.Pengantaran
-	config.DB.Preload("Kurir.User").Preload("Ekspedisi").Where("id_pesanan = ?", pesanan.IdPesanan).First(&pengantaran)
+	config.DB.Preload("Kurir.Karyawan.User").Preload("Ekspedisi").Where("id_pesanan = ?", pesanan.IdPesanan).First(&pengantaran)
 
 	var items []gin.H
 	subtotalItems := 0
@@ -192,7 +192,7 @@ func GetDetailPesanan(c *gin.Context) {
 	var kurirData interface{} = nil
 	if pengantaran.IdPengantaran != 0 {
 		kurirData = gin.H{
-			"nama_kurir": pengantaran.Kurir.User.NamaLengkap,
+			"nama_kurir": pengantaran.Kurir.Karyawan.User.NamaLengkap,
 			"plat_nomor": "H 6582 TH", // Mock karena tidak ada di DB
 			"ekspedisi":  pengantaran.Ekspedisi.NamaEkspedisi,
 			"foto_kurir": "https://api.mantra.com/storage/kurir/ricardo.jpg", // Mock
@@ -413,7 +413,7 @@ func LacakPesanan(c *gin.Context) {
 	idPesanan := c.Param("id_pesanan")
 
 	var pengantaran models.Pengantaran
-	if err := config.DB.Preload("Kurir.User").
+	if err := config.DB.Preload("Kurir.Karyawan.User").
 		Joins("JOIN pesanan ON pesanan.id_pesanan = pengantaran.id_pesanan").
 		Where("pesanan.public_id = ?", idPesanan).
 		First(&pengantaran).Error; err != nil {
@@ -430,7 +430,7 @@ func LacakPesanan(c *gin.Context) {
 		"data": gin.H{
 			"id_pesanan": idPesanan,
 			"kurir": gin.H{
-				"nama":       pengantaran.Kurir.User.NamaLengkap,
+				"nama":       pengantaran.Kurir.Karyawan.User.NamaLengkap,
 				"plat_nomor": "H 6582 TH",                                        // Mock karena tidak ada di DB
 				"foto":       "https://api.mantra.com/storage/kurir/ricardo.jpg", // Mock
 			},
@@ -452,7 +452,7 @@ func GetDashboardKasir(c *gin.Context) {
 
 	// Ambil nama kasir dari data user yang login
 	var kasir models.Kasir
-	if err := config.DB.Preload("User").Where("id_user = ?", userID).First(&kasir).Error; err != nil {
+	if err := config.DB.Joins("JOIN karyawan ON karyawan.id_karyawan = kasir.id_karyawan").Preload("Karyawan").Preload("Karyawan.User").Where("karyawan.id_user = ?", userID).First(&kasir).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Data kasir tidak ditemukan",
@@ -521,7 +521,7 @@ func GetDashboardKasir(c *gin.Context) {
 		"message": "Data dashboard berhasil diambil",
 		"data": gin.H{
 			"user": gin.H{
-				"nama_kasir":        kasir.User.NamaLengkap,
+				"nama_kasir":        kasir.Karyawan.User.NamaLengkap,
 				"status_notifikasi": true,
 			},
 			"statistik_hari_ini": gin.H{

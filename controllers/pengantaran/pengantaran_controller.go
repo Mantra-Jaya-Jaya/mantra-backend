@@ -22,7 +22,7 @@ func GetDaftarPengantaran(c *gin.Context) {
 	// Filter jika yang mengakses adalah kurir
 	if role == "kurir" {
 		var result struct{ IdKurir uint }
-		if err := config.DB.Raw("SELECT id_kurir FROM kurir WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
+		if err := config.DB.Raw("SELECT id_kurir FROM kurir JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan WHERE karyawan.id_user = ?", userID).Scan(&result).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "error",
 				"message": "Gagal mengidentifikasi kurir",
@@ -75,7 +75,7 @@ func UpdateLokasiKurir(c *gin.Context) {
 
 	// 1. Cari id_kurir berdasarkan user_id dari JWT
 	var result struct{ IdKurir uint }
-	if err := config.DB.Raw("SELECT id_kurir FROM kurir WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
+	if err := config.DB.Raw("SELECT id_kurir FROM kurir JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan WHERE karyawan.id_user = ?", userID).Scan(&result).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal mengidentifikasi kurir",

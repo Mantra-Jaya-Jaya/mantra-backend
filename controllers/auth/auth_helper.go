@@ -22,7 +22,7 @@ func GenerateJWT(userID uint, publicID string, role string) (string, error) {
 		"user_id":   userID,
 		"public_id": publicID,
 		"role":      role,
-		"exp":       time.Now().Add(15 * time.Minute).Unix(), // 15 menit sesuai kontrak (900s)
+		"exp":       time.Now().Add(30 * time.Minute).Unix(), // 30 menit
 		"iat":       time.Now().Unix(),
 	}
 
@@ -37,7 +37,7 @@ func RespondWithSuccess(c *gin.Context, clientType string, user models.User, rol
 	if clientType == "nextjs" {
 		// Set cookie sesuai kontrak: HttpOnly; Secure; SameSite=Strict
 		// Gin SetCookie params: name, value string, maxAge int, path, domain string, secure, httpOnly bool
-		c.SetCookie("access_token", accessToken, 900, "/", "", true, true)
+		c.SetCookie("access_token", accessToken, 1800, "/", "", true, true)
 		c.SetCookie("refresh_token", refreshToken, 604800, "/", "", true, true)
 
 		c.JSON(http.StatusOK, gin.H{
@@ -61,7 +61,7 @@ func RespondWithSuccess(c *gin.Context, clientType string, user models.User, rol
 				"access_token":  accessToken,
 				"refresh_token": refreshToken,
 				"token_type":    "Bearer",
-				"expires_in":    900,
+				"expires_in":    1800,
 				"user": gin.H{
 					"id_user":      user.IdUser,
 					"username":     user.Username,

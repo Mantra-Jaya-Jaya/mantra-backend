@@ -16,7 +16,7 @@ db-plan:
 
 # Perintah untuk mengeksekusi skema ke database utama
 db-apply:
-	atlas schema apply --env local --to "env://to"
+	atlas schema apply --env local --to "env://to" --auto-approve
 
 # Melihat struktur db saat ini via CLI
 db-inspect:
@@ -29,7 +29,16 @@ db-ui:
 # Menghapus seluruh skema (Drop All) di database utama
 # PERINGATAN: Hanya gunakan ini di environment lokal saat butuh reset total!
 db-clean:
-	atlas schema clean --env local
+	atlas schema clean --env local --auto-approve
+	PGPASSWORD=${DB_PASSWORD} psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -c 'CREATE SCHEMA IF NOT EXISTS public;'
+
+# Menghapus seluruh skema di database sandbox (mantra_dev)
+db-clean-dev:
+	atlas schema clean --url "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/mantra_dev?sslmode=disable" --auto-approve
+	PGPASSWORD=${DB_PASSWORD} psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d mantra_dev -c 'CREATE SCHEMA IF NOT EXISTS public;'
+
+# Membersihkan skema dari database utama dan sandbox sekaligus
+db-clean-all: db-clean db-clean-dev
 
 # ==========================================
 # GOLANG UTILITIES

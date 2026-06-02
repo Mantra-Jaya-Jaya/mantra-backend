@@ -300,8 +300,8 @@ func GetDashboardAdmin(c *gin.Context) {
 	var transaksiResponse []TransaksiData
 	for _, p := range pesananTerbaru {
 		kasirName := "-"
-		if p.Kasir.User.NamaLengkap != "" {
-			kasirName = p.Kasir.User.NamaLengkap
+		if p.Kasir.Karyawan.User.NamaLengkap != "" {
+			kasirName = p.Kasir.Karyawan.User.NamaLengkap
 		}
 		custName := "-"
 		if p.Customer.User.NamaLengkap != "" {

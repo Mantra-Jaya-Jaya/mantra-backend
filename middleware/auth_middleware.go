@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	"backend-mantra/controllers/auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -73,6 +76,19 @@ func AuthMiddleware() gin.HandlerFunc {
 			})
 			c.Abort()
 			return
+		}
+
+		// Sliding Expiration: Renew token if less than 15 minutes left
+		if claims.ExpiresAt != nil {
+			timeRemaining := time.Until(claims.ExpiresAt.Time)
+			if timeRemaining > 0 && timeRemaining < 15*time.Minute {
+				newToken, errGenerate := auth.GenerateJWT(claims.UserID, claims.PublicID, claims.Role)
+				if errGenerate == nil && newToken != "" {
+					c.SetCookie("access_token", newToken, 1800, "/", "", true, true)
+					c.Header("X-New-Access-Token", newToken)
+					c.Header("Access-Control-Expose-Headers", "X-New-Access-Token")
+				}
+			}
 		}
 
 		// Save to context for next handlers

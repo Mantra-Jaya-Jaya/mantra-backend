@@ -23,8 +23,8 @@ func SeedKasir() {
 	// 2. Siapin data tanggal lahir (Contoh: 15 Mei 2004)
 	tglLahir := time.Date(2004, time.May, 15, 0, 0, 0, 0, time.Local)
 
-	// 3. Siapin profil Kasir-nya
-	kasirProfil := models.Kasir{
+	// 3. Siapin profil Karyawan-nya
+	karyawanProfil := models.Karyawan{
 		NoTelp:             "08" + gofakeit.DigitN(10),
 		TempatLahir:        "Semarang",
 		TanggalLahir:       tglLahir,
@@ -33,12 +33,20 @@ func SeedKasir() {
 		PendidikanTerakhir: "D3 Teknik Komputer",
 		Nik:                "3374" + gofakeit.DigitN(12),
 		Status:             "Aktif",
-		Shift:              "Pagi",
 		UserId:             user.IdUser,
 	}
 
-	// 4. Simpan ke database (FirstOrCreate berdasarkan UserId)
-	if err := config.DB.Where("id_user = ?", user.IdUser).FirstOrCreate(&kasirProfil).Error; err != nil {
+	// 4. Simpan ke database
+	if err := config.DB.Where("id_user = ?", user.IdUser).FirstOrCreate(&karyawanProfil).Error; err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	kasirProfil := models.Kasir{
+		Shift:      "Pagi",
+		KaryawanId: karyawanProfil.IdKaryawan,
+	}
+	if err := config.DB.Where("id_karyawan = ?", karyawanProfil.IdKaryawan).FirstOrCreate(&kasirProfil).Error; err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
