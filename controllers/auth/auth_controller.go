@@ -166,7 +166,7 @@ func RefreshToken(c *gin.Context) {
 	}
 
 	if clientType == "nextjs" {
-		c.SetCookie("access_token", newAccessToken, 900, "/", "", true, true)
+		c.SetCookie("access_token", newAccessToken, 1800, "/", "", true, true)
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
 			"message": "Token berhasil diperbarui",
@@ -177,7 +177,7 @@ func RefreshToken(c *gin.Context) {
 			"message": "Token berhasil diperbarui",
 			"data": gin.H{
 				"access_token": newAccessToken,
-				"expires_in":   900,
+				"expires_in":   1800,
 			},
 		})
 	}

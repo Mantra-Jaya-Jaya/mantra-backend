@@ -10,6 +10,7 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -32,6 +33,17 @@ func GetDaftarKaryawan(c *gin.Context) {
 	if search != "" {
 		query = query.Where("User.nama_lengkap ILIKE ? OR User.username ILIKE ? OR User.email ILIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
+	
+	role := c.Query("role")
+	if role != "" && role != "Semua Role" {
+		query = query.Where("\"User__Role\".nama_role = ?", role)
+	}
+
+	status := c.Query("status")
+	if status != "" && status != "Semua Status" {
+		query = query.Where("karyawan.status = ?", status)
+	}
+
 	query.Count(&total)
 
 	if err := query.Preload("User").Preload("User.Role").Offset(offset).Limit(limit).Find(&karyawans).Error; err != nil {
@@ -98,6 +110,7 @@ func TambahKaryawan(c *gin.Context) {
 		Nik                string `json:"nik"`
 		Role               string `json:"role" binding:"required"`
 		Shift              string `json:"shift"`
+		FotoProfil         string `json:"foto_profil"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -140,6 +153,7 @@ func TambahKaryawan(c *gin.Context) {
 		Password:    string(hashed),
 		NamaLengkap: input.NamaLengkap,
 		RoleID:      role.IdRole,
+		FotoProfil:  input.FotoProfil,
 	}
 	if err := tx.Create(&newUser).Error; err != nil {
 		tx.Rollback()
@@ -251,6 +265,9 @@ func GetDetailKaryawan(c *gin.Context) {
 			"role":                karyawan.User.Role.NamaRole,
 			"shift":               shift,
 			"status":              karyawan.Status,
+			"foto_profil":         karyawan.User.FotoProfil,
+			"dibuat_pada":         "Tidak tersedia", // TODO: Tambahkan field created_at di tabel
+			"login_terakhir":      "Belum pernah",   // TODO: Ambil dari refresh token atau tracking login
 		},
 	})
 }
@@ -271,6 +288,7 @@ func UpdateKaryawan(c *gin.Context) {
 		Nik                string `json:"nik"`
 		Status             string `json:"status"`
 		Shift              string `json:"shift"`
+		FotoProfil         string `json:"foto_profil"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -290,6 +308,7 @@ func UpdateKaryawan(c *gin.Context) {
 	if input.Username != "" { karyawan.User.Username = input.Username }
 	if input.Email != "" { karyawan.User.Email = input.Email }
 	if input.NamaLengkap != "" { karyawan.User.NamaLengkap = input.NamaLengkap }
+	if input.FotoProfil != "" { karyawan.User.FotoProfil = input.FotoProfil }
 	if input.Password != "" {
 		hashed, _ := bcrypt.GenerateFromPassword([]byte(input.Password), 12)
 		karyawan.User.Password = string(hashed)
@@ -326,4 +345,27 @@ func UpdateKaryawan(c *gin.Context) {
 
 	tx.Commit()
 	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Karyawan berhasil diupdate"})
+}
+
+// UploadFotoKaryawan mengunggah gambar foto profil karyawan ke MinIO.
+// Dipakai oleh: admin (POST /admin/karyawan/upload)
+// Auth: Wajib login, role admin
+func UploadFotoKaryawan(c *gin.Context) {
+	// Biasanya nama form datanya adalah "file" atau "foto", mari kita coba sesuaikan dengan util yang ada.
+	// Jika dari sisi klien mengirim field "foto" atau "file", utils.UploadFileToMinio mungkin pakai field itu.
+	// Mari kita asumsi dari parameter fungsi utamanya.
+	fileUrl, err := utils.UploadFileToMinio(c, "foto", "karyawan")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Gagal mengunggah foto profil: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Foto berhasil diunggah ke server storage",
+		"url":     fileUrl,
+	})
 }

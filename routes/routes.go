@@ -100,6 +100,7 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.GET("/diskon", katalog.GetPromo)
 			adminGroup.GET("/karyawan", user.GetDaftarKaryawan)
 			adminGroup.POST("/karyawan", user.TambahKaryawan)
+			adminGroup.POST("/karyawan/upload", user.UploadFotoKaryawan)
 			adminGroup.GET("/karyawan/:id", user.GetDetailKaryawan)
 			adminGroup.PUT("/karyawan/:id", user.UpdateKaryawan)
 			adminGroup.DELETE("/karyawan/:id", user.HapusKaryawan)
