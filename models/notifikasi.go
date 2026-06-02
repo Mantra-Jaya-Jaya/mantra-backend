@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 func (Notifikasi) TableName() string {
 	return "notifikasi"
 }
@@ -13,4 +15,5 @@ type Notifikasi struct {
 	Judul  string `gorm:"column:judul" json:"judul"`
 	Pesan  string `gorm:"column:pesan" json:"pesan"`
 	Status string `gorm:"column:status" json:"status"`
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
 }

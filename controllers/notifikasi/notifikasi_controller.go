@@ -3,6 +3,7 @@ package notifikasi
 import (
 	"net/http"
 	"time"
+	"fmt"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -45,13 +46,13 @@ func GetNotifikasiAdmin(c *gin.Context) {
 
 	var responseData []gin.H
 
-	// 1. Ambil riwayat notifikasi admin dari database
 	var notifikasis []models.Notifikasi
 	if err := config.DB.Where("id_user = ?", userID).Find(&notifikasis).Error; err == nil {
 		for _, n := range notifikasis {
 			responseData = append(responseData, gin.H{
-				"id_notifikasi": n.IdNotifikasi,
+				"id_notifikasi": fmt.Sprintf("SYS-%d", n.IdNotifikasi),
 				"id_barang":     nil,
+				"public_id" : 	 nil,
 				"nama_barang":   nil,
 				"varian":        nil,
 				"stok_saat_ini": nil,
@@ -59,12 +60,11 @@ func GetNotifikasiAdmin(c *gin.Context) {
 				"pesan":         n.Pesan,
 				"judul":         n.Judul,
 				"status":        n.Status,
-				"created_at":    time.Now().Add(-1 * time.Hour).Format(time.RFC3339), // Fallback time
+				"created_at":    n.CreatedAt.Format(time.RFC3339),
 			})
 		}
 	}
 
-	// 2. Ambil barang-barang dengan stok menipis (jumlah <= 5) secara dinamis
 	var lowStockItems []models.SpesifikasiBarang
 	if err := config.DB.
 		Preload("Barang").
@@ -80,8 +80,9 @@ func GetNotifikasiAdmin(c *gin.Context) {
 			}
 
 			responseData = append(responseData, gin.H{
-				"id_notifikasi": item.IdSpesifikasiBarang + 1000, // Offset agar tidak bentrok ID-nya
+				"id_notifikasi": fmt.Sprintf("STK-%d", item.IdSpesifikasiBarang),
 				"id_barang":     item.BarangID,
+				"public_id":     item.Barang.PublicId,
 				"nama_barang":   item.Barang.NamaBarang,
 				"varian":        varianName,
 				"stok_saat_ini": item.Jumlah,
