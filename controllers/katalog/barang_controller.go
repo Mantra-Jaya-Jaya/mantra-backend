@@ -123,7 +123,7 @@ func GetDaftarBarang(c *gin.Context) {
 }
 
 // GetDetailBarang mengambil detail satu barang berdasarkan ID.
-// Dipakai oleh: admin (GET /admin/katalog/barang/:id_barang)
+// Dipakai oleh: admin (GET /admin/katalog/barang/:public_id)
 // Auth: Wajib login, role admin
 func GetDetailBarang(c *gin.Context) {
   // 🚀 1. Ambil param public_id (String/UUID)
@@ -150,6 +150,21 @@ func GetDetailBarang(c *gin.Context) {
     Where("id_barang = ?", barang.IdBarang).
     Find(&varians)
 
+  var hargaBeli int = 0
+  var spekIds []uint
+  for _, v := range varians {
+    spekIds = append(spekIds, v.IdSpesifikasiBarang)
+  }
+
+  // Kalau ada variannya, intip riwayat gudang terbarunya!
+  if len(spekIds) > 0 {
+    var lastStok models.StokOpname
+    // Order("tanggal DESC") memastikan kita cuma ngambil 1 baris data yang paling baru
+    if err := config.DB.Where("id_spesifikasi_barang IN ?", spekIds).Order("tanggal DESC").First(&lastStok).Error; err == nil {
+      hargaBeli = lastStok.HargaBeli
+    }
+  }
+
   now := time.Now()
   var responseVarian []gin.H
   for _, v := range varians {
@@ -162,15 +177,14 @@ func GetDetailBarang(c *gin.Context) {
 
     // 🚀 4. Ambil Barcode untuk varian ini
     var barcodes []models.Barcode
-    // Pastikan nama field string "id_spesifikasi_barang" sesuai dengan nama kolom di database Postgres lu
     config.DB.Where("id_spesifikasi_barang = ?", v.IdSpesifikasiBarang).Find(&barcodes)
     
     var responseBarcodes []gin.H
     for _, b := range barcodes {
       responseBarcodes = append(responseBarcodes, gin.H{
         "id_barcode":   b.IdBarcode,
-        "kode_barcode": b.KodeBarcode, // 🔥 WAJIB ADA: Biar frontend bisa nampilin teks barcodenya
-        "kuantitas":    b.Kuantitas,   // 🔥 FIX: Hapus SatuanId karena emang gak ada di tabel barcode
+        "kode_barcode": b.KodeBarcode,
+        "kuantitas":    b.Kuantitas,   
       })
     }
     if responseBarcodes == nil {
@@ -184,7 +198,7 @@ func GetDetailBarang(c *gin.Context) {
       "harga_barang":          v.HargaBarang,
       "harga_diskon":          hargaDiskon,
       "stok":                  v.Jumlah,
-      "barcodes":              responseBarcodes, // 🔥 SUNTIKKAN BARCODE KE DALAM VARIAN
+      "barcodes":              responseBarcodes, 
     })
   }
   
@@ -195,6 +209,7 @@ func GetDetailBarang(c *gin.Context) {
   var diskonData interface{} = nil
   if barang.DiskonId != nil && barang.Diskon.IdDiskon != 0 {
     diskonData = gin.H{
+      "id_diskon":    barang.Diskon.IdDiskon, 
       "nama_diskon":  barang.Diskon.NamaDiskon,
       "besar_diskon": barang.Diskon.BesarDiskon,
       "tgl_selesai":  barang.Diskon.TglSelesai,
@@ -209,6 +224,7 @@ func GetDetailBarang(c *gin.Context) {
       "id_barang":     barang.IdBarang,
       "public_id":     barang.PublicId,
       "nama_barang":   barang.NamaBarang,
+      "harga_beli":    hargaBeli, 
       "deskripsi":     barang.Deskripsi,
       "gambar_barang": barang.GambarBarang,
       "kategori":      barang.Kategori.NamaKategori,
@@ -223,252 +239,409 @@ func GetDetailBarang(c *gin.Context) {
 // Dipakai oleh: admin (POST /admin/katalog/barang)
 // Auth: Wajib login, role admin
 func TambahBarang(c *gin.Context) {
-  var input struct {
-    Media           string `json:"media"`
-    InformasiBarang struct {
-      Nama      string `json:"nama" binding:"required"`
-      HargaBeli string `json:"hargaBeli"`
-      Kategori  string `json:"kategori" binding:"required"`
-      Satuan    string `json:"satuan" binding:"required"`
-      Deskripsi string `json:"deskripsi"`
-    } `json:"informasi_barang"`
-    Spesifikasi []struct {
-      Atribut   string `json:"atribut"`
-      Nilai     string `json:"nilai"`
-      Stok      string `json:"stok"`
-      HargaJual string `json:"hargaJual"`
-      Barcodes  []struct {
-        Code string `json:"code"`
-        Qty  string `json:"qty"`
-      } `json:"barcodes"`
-    } `json:"spesifikasi"`
-  }
+	var input struct {
+		Media           string `json:"media"`
+		InformasiBarang struct {
+			Nama      string `json:"nama" binding:"required"`
+			HargaBeli string `json:"hargaBeli"`
+			Kategori  string `json:"kategori" binding:"required"`
+			Diskon    string `json:"diskon"`
+			Satuan    string `json:"satuan" binding:"required"`
+			Deskripsi string `json:"deskripsi"`
+		} `json:"informasi_barang"`
+		Spesifikasi []struct {
+			Atribut   string `json:"atribut"`
+			Nilai     string `json:"nilai"`
+			Stok      string `json:"stok"` // Ini stok per variasi
+			HargaJual string `json:"hargaJual"`
+			Barcodes  []struct {
+				Code string `json:"code"`
+				Qty  string `json:"qty"`
+			} `json:"barcodes"`
+		} `json:"spesifikasi"`
+	}
 
-  if err := c.ShouldBindJSON(&input); err != nil {
-    c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Format JSON tidak sesuai: " + err.Error()})
-    return
-  }
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Format JSON tidak sesuai: " + err.Error()})
+		return
+	}
 
-  // MULAI TRANSAKSI DATABASE
-  tx := config.DB.Begin()
-  if tx.Error != nil {
-    c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memulai transaksi DB"})
-    return
-  }
+	// MULAI TRANSAKSI DATABASE
+	tx := config.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memulai transaksi DB"})
+		return
+	}
 
-  // PROSES KATEGORI & SATUAN
-  var kategori models.Kategori
-  if err := tx.FirstOrCreate(&kategori, models.Kategori{NamaKategori: input.InformasiBarang.Kategori}).Error; err != nil {
-    tx.Rollback()
-    c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memproses kategori"})
-    return
-  }
+	// PROSES KATEGORI & SATUAN
+	var kategori models.Kategori
+	if err := tx.FirstOrCreate(&kategori, models.Kategori{NamaKategori: input.InformasiBarang.Kategori}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memproses kategori"})
+		return
+	}
 
-  var satuan models.Satuan
-  if err := tx.FirstOrCreate(&satuan, models.Satuan{NamaSatuan: input.InformasiBarang.Satuan}).Error; err != nil {
-    tx.Rollback()
-    c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memproses satuan"})
-    return
-  }
+	var satuan models.Satuan
+	if err := tx.FirstOrCreate(&satuan, models.Satuan{NamaSatuan: input.InformasiBarang.Satuan}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memproses satuan"})
+		return
+	}
 
-  // SIMPAN INDUK BARANG
-  barang := models.Barang{
-    NamaBarang:   input.InformasiBarang.Nama,
-    GambarBarang: input.Media,
-    Deskripsi:    input.InformasiBarang.Deskripsi,
-    KategoriId:   kategori.IdKategori,
-    SatuanId:     satuan.IdSatuan,
-  }
+	var idDiskonPointer *uint 
+	
+	if input.InformasiBarang.Diskon != "" {
+		idDiskonInt, err := strconv.Atoi(input.InformasiBarang.Diskon)
+		if err == nil {
+			idDiskonUint := uint(idDiskonInt)
+			idDiskonPointer = &idDiskonUint
+		}
+	}
 
-  if err := tx.Create(&barang).Error; err != nil {
-    tx.Rollback()
-    c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan induk barang"})
-    return
-  }
+	// SIMPAN INDUK BARANG
+	barang := models.Barang{
+		NamaBarang:   input.InformasiBarang.Nama,
+		GambarBarang: input.Media,
+		Deskripsi:    input.InformasiBarang.Deskripsi,
+		KategoriId:   kategori.IdKategori,
+		SatuanId:     satuan.IdSatuan,
+		DiskonId:     idDiskonPointer,
+	}
 
-  hargaBeliInt, _ := strconv.Atoi(input.InformasiBarang.HargaBeli)
+	if err := tx.Create(&barang).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan induk barang"})
+		return
+	}
 
-  // LOOPING PEMETAAN VARIAN & BARCODE SESUAI MODELS LU
-  for _, spek := range input.Spesifikasi {
-    
-    // A. Atribut Induk
-    var spesifikasi models.Spesifikasi
-    if err := tx.FirstOrCreate(&spesifikasi, models.Spesifikasi{NamaSpesifikasi: spek.Atribut}).Error; err != nil {
-      tx.Rollback()
-      c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memproses tabel spesifikasi"})
-      return
-    }
+	// 🔥 AMBIL HARGA BELI DARI INDUK (Buat disuntik ke Stok Opname per variasi nanti)
+	hargaBeliInt, _ := strconv.Atoi(input.InformasiBarang.HargaBeli)
 
-    // B. Detail Nilai Atribut
-    var detail models.DetailSpesifikasi
-    if err := tx.FirstOrCreate(&detail, models.DetailSpesifikasi{
-      SpesifikasiID:         spesifikasi.IdSpesifikasi, // 🔥 FIX: Menggunakan SpesifikasiID sesuai model lu
-      NamaDetailSpesifikasi: spek.Nilai,
-    }).Error; err != nil {
-      tx.Rollback()
-      c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memproses tabel detail_spesifikasi"})
-      return
-    }
+	// LOOPING PEMETAAN VARIAN (Diproses Satu per Satu!)
+	for _, spek := range input.Spesifikasi {
+		
+		// A. Atribut Induk (Misal: "Ukuran")
+		var spesifikasi models.Spesifikasi
+		if err := tx.FirstOrCreate(&spesifikasi, models.Spesifikasi{NamaSpesifikasi: spek.Atribut}).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memproses tabel spesifikasi"})
+			return
+		}
 
-    stokInt, _ := strconv.Atoi(spek.Stok)
-    hargaJualInt, _ := strconv.Atoi(spek.HargaJual)
+		// B. Detail Nilai Atribut (Misal: "XL")
+		var detail models.DetailSpesifikasi
+		if err := tx.FirstOrCreate(&detail, models.DetailSpesifikasi{
+			SpesifikasiID:         spesifikasi.IdSpesifikasi,
+			NamaDetailSpesifikasi: spek.Nilai,
+		}).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memproses tabel detail_spesifikasi"})
+			return
+		}
 
-    // C. Gabungkan ke SpesifikasiBarang
-    spekBarang := models.SpesifikasiBarang{
-      BarangID:            barang.IdBarang,            // 🔥 FIX: Menggunakan BarangID
-      DetailSpesifikasiID: detail.IdDetailSpesifikasi, // 🔥 FIX: Menggunakan DetailSpesifikasiID
-      Jumlah:              stokInt,
-      HargaBarang:         hargaJualInt,
-    }
-    if err := tx.Create(&spekBarang).Error; err != nil {
-      tx.Rollback()
-      c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan spesifikasi_barang"})
-      return
-    }
+		stokInt, _ := strconv.Atoi(spek.Stok)
+		hargaJualInt, _ := strconv.Atoi(spek.HargaJual)
 
-    // D. Catat Saldo Awal ke StokOpname
-    stokOpname := models.StokOpname{
-      SpesifikasiBarangID: spekBarang.IdSpesifikasiBarang, // 🔥 FIX: Menggunakan SpesifikasiBarangID
-      HargaBeli:           hargaBeliInt,
-      Status:              true, 
-      JumlahStok:          stokInt,
-      Keterangan:          "Stok awal dari tambah barang baru",
-      Tanggal:             time.Now(),
-    }
-    if err := tx.Create(&stokOpname).Error; err != nil {
-      tx.Rollback()
-      c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mencatat stok_opname"})
-      return
-    }
+		// C. Simpan Variasi Barangnya
+		spekBarang := models.SpesifikasiBarang{
+			BarangID:            barang.IdBarang,            
+			DetailSpesifikasiID: detail.IdDetailSpesifikasi, 
+			Jumlah:              stokInt,
+			HargaBarang:         hargaJualInt,
+		}
+		if err := tx.Create(&spekBarang).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan spesifikasi_barang"})
+			return
+		}
 
-    // E. Looping Barcode
-    for _, bc := range spek.Barcodes {
-      qtyInt, _ := strconv.Atoi(bc.Qty)
-      
-      barcodeData := models.Barcode{
-        SpesifikasiBarangID: spekBarang.IdSpesifikasiBarang, // 🔥 FIX: Menggunakan SpesifikasiBarangID
-        KodeBarcode:         bc.Code,                         // 🔥 Cek catatan di bawah jika baris ini masih merah
-        Kuantitas:           uint(qtyInt),                    // 🔥 FIX: Konversi aman ke uint
-      }
-      if err := tx.Create(&barcodeData).Error; err != nil {
-        tx.Rollback()
-        c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan barcode"})
-        return
-      }
-    }
-  }
+		// 🚀 D. LOGIKA STOK OPNAME KHUSUS VARIASI INI (Sesuai Request Lu!)
+		// Kita cek dulu, kalau admin masukin stok awal > 0, baru kita catat sebagai barang masuk
+		if stokInt > 0 {
+			stokOpname := models.StokOpname{
+				SpesifikasiBarangID: spekBarang.IdSpesifikasiBarang, // Nempel ke variasi ini aja
+				HargaBeli:           hargaBeliInt,                   // Suntik harga beli dari induk
+				Status:              true,                           // Boolean True = Barang Masuk
+				JumlahStok:          stokInt,                        // Jumlah stok MURNI dari variasi ini
+				Keterangan:          "menambahkan barang pertama kali", // Teks sesuai request lu
+				Tanggal:             time.Now(),                     // Tanggal otomatis terekam saat ini
+			}
+			
+			if err := tx.Create(&stokOpname).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mencatat stok_opname"})
+				return
+			}
+		}
 
-  // COMMIT TRANSAKSI
-  if err := tx.Commit().Error; err != nil {
-    c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyelesaikan transaksi database"})
-    return
-  }
+		// E. Looping Barcode buat variasi ini
+		for _, bc := range spek.Barcodes {
+			if bc.Code == "" {
+				continue // Skip kalau barcodenya kosong
+			}
+			qtyInt, _ := strconv.Atoi(bc.Qty)
+			
+			barcodeData := models.Barcode{
+				SpesifikasiBarangID: spekBarang.IdSpesifikasiBarang,
+				KodeBarcode:         bc.Code,                        
+				Kuantitas:           uint(qtyInt),                   
+			}
+			if err := tx.Create(&barcodeData).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan barcode"})
+				return
+			}
+		}
+	}
 
-  config.DB.First(&barang, barang.IdBarang)
+	// COMMIT TRANSAKSI (Semua sukses, simpan permanen)
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyelesaikan transaksi database"})
+		return
+	}
 
-  c.JSON(http.StatusCreated, gin.H{
-    "status":  "success",
-    "message": "Barang baru berhasil ditambahkan!",
-    "data": gin.H{
-      "id_barang":   barang.IdBarang,
-      "public_id":   barang.PublicId,
-      "nama_barang": barang.NamaBarang,
-    },
-  })
+	config.DB.First(&barang, barang.IdBarang)
+
+	c.JSON(http.StatusCreated, gin.H{
+		"status":  "success",
+		"message": "Barang baru berhasil ditambahkan!",
+		"data": gin.H{
+			"id_barang":   barang.IdBarang,
+			"public_id":   barang.PublicId,
+			"nama_barang": barang.NamaBarang,
+		},
+	})
 }
 
 // UpdateBarang memperbarui detail barang yang ada.
 // Dipakai oleh: admin (PUT /admin/katalog/barang/:id_barang)
 // Auth: Wajib login, role admin
 func UpdateBarang(c *gin.Context) {
-	idBarangStr := c.Param("id_barang")
+	publicIdStr := c.Param("public_id") 
 
 	var barang models.Barang
-	if err := config.DB.First(&barang, "public_id = ?", idBarangStr).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Barang tidak ditemukan",
-		})
+	if err := config.DB.First(&barang, "public_id = ?", publicIdStr).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Barang tidak ditemukan"})
 		return
 	}
 
+	// 🚀 1. TANGKAP PAYLOAD KOMPLEKS DARI FRONTEND
 	var input struct {
-		NamaBarang   string `json:"nama_barang"`
-		GambarBarang string `json:"gambar_barang"`
-		Deskripsi    string `json:"deskripsi"`
-		KategoriId   uint   `json:"id_kategori"`
-		SatuanId     uint   `json:"id_satuan"`
-		DiskonId     uint   `json:"id_diskon"`
+		Media           string `json:"media"`
+		InformasiBarang struct {
+			Nama      string `json:"nama" binding:"required"`
+			HargaBeli string `json:"hargaBeli"`
+			Kategori  string `json:"kategori" binding:"required"`
+			Satuan    string `json:"satuan" binding:"required"`
+			Diskon    string `json:"diskon"` // ID Diskon bentuk string
+			Deskripsi string `json:"deskripsi"`
+		} `json:"informasi_barang"`
+		Spesifikasi []struct {
+			Atribut         string `json:"atribut"`
+			Nilai           string `json:"nilai"`
+			HargaJual       string `json:"hargaJual"`
+			PenyesuaianStok *struct {
+				IsMasuk    bool   `json:"isMasuk"`
+				Jumlah     int    `json:"jumlah"`
+				Keterangan string `json:"keterangan"`
+			} `json:"penyesuaian_stok"`
+			Barcodes []struct {
+				Code string `json:"code"`
+				Qty  string `json:"qty"`
+			} `json:"barcodes"`
+		} `json:"spesifikasi"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "Format inputan salah: " + err.Error(),
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Format JSON tidak sesuai: " + err.Error()})
 		return
 	}
 
-	updates := map[string]interface{}{}
-	if input.NamaBarang != "" {
-		updates["nama_barang"] = input.NamaBarang
-	}
-	if input.GambarBarang != "" {
-		updates["gambar_barang"] = input.GambarBarang
-	}
-	if input.Deskripsi != "" {
-		updates["deskripsi"] = input.Deskripsi
-	}
-	if input.KategoriId != 0 {
-		updates["id_kategori"] = input.KategoriId
-	}
-	if input.SatuanId != 0 {
-		updates["id_satuan"] = input.SatuanId
-	}
-	if input.DiskonId != 0 {
-		updates["id_diskon"] = input.DiskonId
+	// 🚀 2. MULAI TRANSAKSI DATABASE (ANTI DATA BERANTAKAN)
+	tx := config.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memulai transaksi DB"})
+		return
 	}
 
-	if err := config.DB.Model(&barang).Updates(updates).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal memperbarui data barang",
+	// --- A. PROSES KATEGORI & SATUAN ---
+	var kategori models.Kategori
+	tx.FirstOrCreate(&kategori, models.Kategori{NamaKategori: input.InformasiBarang.Kategori})
+
+	var satuan models.Satuan
+	tx.FirstOrCreate(&satuan, models.Satuan{NamaSatuan: input.InformasiBarang.Satuan})
+
+	// --- B. PROSES DISKON ---
+	var diskonId *uint
+	if input.InformasiBarang.Diskon != "" {
+		dId, err := strconv.Atoi(input.InformasiBarang.Diskon)
+		if err == nil && dId > 0 {
+			idUint := uint(dId)
+			diskonId = &idUint
+		}
+	}
+
+	// --- C. UPDATE BARANG INDUK ---
+	updates := map[string]interface{}{
+		"nama_barang": input.InformasiBarang.Nama,
+		"deskripsi":   input.InformasiBarang.Deskripsi,
+		"id_kategori": kategori.IdKategori,
+		"id_satuan":   satuan.IdSatuan,
+		"id_diskon":   diskonId,
+	}
+	if input.Media != "" {
+		updates["gambar_barang"] = input.Media
+	}
+
+	if err := tx.Model(&barang).Updates(updates).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memperbarui data induk barang"})
+		return
+	}
+
+	hargaBeliInt, _ := strconv.Atoi(input.InformasiBarang.HargaBeli)
+
+	// --- D. LOOPING VARIAN & STOK OPNAME ---
+	for _, spek := range input.Spesifikasi {
+		var spesifikasi models.Spesifikasi
+		tx.FirstOrCreate(&spesifikasi, models.Spesifikasi{NamaSpesifikasi: spek.Atribut})
+
+		var detail models.DetailSpesifikasi
+		tx.FirstOrCreate(&detail, models.DetailSpesifikasi{
+			SpesifikasiID:         spesifikasi.IdSpesifikasi,
+			NamaDetailSpesifikasi: spek.Nilai,
 		})
+
+		hargaJualInt, _ := strconv.Atoi(spek.HargaJual)
+		var spekBarang models.SpesifikasiBarang
+		
+		// Cari apakah varian ini udah ada atau varian baru
+		errFind := tx.Where("id_barang = ? AND id_detail_spesifikasi = ?", barang.IdBarang, detail.IdDetailSpesifikasi).First(&spekBarang).Error
+
+		if errFind != nil {
+			// Varian Baru (Stok awal 0)
+			spekBarang = models.SpesifikasiBarang{
+				BarangID:            barang.IdBarang,
+				DetailSpesifikasiID: detail.IdDetailSpesifikasi,
+				Jumlah:              0, 
+				HargaBarang:         hargaJualInt,
+			}
+			tx.Create(&spekBarang)
+		} else {
+			// Varian Lama, update harga dasar
+			tx.Model(&spekBarang).Update("harga_barang", hargaJualInt)
+		}
+
+		// 🔥 PROSES PENYESUAIAN STOK (STOK OPNAME)
+		if spek.PenyesuaianStok != nil && spek.PenyesuaianStok.Jumlah > 0 {
+			qty := spek.PenyesuaianStok.Jumlah
+			if spek.PenyesuaianStok.IsMasuk {
+				spekBarang.Jumlah += qty
+			} else {
+				spekBarang.Jumlah -= qty
+			}
+
+			// Update total stok di varian
+			tx.Model(&spekBarang).Update("jumlah", spekBarang.Jumlah)
+
+			// Catat ke log riwayat gudang
+			stokOpname := models.StokOpname{
+				SpesifikasiBarangID: spekBarang.IdSpesifikasiBarang,
+				HargaBeli:           hargaBeliInt,
+				Status:              spek.PenyesuaianStok.IsMasuk,
+				JumlahStok:          qty,
+				Keterangan:          spek.PenyesuaianStok.Keterangan,
+				Tanggal:             time.Now(),
+			}
+			tx.Create(&stokOpname)
+		}
+
+		// --- E. UPDATE BARCODE ---
+		// Hapus semua relasi barcode lama untuk varian ini, ganti dengan yang baru dari frontend
+		tx.Where("id_spesifikasi_barang = ?", spekBarang.IdSpesifikasiBarang).Delete(&models.Barcode{})
+
+		for _, bc := range spek.Barcodes {
+			qtyInt, _ := strconv.Atoi(bc.Qty)
+			barcodeData := models.Barcode{
+				SpesifikasiBarangID: spekBarang.IdSpesifikasiBarang,
+				KodeBarcode:         bc.Code,
+				Kuantitas:           uint(qtyInt),
+			}
+			tx.Create(&barcodeData)
+		}
+	}
+
+	// 🚀 3. COMMIT TRANSAKSI (SEMUA SUKSES)
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan seluruh perubahan ke database"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Barang berhasil diperbarui",
+		"message": "Barang, Varian, dan Stok berhasil diperbarui secara menyeluruh!",
 	})
 }
 
 // HapusBarang menghapus barang dari katalog.
-// Dipakai oleh: admin (DELETE /admin/katalog/barang/:id_barang)
+// Dipakai oleh: admin (DELETE /admin/katalog/barang/:public_id)
 // Auth: Wajib login, role admin
 func HapusBarang(c *gin.Context) {
-	idBarangStr := c.Param("id_barang")
+	// 🚀 1. Ambil param sesuai dengan route lu (public_id)
+	publicId := c.Param("public_id")
 
-	var barang models.Barang
-	if err := config.DB.First(&barang, "public_id = ?", idBarangStr).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Barang tidak ditemukan",
-		})
+	// 🚀 2. Mulai Transaksi (Biar kalau gagal di tengah jalan, data bisa di-rollback/kembali seperti semula)
+	tx := config.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memulai transaksi DB"})
 		return
 	}
 
-	if err := config.DB.Delete(&barang).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal menghapus barang",
-		})
+	// 🚀 3. Cari Induk Barangnya
+	var barang models.Barang
+	if err := tx.First(&barang, "public_id = ?", publicId).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Barang tidak ditemukan"})
+		return
+	}
+
+	// 🚀 4. Cari semua Varian (Spesifikasi Barang) yang nempel ke barang ini
+	var varians []models.SpesifikasiBarang
+	tx.Where("id_barang = ?", barang.IdBarang).Find(&varians)
+
+	// Kalau barang ini punya varian, kita harus tebas anak-anaknya dulu
+	if len(varians) > 0 {
+		var varianIds []uint
+		for _, v := range varians {
+			varianIds = append(varianIds, v.IdSpesifikasiBarang)
+		}
+
+		// A. Hapus semua Barcode yang nempel di varian-varian ini
+		tx.Where("id_spesifikasi_barang IN ?", varianIds).Delete(&models.Barcode{})
+
+		// B. Hapus semua riwayat Stok Opname yang nempel di varian-varian ini
+		tx.Where("id_spesifikasi_barang IN ?", varianIds).Delete(&models.StokOpname{})
+		
+		// C. Hapus Variannya (SpesifikasiBarang)
+		tx.Where("id_barang = ?", barang.IdBarang).Delete(&models.SpesifikasiBarang{})
+	}
+
+	// 🚀 5. Terakhir, setelah anak-anaknya bersih, baru tebas Bapaknya (Induk Barang)
+	if err := tx.Delete(&barang).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menghapus induk barang"})
+		return
+	}
+
+	// 🚀 6. Selesai! Simpan semua perubahan permanen ke Database
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyelesaikan transaksi hapus data"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Barang berhasil dihapus",
+		"message": "Barang beserta seluruh varian, barcode, dan riwayat stok berhasil dihapus bersih!",
 	})
 }
 
@@ -657,4 +830,32 @@ func UploadGambarBarang(c *gin.Context) {
     "message": "Gambar berhasil diunggah ke server storage",
     "url":     fileUrl, // URL ini yang nanti dikirim Next.js ke TambahBarang
   })
+}
+
+// GetSatuan mengambil semua daftar satuan yang pernah ada di database.
+// Dipakai oleh: admin (GET /admin/satuan) untuk autocomplete form tambah barang
+// Auth: Wajib login, role admin
+func GetSatuan(c *gin.Context) {
+	var satuanList []models.Satuan
+	
+	// Tarik semua data dari tabel satuan
+	if err := config.DB.Find(&satuanList).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengambil data satuan",
+		})
+		return
+	}
+
+	// Kalau databasenya masih kosong melompong, pastikan return array kosong []
+	// Biar frontend Next.js lu gak error pas nge-map (looping) datanya
+	if satuanList == nil {
+		satuanList = []models.Satuan{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Berhasil mengambil daftar satuan",
+		"data":    satuanList,
+	})
 }

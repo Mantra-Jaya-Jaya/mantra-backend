@@ -23,17 +23,7 @@ func RunAllSeeders() {
 	SeedKasir()
 	SeedKurir()
 	SeedAlamat()
-	SeedBarang()
-	SeedDetailSpesifikasi()
-	SeedSpesifikasiBarang()
-	SeedBarcode()
-	SeedStokOpname()
-	SeedPesanan()
-	SeedDetailPesanan()
-	SeedPembayaran()
-	SeedPengantaran()
-	SeedKeranjang()
-	SeedNotifikasi()
+	//            
 
 	fmt.Println("======================================")
 	fmt.Println("SEMUA DATA BERHASIL DI-SEED!")

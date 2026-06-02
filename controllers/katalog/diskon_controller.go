@@ -7,8 +7,10 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // GetPromo mengambil semua diskon/promo yang sedang aktif.
@@ -178,7 +180,7 @@ func GetAllDiskon(c *gin.Context) {
 }
 
 // HapusDiskon menghapus diskon berdasarkan ID.
-// Dipakai oleh: admin (DELETE /admin/katalog/diskon/:id_diskon)
+// Dipakai oleh: admin (DELETE /admin/diskon/:id_diskon)
 // Auth: Wajib login, role admin
 func HapusDiskon(c *gin.Context) {
 	idDiskonStr := c.Param("id_diskon")
@@ -200,6 +202,21 @@ func HapusDiskon(c *gin.Context) {
 		return
 	}
 
+	// PUTUS HUBUNGAN DULU (SET NULL)
+	// Biar barang yang tadinya dapet diskon ini, balik ke harga normal, dan database gak error
+	errLepasRelasi := config.DB.Model(&models.Barang{}).
+		Where("id_diskon = ?", idDiskon).
+		Update("id_diskon", gorm.Expr("NULL")).Error
+
+	if errLepasRelasi != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal melepaskan relasi promo dari barang",
+		})
+		return
+	}
+
+	// 🚀 BARU HAPUS DISKONNYA DENGAN AMAN
 	if err := config.DB.Delete(&diskon).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -210,6 +227,27 @@ func HapusDiskon(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Diskon berhasil dihapus",
+		"message": "Diskon berhasil dihapus dan barang terkait kembali ke harga normal",
+	})
+}
+
+// UploadBannerDiskon mengunggah gambar banner promo/diskon ke MinIO.
+// Dipakai oleh: admin (POST /admin/diskon/upload)
+// Auth: Wajib login, role admin
+func UploadBannerDiskon(c *gin.Context) {
+	fileUrl, err := utils.UploadFileToMinio(c, "banner", "diskon")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Gagal mengunggah banner diskon: " + err.Error(),
+		})
+		return
+	}
+
+	// 2. Kembalikan URL publik MinIO ke Next.js
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Banner diskon berhasil diunggah ke server storage",
+		"url":     fileUrl, // URL ini yang nanti disisipkan ke JSON TambahDiskon
 	})
 }
