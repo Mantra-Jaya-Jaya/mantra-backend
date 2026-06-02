@@ -22,8 +22,8 @@ func SeedKurir() {
 	// 2. Siapin tanggal lahir (Misal: 10 Oktober 2003)
 	tglLahir := time.Date(2003, time.October, 10, 0, 0, 0, 0, time.Local)
 
-	// 3. Siapin profil Kurir-nya
-	kurirProfil := models.Kurir{
+	// 3. Siapin profil Karyawan-nya
+	karyawanProfil := models.Karyawan{
 		NoTelp:             "08" + gofakeit.DigitN(10),
 		TempatLahir:        "Wonogiri", // Sesuaikan dengan vibes daerah lu bro!
 		TanggalLahir:       tglLahir,
@@ -35,8 +35,15 @@ func SeedKurir() {
 		UserId:             user.IdUser,
 	}
 
-	// 4. Simpan ke database (FirstOrCreate biar aman pas di-run ulang)
-	if err := config.DB.Where("id_user = ?", user.IdUser).FirstOrCreate(&kurirProfil).Error; err != nil {
+	if err := config.DB.Where("id_user = ?", user.IdUser).FirstOrCreate(&karyawanProfil).Error; err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	kurirProfil := models.Kurir{
+		KaryawanId: karyawanProfil.IdKaryawan,
+	}
+	if err := config.DB.Where("id_karyawan = ?", karyawanProfil.IdKaryawan).FirstOrCreate(&kurirProfil).Error; err != nil {
 		fmt.Println("Error:", err)
 		return
 	}

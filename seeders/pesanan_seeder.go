@@ -14,8 +14,8 @@ func SeedPesanan() {
 
 	var count int64
 	config.DB.Model(&models.Pesanan{}).Count(&count)
-	if count >= 400 {
-		fmt.Println("Tabel pesanan udah punya minimal 400 data, proses seeding dilewati.")
+	if count >= 100 {
+		fmt.Println("Tabel pesanan udah punya minimal 100 data, proses seeding dilewati.")
 		return
 	}
 
@@ -39,27 +39,13 @@ func SeedPesanan() {
 
 	// Per hari dalam 30 hari terakhir: 3-8 pesanan per hari
 	for d := 0; d < 30; d++ {
-		ordersPerDay := fake.IntRange(3, 8)
+		ordersPerDay := fake.IntRange(5, 10)
 		for i := 0; i < ordersPerDay; i++ {
 			datesToGenerate = append(datesToGenerate, now.AddDate(0, 0, -d))
 		}
 	}
 
-	// Per bulan dalam 12 bulan terakhir (bulan 1 s/d 12 lalu): 15-30 pesanan per bulan
-	for m := 1; m <= 12; m++ {
-		ordersPerMonth := fake.IntRange(15, 30)
-		for i := 0; i < ordersPerMonth; i++ {
-			datesToGenerate = append(datesToGenerate, now.AddDate(0, -m, -fake.IntRange(0, 28)))
-		}
-	}
 
-	// Per bulan dalam tahun sebelumnya (bulan 13 s/d 24 lalu): 10-20 pesanan per bulan
-	for m := 13; m <= 24; m++ {
-		ordersPerMonth := fake.IntRange(10, 20)
-		for i := 0; i < ordersPerMonth; i++ {
-			datesToGenerate = append(datesToGenerate, now.AddDate(0, -m, -fake.IntRange(0, 28)))
-		}
-	}
 
 	totalCreated := 0
 	kasirLen := len(kasirs)
