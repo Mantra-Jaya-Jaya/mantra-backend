@@ -2,12 +2,15 @@ package transaksi
 
 import (
 	"net/http"
+	"os"
 	"strconv"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
 
 	"github.com/gin-gonic/gin"
+	"github.com/midtrans/midtrans-go"
+	"github.com/midtrans/midtrans-go/snap"
 )
 
 // GetRingkasanCheckout mengambil ringkasan belanja sebelum pembayaran di POS kasir.
@@ -248,65 +251,78 @@ func BayarTunai(c *gin.Context) {
 // Dipakai oleh: kasir (POST /kasir/transaksi/:id_transaksi/bayar/non-tunai)
 // Auth: Wajib login, role kasir
 func BayarNonTunai(c *gin.Context) {
-	var input struct {
-		IdPesanan uint `json:"id_pesanan"`
-	}
+    var input struct {
+        IdPesanan uint `json:"id_pesanan"`
+    }
 
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "Format inputan salah",
-		})
-		return
-	}
+    if err := c.ShouldBindJSON(&input); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Format inputan salah"})
+        return
+    }
 
-	var pesanan models.Pesanan
-	if err := config.DB.First(&pesanan, "id_pesanan = ?", input.IdPesanan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Pesanan tidak ditemukan",
-		})
-		return
-	}
+    var pesanan models.Pesanan
+    if err := config.DB.First(&pesanan, "id_pesanan = ?", input.IdPesanan).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pesanan tidak ditemukan"})
+        return
+    }
 
-	tx := config.DB.Begin()
+    // Hitung total akhir
+    pajakNominal := int(float64(pesanan.TotalPembayaran) * 0.11)
+    totalAkhir := pesanan.TotalPembayaran + pajakNominal
 
-	pesanan.StatusPesanan = "Diproses"
-	if err := tx.Save(&pesanan).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal memperbarui status pesanan",
-		})
-		return
-	}
+    // Setup Midtrans
+    var s snap.Client
+    s.New(os.Getenv("MIDTRANS_SERVER_KEY"), midtrans.Sandbox)
 
-	pembayaran := models.Pembayaran{
-		PesananID:       pesanan.IdPesanan,
-		OrderIdMidtrans: "MID-" + pesanan.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(pesanan.IdPesanan)),
-		PaymentType:     "qris",
-		StatusTransaksi: "pending",
-		FraudStatus:     "challenge",
-	}
-	if err := tx.Create(&pembayaran).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal mencatat data pembayaran non-tunai",
-		})
-		return
-	}
+    orderID := "MID-" + pesanan.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(pesanan.IdPesanan))
+    
+    req := &snap.Request{
+        TransactionDetails: midtrans.TransactionDetails{
+            OrderID:  orderID,
+            GrossAmt: int64(totalAkhir),
+        },
+		// EnabledPayments: []string{"qris"},
+    }
 
-	tx.Commit()
+    snapResp, err := s.CreateTransaction(req)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal terhubung ke Midtrans: " + err.GetMessage()})
+        return
+    }
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Pembayaran non-tunai diproses",
-		"data": gin.H{
-			"midtrans_data": gin.H{
-				"token":        "snap-token-" + strconv.Itoa(int(pesanan.IdPesanan)),
-				"redirect_url": "https://app.sandbox.midtrans.com/snap/v2/vtweb/" + strconv.Itoa(int(pesanan.IdPesanan)),
-			},
-		},
-	})
+    // Transaksi Database: Memulai dari sini agar status pesanan & record pembayaran sinkron
+    tx := config.DB.Begin()
+
+    pesanan.StatusPesanan = "Diproses"
+    if err := tx.Save(&pesanan).Error; err != nil {
+        tx.Rollback()
+        c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal update status pesanan"})
+        return
+    }
+
+    pembayaran := models.Pembayaran{
+        PesananID:       pesanan.IdPesanan,
+        OrderIdMidtrans: orderID,
+        PaymentType:     "qris",
+        StatusTransaksi: "pending",
+        FraudStatus:     "challenge",
+    }
+    
+    if err := tx.Create(&pembayaran).Error; err != nil {
+        tx.Rollback()
+        c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mencatat pembayaran"})
+        return
+    }
+
+    tx.Commit()
+
+    c.JSON(http.StatusOK, gin.H{
+        "status":  "success",
+        "message": "Pembayaran non-tunai diproses",
+        "data": gin.H{
+            "midtrans_data": gin.H{
+                "token": snapResp.Token,
+            },
+        },
+    })
 }
