@@ -256,7 +256,7 @@ URL publik file: `https://storage.mantra.web.id/mantra-storage/{folder}/{tahun}/
 | `docs/api/notifikasi.md`            | Notifikasi per role                              |
 | `docs/api/pengantaran.md`           | Lacak pengiriman pesanan                         |
 | `docs/architecture.md`              | Component interaction, decision records          |
-| `docs/security-rbac.md`             | JWT, middleware chain, RBAC matrix               |
+| `docs/security/`                    | JWT, middleware chain, RBAC matrix, error codes  |
 | `docs/database/erd.md`              | Panduan baca ERD, konvensi tabel & kolom         |
 | `docs/database/migrations.md`       | Workflow Atlas CLI, cara nambah tabel            |
 | `docs/deployment.md`                | Build binary, env vars, production checklist     |

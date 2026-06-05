@@ -31,7 +31,11 @@ Dokumentasi endpoint API diorganisir per domain — mirror struktur `controllers
 | Dokumen | Isi |
 |---------|-----|
 | `architecture.md` | Overview arsitektur, decision records, component interaction |
-| `security-rbac.md` | JWT flow, sliding expiration, middleware chain, RBAC matrix |
+| `security/README.md` | Index dokumentasi security |
+| `security/jwt.md` | JWT flow, claims structure, sliding expiration |
+| `security/middleware.md` | AuthMiddleware, RoleMiddleware, OwnershipMiddleware |
+| `security/rbac.md` | RBAC matrix per endpoint & role |
+| `security/errors.md` | Error codes, HTTP status, response format |
 
 ## Database
 
