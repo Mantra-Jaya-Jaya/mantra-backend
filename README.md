@@ -246,7 +246,17 @@ URL publik file: `https://storage.mantra.web.id/mantra-storage/{folder}/{tahun}/
 
 | Dokumen                             | Kegunaan                                         |
 |-------------------------------------|--------------------------------------------------|
-| `docs/mantra.dbml`                  | Skema ERD Database (25 tabel)                    |
-| `docs/mantra.dbdiagram`             | Layout diagram dbdiagram.io                      |
-| `docs/api-contract.md`              | *(coming soon)* Semua endpoint API & response    |
-| `docs/security-rbac.md`             | *(coming soon)* Kebijakan JWT & RBAC detail      |
+| `docs/README.md`                    | Index seluruh dokumentasi                        |
+| `docs/api/overview.md`              | Format API, error codes, autentikasi             |
+| `docs/api/auth.md`                  | Endpoint login, register, refresh, logout        |
+| `docs/api/katalog/`                 | Barang, kategori, diskon, promo, scan barcode    |
+| `docs/api/keranjang.md`             | CRUD keranjang belanja customer                  |
+| `docs/api/transaksi/`               | Pesanan, pembayaran, POS kasir                   |
+| `docs/api/user/`                    | Profil customer, kasir, admin, karyawan, alamat  |
+| `docs/api/notifikasi.md`            | Notifikasi per role                              |
+| `docs/api/pengantaran.md`           | Lacak pengiriman pesanan                         |
+| `docs/architecture.md`              | Component interaction, decision records          |
+| `docs/security-rbac.md`             | JWT, middleware chain, RBAC matrix               |
+| `docs/database/erd.md`              | Panduan baca ERD, konvensi tabel & kolom         |
+| `docs/database/migrations.md`       | Workflow Atlas CLI, cara nambah tabel            |
+| `docs/deployment.md`                | Build binary, env vars, production checklist     |
