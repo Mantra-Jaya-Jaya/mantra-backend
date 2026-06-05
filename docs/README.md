@@ -51,3 +51,26 @@ Dokumentasi endpoint API diorganisir per domain — mirror struktur `controllers
 | Dokumen | Isi |
 |---------|-----|
 | `deployment.md` | Build binary, environment variables, production checklist |
+
+## API Collections (Bruno)
+
+Folder `api-collections/` berisi koleksi request API untuk **Bruno** (open-source API client, alternative Postman).
+
+| Path | Isi |
+|------|-----|
+| `api-collections/collection.bru` | Global settings (baseUrl, auth bearer) |
+| `api-collections/environments/` | Environment variables (local) |
+| `api-collections/Auth/` | Login, Register, Refresh, Logout, Change Password |
+| `api-collections/Katalog/` | Promo, Kategori, Barang, Barcode |
+| `api-collections/Keranjang/` | Tambah, Update, Hapus item |
+| `api-collections/Transaksi - Customer/` | Pesanan, Checkout, Lacak |
+| `api-collections/Transaksi - Kasir/` | Dashboard, Laporan, Bayar |
+| `api-collections/Admin - Katalog/` | CRUD Kategori, Barang, Satuan |
+| `api-collections/Admin - Diskon/` | CRUD Diskon + Upload Banner |
+| `api-collections/Admin - Karyawan/` | CRUD Karyawan + Upload Foto |
+| `api-collections/Admin - Dashboard/` | Ringkasan, Chart |
+| `api-collections/Profil/` | Customer, Kasir, Admin |
+| `api-collections/Alamat/` | CRUD Alamat |
+| `api-collections/Notifikasi/` | Customer, Admin |
+
+**Cara pakai:** Buka Bruno → Import collection → Pilih folder `docs/api-collections/`. |
