@@ -1,5 +1,5 @@
 meta {
-  name: Login
+  name: Login - Flutter
   type: http
   seq: 1
 }
@@ -12,6 +12,7 @@ post {
 
 headers {
   Content-Type: application/json
+  X-Client-Type: flutter
 }
 
 body:json {
@@ -22,11 +23,11 @@ body:json {
 }
 
 script:post-response {
-  const token = res.body.data.access_token;
+  const token = res.body.data?.access_token;
   if (token) {
     bru.setVar("accessToken", token);
   }
-  const publicId = res.body.data.user?.public_id;
+  const publicId = res.body.data?.user?.public_id;
   if (publicId) {
     bru.setVar("publicId", publicId);
   }

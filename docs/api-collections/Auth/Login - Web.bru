@@ -1,0 +1,28 @@
+meta {
+  name: Login - Web
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: nextjs
+}
+
+body:json {
+  {
+    "username": "admin",
+    "password": "admin123"
+  }
+}
+
+script:post-response {
+  // httpOnly cookie — token tidak bisa dibaca JavaScript Bruno
+  // Akses endpoint lain via browser session / cookie manager
+}
