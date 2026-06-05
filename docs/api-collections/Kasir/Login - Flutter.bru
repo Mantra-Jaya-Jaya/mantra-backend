@@ -27,6 +27,10 @@ script:post-response {
   if (token) {
     bru.setVar("accessToken", token);
   }
+  const refresh = res.body.data?.refresh_token;
+  if (refresh) {
+    bru.setVar("refreshToken", refresh);
+  }
   const publicId = res.body.data?.user?.public_id;
   if (publicId) {
     bru.setVar("publicId", publicId);

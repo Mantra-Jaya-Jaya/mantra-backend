@@ -17,7 +17,7 @@ headers {
 
 body:json {
   {
-    "refresh_token": "isi_refresh_token_dari_response_login"
+    "refresh_token": "{{refreshToken}}"
   }
 }
 
@@ -25,5 +25,9 @@ script:post-response {
   const token = res.body.data.access_token;
   if (token) {
     bru.setVar("accessToken", token);
+  }
+  const refresh = res.body.data?.refresh_token;
+  if (refresh) {
+    bru.setVar("refreshToken", refresh);
   }
 }

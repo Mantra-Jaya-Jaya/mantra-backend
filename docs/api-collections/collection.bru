@@ -6,6 +6,7 @@ meta {
 vars:pre-request {
   baseUrl: http://localhost:8080/api/v1
   accessToken: 
+  refreshToken: 
   publicId: 
 }
 
@@ -31,8 +32,9 @@ docs {
   ## Setup
 
   1. Aktifkan environment `local`
-  2. Login via `Auth > Login` untuk mendapatkan access token
-  3. Token otomatis terisi di collection-level auth
+  2. Login via `Login` di folder aktor (Customer/Kasir/Admin)
+  3. Access token otomatis terisi di collection-level auth
+  4. Refresh token otomatis tersimpan untuk Logout & Refresh Token
 
   ## Base URL
 
