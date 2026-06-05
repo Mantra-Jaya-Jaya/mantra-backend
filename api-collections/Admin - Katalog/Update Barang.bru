@@ -1,0 +1,28 @@
+meta {
+  name: Update Barang
+  type: http
+  seq: 10
+}
+
+put {
+  url: {{baseUrl}}/admin/barang/{{publicId}}
+  body: json
+  auth: bearer
+}
+
+params:path {
+  publicId: {{publicId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_barang": "Produk Updated",
+    "id_kategori": 1,
+    "id_satuan": 1,
+    "deskripsi": "Deskripsi updated"
+  }
+}

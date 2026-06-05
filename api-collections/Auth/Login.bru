@@ -1,0 +1,33 @@
+meta {
+  name: Login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "username": "admin",
+    "password": "admin123"
+  }
+}
+
+script:post-response {
+  const token = res.body.data.access_token;
+  if (token) {
+    bru.setVar("accessToken", token);
+  }
+  const publicId = res.body.data.user?.public_id;
+  if (publicId) {
+    bru.setVar("publicId", publicId);
+  }
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Update Qty Item
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/kasir/transaksi/item/update
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "id_detail_pesanan": 1,
+    "jumlah": 3
+  }
+}

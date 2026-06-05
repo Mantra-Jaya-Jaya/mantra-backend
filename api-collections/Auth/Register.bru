@@ -1,0 +1,26 @@
+meta {
+  name: Register Customer
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "username": "customer{{$randomInt}}",
+    "email": "customer{{$randomInt}}@example.com",
+    "password": "password123",
+    "konfirmasi_password": "password123",
+    "nama_lengkap": "Customer Baru",
+    "no_telp": "0812{{$randomInt}}"
+  }
+}

@@ -1,0 +1,14 @@
+meta {
+  name: Hapus Diskon
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/admin/diskon/{{idDiskon}}
+  auth: bearer
+}
+
+params:path {
+  idDiskon: 1
+}

@@ -1,0 +1,25 @@
+meta {
+  name: Update Kategori
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/admin/kategori/{{idKategori}}
+  body: json
+  auth: bearer
+}
+
+params:path {
+  idKategori: 1
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_kategori": "Minuman Segar"
+  }
+}

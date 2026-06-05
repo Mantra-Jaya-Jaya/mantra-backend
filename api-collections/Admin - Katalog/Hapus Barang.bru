@@ -1,0 +1,14 @@
+meta {
+  name: Hapus Barang
+  type: http
+  seq: 11
+}
+
+delete {
+  url: {{baseUrl}}/admin/barang/{{publicId}}
+  auth: bearer
+}
+
+params:path {
+  publicId: {{publicId}}
+}

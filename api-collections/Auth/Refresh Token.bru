@@ -1,0 +1,28 @@
+meta {
+  name: Refresh Token
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/auth/refresh
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "refresh_token": "isi_refresh_token_dari_response_login"
+  }
+}
+
+script:post-response {
+  const token = res.body.data.access_token;
+  if (token) {
+    bru.setVar("accessToken", token);
+  }
+}

@@ -1,0 +1,14 @@
+meta {
+  name: Detail Pesanan
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/customer/pesanan/{{idPesanan}}
+  auth: bearer
+}
+
+params:path {
+  idPesanan: 1
+}
