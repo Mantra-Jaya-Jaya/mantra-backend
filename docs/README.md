@@ -59,18 +59,10 @@ Folder `api-collections/` berisi koleksi request API untuk **Bruno** (open-sourc
 | Path | Isi |
 |------|-----|
 | `api-collections/collection.bru` | Global settings (baseUrl, auth bearer) |
-| `api-collections/environments/` | Environment variables (local) |
-| `api-collections/Auth/` | Login, Register, Refresh, Logout, Change Password |
-| `api-collections/Katalog/` | Promo, Kategori, Barang, Barcode |
-| `api-collections/Keranjang/` | Tambah, Update, Hapus item |
-| `api-collections/Transaksi - Customer/` | Pesanan, Checkout, Lacak |
-| `api-collections/Transaksi - Kasir/` | Dashboard, Laporan, Bayar |
-| `api-collections/Admin - Katalog/` | CRUD Kategori, Barang, Satuan |
-| `api-collections/Admin - Diskon/` | CRUD Diskon + Upload Banner |
-| `api-collections/Admin - Karyawan/` | CRUD Karyawan + Upload Foto |
-| `api-collections/Admin - Dashboard/` | Ringkasan, Chart |
-| `api-collections/Profil/` | Customer, Kasir, Admin |
-| `api-collections/Alamat/` | CRUD Alamat |
-| `api-collections/Notifikasi/` | Customer, Admin |
+| `api-collections/environments/` | Environment variables (local, dev, production) |
+| `api-collections/Public/` | Scan Barcode (no auth) |
+| `api-collections/Customer/` | Login, Register, Logout, Change Password, Refresh Token, Profil, Notifikasi, Promo, Kategori, Barang, Keranjang, Pesanan, Alamat |
+| `api-collections/Kasir/` | Login, Logout, Change Password, Refresh Token, Profil, Dashboard, Laporan, Transaksi |
+| `api-collections/Admin/` | Login, Logout, Change Password, Refresh Token, Profil, Notifikasi, Dashboard, Kategori, Barang, Diskon, Karyawan, Satuan |
 
 **Cara pakai:** Buka Bruno → Import collection → Pilih folder `docs/api-collections/`. |
