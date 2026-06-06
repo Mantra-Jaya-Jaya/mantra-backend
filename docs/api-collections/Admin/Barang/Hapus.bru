@@ -5,10 +5,10 @@ meta {
 }
 
 delete {
-  url: {{baseUrl}}/admin/barang/{{publicId}}
+  url: {{baseUrl}}/admin/barang/:publicId
   auth: bearer
 }
 
 params:path {
-  publicId: {{publicId}}
+  publicId: :publicId
 }

@@ -197,7 +197,7 @@ func TambahKaryawan(c *gin.Context) {
 }
 
 func HapusKaryawan(c *gin.Context) {
-	id := c.Param("id")
+	id := c.Param("public_id")
 	var karyawan models.Karyawan
 	if err := config.DB.Preload("User").Preload("User.Role").Where("public_id = ?", id).First(&karyawan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Karyawan tidak ditemukan"})
@@ -234,7 +234,7 @@ func getInisial(name string) string {
 }
 
 func GetDetailKaryawan(c *gin.Context) {
-	id := c.Param("id")
+	id := c.Param("public_id")
 	var karyawan models.Karyawan
 	if err := config.DB.Preload("User").Preload("User.Role").Where("public_id = ?", id).First(&karyawan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Karyawan tidak ditemukan"})
@@ -273,7 +273,7 @@ func GetDetailKaryawan(c *gin.Context) {
 }
 
 func UpdateKaryawan(c *gin.Context) {
-	id := c.Param("id")
+	id := c.Param("public_id")
 	var input struct {
 		Username           string `json:"username"`
 		Email              string `json:"email"`

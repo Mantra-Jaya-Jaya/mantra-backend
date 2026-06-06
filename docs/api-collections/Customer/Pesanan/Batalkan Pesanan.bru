@@ -5,10 +5,10 @@ meta {
 }
 
 patch {
-  url: {{baseUrl}}/customer/pesanan/{{idPesanan}}/batal
+  url: {{baseUrl}}/customer/pesanan/:publicId/batal
   auth: bearer
 }
 
 params:path {
-  idPesanan: 1
+  publicId: 123e4567-e89b-12d3-a456-426614174000
 }

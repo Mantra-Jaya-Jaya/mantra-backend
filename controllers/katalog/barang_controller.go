@@ -41,16 +41,16 @@ func GetDaftarBarang(c *gin.Context) {
 	var results []ProductResult
 	var total int64
 
-	kategoriIdStr := c.Query("id_kategori")
+	kategoriIdStr := c.Query("id_kategori") // Bisa berisi public_id (UUID)
 
 	queryCount := config.DB.Model(&models.Barang{})
 	querySelect := config.DB.Table("barang")
 
 	if kategoriIdStr != "" {
-		kategoriId, err := strconv.Atoi(kategoriIdStr)
-		if err == nil && kategoriId > 0 {
-			queryCount = queryCount.Where("id_kategori = ?", kategoriId)
-			querySelect = querySelect.Where("barang.id_kategori = ?", kategoriId)
+		var kat models.Kategori
+		if err := config.DB.Where("public_id = ?", kategoriIdStr).First(&kat).Error; err == nil {
+			queryCount = queryCount.Where("id_kategori = ?", kat.IdKategori)
+			querySelect = querySelect.Where("barang.id_kategori = ?", kat.IdKategori)
 		}
 	}
 

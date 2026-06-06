@@ -9,6 +9,7 @@ import (
 	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // GetKategori mengambil semua kategori barang.
@@ -80,21 +81,21 @@ func TambahKategori(c *gin.Context) {
 }
 
 // UpdateKategori memperbarui data kategori berdasarkan ID.
-// Dipakai oleh: admin (PUT /admin/katalog/kategori/:id_kategori)
+// Dipakai oleh: admin (PUT /admin/katalog/kategori/:public_id)
 // Auth: Wajib login, role admin
 func UpdateKategori(c *gin.Context) {
-	idStr := c.Param("id_kategori")
-	idKategori, err := strconv.Atoi(idStr)
+	publicIdStr := c.Param("public_id")
+	publicId, err := uuid.Parse(publicIdStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
-			"message": "ID kategori tidak valid",
+			"message": "ID kategori tidak valid (harus UUID)",
 		})
 		return
 	}
 
 	var kategori models.Kategori
-	if err := config.DB.First(&kategori, "id_kategori = ?", idKategori).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", publicId).First(&kategori).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Kategori tidak ditemukan",
@@ -147,21 +148,21 @@ func UpdateKategori(c *gin.Context) {
 }
 
 // HapusKategori menghapus kategori berdasarkan ID.
-// Dipakai oleh: admin (DELETE /admin/katalog/kategori/:id_kategori)
+// Dipakai oleh: admin (DELETE /admin/katalog/kategori/:public_id)
 // Auth: Wajib login, role admin
 func HapusKategori(c *gin.Context) {
-	idStr := c.Param("id_kategori")
-	idKategori, err := strconv.Atoi(idStr)
+	publicIdStr := c.Param("public_id")
+	publicId, err := uuid.Parse(publicIdStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
-			"message": "ID kategori tidak valid",
+			"message": "ID kategori tidak valid (harus UUID)",
 		})
 		return
 	}
 
 	var kategori models.Kategori
-	if err := config.DB.First(&kategori, "id_kategori = ?", idKategori).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", publicId).First(&kategori).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Kategori tidak ditemukan",
@@ -171,7 +172,7 @@ func HapusKategori(c *gin.Context) {
 
 	// Cek apakah kategori masih digunakan oleh barang
 	var count int64
-	if err := config.DB.Model(&models.Barang{}).Where("id_kategori = ?", idKategori).Count(&count).Error; err != nil {
+	if err := config.DB.Model(&models.Barang{}).Where("id_kategori = ?", kategori.IdKategori).Count(&count).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal memeriksa keterkaitan barang dengan kategori",

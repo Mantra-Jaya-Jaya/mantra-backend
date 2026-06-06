@@ -5,10 +5,10 @@ meta {
 }
 
 delete {
-  url: {{baseUrl}}/customer/keranjang/{{idKeranjang}}
+  url: {{baseUrl}}/customer/keranjang/:publicId
   auth: bearer
 }
 
 params:path {
-  idKeranjang: 1
+  publicId: 123e4567-e89b-12d3-a456-426614174000
 }

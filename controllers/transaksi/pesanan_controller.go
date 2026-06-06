@@ -123,7 +123,7 @@ func GetDaftarPesanan(c *gin.Context) {
 // Dipakai oleh: customer (GET /customer/pesanan/:id_pesanan), kasir (GET /kasir/pesanan/:id_pesanan), admin (GET /admin/pesanan/:id_pesanan)
 // Auth: Wajib login
 func GetDetailPesanan(c *gin.Context) {
-	idPesanan := c.Param("id_pesanan")
+	idPesanan := c.Param("public_id")
 	role := c.GetString("role")
 	userID := c.GetInt64("user_id")
 
@@ -351,7 +351,7 @@ func CheckoutPesanan(c *gin.Context) {
 // Auth: Wajib login, role customer
 // Ownership: pesanan harus milik customer yang login (id_customer dari JWT)
 func BatalkanPesanan(c *gin.Context) {
-	idPesanan := c.Param("id_pesanan")
+	idPesanan := c.Param("public_id")
 	userID := c.GetInt64("user_id")
 
 	// Ownership check
@@ -410,7 +410,7 @@ func BatalkanPesanan(c *gin.Context) {
 // Dipakai oleh: customer (GET /customer/pesanan/:id_pesanan/lacak)
 // Auth: Wajib login, role customer
 func LacakPesanan(c *gin.Context) {
-	idPesanan := c.Param("id_pesanan")
+	idPesanan := c.Param("public_id")
 
 	var pengantaran models.Pengantaran
 	if err := config.DB.Preload("Kurir.Karyawan.User").
@@ -464,18 +464,31 @@ func GetDashboardKasir(c *gin.Context) {
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
-	// Hitung total pendapatan hari ini
+	// Hitung total pendapatan hari ini (Gross)
 	var totalPendapatan struct{ Total int }
 	config.DB.Model(&models.Pesanan{}).
 		Select("COALESCE(SUM(total_pembayaran), 0) as total").
 		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
 		Scan(&totalPendapatan)
 
-	// Hitung jumlah transaksi hari ini
+	// Hitung total pendapatan bersih hari ini (Net - Hanya Selesai)
+	var totalPendapatanBersih struct{ Total int }
+	config.DB.Model(&models.Pesanan{}).
+		Select("COALESCE(SUM(total_pembayaran), 0) as total").
+		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ? AND status_pesanan = ?", startOfDay, endOfDay, "Selesai").
+		Scan(&totalPendapatanBersih)
+
+	// Hitung jumlah transaksi hari ini (Gross)
 	var jumlahTransaksi int64
 	config.DB.Model(&models.Pesanan{}).
 		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
 		Count(&jumlahTransaksi)
+
+	// Hitung jumlah transaksi selesai hari ini (Net)
+	var jumlahTransaksiSelesai int64
+	config.DB.Model(&models.Pesanan{}).
+		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ? AND status_pesanan = ?", startOfDay, endOfDay, "Selesai").
+		Count(&jumlahTransaksiSelesai)
 
 	// Hitung total item terjual hari ini
 	var totalItemTerjual struct{ Total int }
@@ -525,9 +538,11 @@ func GetDashboardKasir(c *gin.Context) {
 				"status_notifikasi": true,
 			},
 			"statistik_hari_ini": gin.H{
-				"total_pendapatan":   totalPendapatan.Total,
-				"jumlah_transaksi":   jumlahTransaksi,
-				"total_item_terjual": totalItemTerjual.Total,
+				"total_pendapatan":         totalPendapatan.Total,
+				"total_pendapatan_bersih":  totalPendapatanBersih.Total,
+				"jumlah_transaksi":         jumlahTransaksi,
+				"jumlah_transaksi_selesai": jumlahTransaksiSelesai,
+				"total_item_terjual":       totalItemTerjual.Total,
 			},
 			"aktivitas_terkini": aktivitasTerkini,
 		},
@@ -637,7 +652,7 @@ func GetLaporanRingkasan(c *gin.Context) {
 // Dipakai oleh: kasir (GET /kasir/laporan/produk/:id_produk)
 // Auth: Wajib login, role kasir
 func GetDetailLaporanProduk(c *gin.Context) {
-	idProdukStr := c.Param("id_produk")
+	idProdukStr := c.Param("public_id")
 	var barang models.Barang
 	if err := config.DB.Preload("Kategori").First(&barang, "public_id = ?", idProdukStr).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -707,7 +722,7 @@ func GetDetailLaporanProduk(c *gin.Context) {
 // Dipakai oleh: kasir (GET /kasir/laporan/produk/:id_produk/:id_pesanan)
 // Auth: Wajib login, role kasir
 func GetDetailPesananDariLaporan(c *gin.Context) {
-	idPesananStr := c.Param("id_pesanan")
+	idPesananStr := c.Param("pesanan_id")
 
 	var pesanan models.Pesanan
 	if err := config.DB.Preload("Customer.User").Preload("Alamat").First(&pesanan, "public_id = ?", idPesananStr).Error; err != nil {

@@ -5,13 +5,13 @@ meta {
 }
 
 put {
-  url: {{baseUrl}}/admin/barang/{{publicId}}
+  url: {{baseUrl}}/admin/barang/:publicId
   body: json
   auth: bearer
 }
 
 params:path {
-  publicId: {{publicId}}
+  publicId: :publicId
 }
 
 headers {

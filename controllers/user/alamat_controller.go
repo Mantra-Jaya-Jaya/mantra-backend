@@ -168,7 +168,7 @@ func TambahAlamat(c *gin.Context) {
 // Dipakai oleh: customer (PUT /customer/alamat/:id_alamat)
 // Auth: Wajib login, role customer
 func UpdateAlamat(c *gin.Context) {
-	idAlamat := c.Param("id_alamat")
+	idAlamat := c.Param("public_id")
 
 	type UpdateAlamatInput struct {
 		LabelAlamat    string  `json:"label_alamat"`
@@ -292,7 +292,7 @@ func UpdateAlamat(c *gin.Context) {
 // Dipakai oleh: customer (DELETE /customer/alamat/:id_alamat)
 // Auth: Wajib login, role customer
 func HapusAlamat(c *gin.Context) {
-	idAlamat := c.Param("id_alamat")
+	idAlamat := c.Param("public_id")
 
 	uid, exists := getUserIDFromContext(c)
 	if !exists {

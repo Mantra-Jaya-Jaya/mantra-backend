@@ -5,10 +5,10 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/customer/pesanan/{{idPesanan}}
+  url: {{baseUrl}}/customer/pesanan/:publicId
   auth: bearer
 }
 
 params:path {
-  idPesanan: 1
+  publicId: 123e4567-e89b-12d3-a456-426614174000
 }

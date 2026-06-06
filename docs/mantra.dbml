@@ -141,6 +141,7 @@ Table alamat {
 // Master kategori barang
 Table kategori {
   id_kategori   int     [pk]
+  public_id     uuid    [note: 'gen_random_uuid()']
   nama_kategori varchar
   icon_kategori varchar
 }
@@ -154,6 +155,7 @@ Table satuan {
 // Master diskon yang bisa diterapkan ke barang
 Table diskon {
   id_diskon     int       [pk]
+  public_id     uuid      [note: 'gen_random_uuid()']
   nama_diskon   varchar
   besar_diskon  int       [note: 'Persentase: 0-100']
   banner_diskon varchar
