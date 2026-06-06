@@ -5,6 +5,7 @@ Backend service untuk aplikasi **MANTRA**. Dibangun dengan **Golang + Gin**, dat
 ---
 
 ## Daftar Isi
+
 - [1. Overview & Arsitektur](#1-overview--arsitektur)
 - [2. Struktur Folder & Domain](#2-struktur-folder--domain)
   - [2.1 Penjelasan Direktori](#21-penjelasan-direktori)
@@ -18,7 +19,8 @@ Backend service untuk aplikasi **MANTRA**. Dibangun dengan **Golang + Gin**, dat
   - [4.2 Workflow Makefile](#42-workflow-makefile)
 - [5. Keamanan & Middleware](#5-keamanan--middleware)
 - [6. Storage (MinIO)](#6-storage-minio)
-- [7. Referensi Dokumentasi](#7-referensi-dokumentasi)
+- [7. API Testing (Bruno)](#8-api-testing-bruno)
+- [8. Referensi Dokumentasi](#9-referensi-dokumentasi)
 
 ---
 
@@ -99,30 +101,38 @@ Controller diorganisir per **domain bisnis**, bukan per role. Satu function cont
 Ikuti langkah-langkah di bawah ini secara berurutan agar server berjalan lancar di komputer lokal Anda.
 
 ### 3.1 Prasyarat & Buat Database Kosong
+
 1. Pastikan **PostgreSQL** sudah terinstall dan berjalan.
 2. Buat database baru bernama `mantra_db`.
+
    ```sql
    CREATE DATABASE mantra_db;
    ```
+
    *(Cukup bikin databasenya aja, GORM akan otomatis membuatkan tabelnya via AutoMigrate).*
 
 ### 3.2 Konfigurasi Environment (.env)
+
 1. Buka folder `mantra-backend/`.
 2. Copy file `.env.example` menjadi `.env`:
+
    ```bash
    cp .env.example .env
    ```
+
 3. Download semua library: `go mod tidy`
 4. Sesuaikan isi `.env` dengan konfigurasi lokal Anda.
 
 ### 3.3 Menjalankan Server
 
 **Opsi A — Langsung:**
+
 ```bash
 go run main.go
 ```
 
 **Opsi B — Hot reload (Air):**
+
 ```bash
 # Install Air (satu kali)
 go install github.com/air-verse/air@latest
@@ -143,20 +153,25 @@ Atlas CLI adalah engine untuk menyinkronkan struktur tabel di PostgreSQL secara 
 
 1. **Install Atlas CLI**:
    - **Linux / macOS (atau Windows dengan Git Bash):**
+
      ```bash
      curl -sSf https://atlasgo.sh | sh
      ```
+
    - **Windows (PowerShell):**
+
      ```powershell
      Invoke-WebRequest https://release.ariga.io/atlas/atlas-windows-amd64-latest.exe -OutFile atlas.exe
      ```
 
 2. **Install Atlas Provider GORM (Semua OS):**
+
    ```bash
    go install ariga.io/atlas-provider-gorm@latest
    ```
 
 3. **Buat database sandbox `mantra_dev`** (digunakan Atlas untuk komparasi skema):
+
    ```sql
    CREATE DATABASE mantra_dev;
    ```
@@ -186,25 +201,29 @@ Jalankan perintah di dalam direktori `mantra-backend/`:
 
 Urutan eksekusi middleware pada setiap request:
 
-```
+```text
 Request → RateLimit (future) → CORS → AuthMiddleware → RoleMiddleware → Controller
 ```
 
 ### AuthMiddleware (`middleware/auth_middleware.go`)
+
 - Validasi JWT dari `Authorization: Bearer <token>` (Flutter) atau cookie `access_token` (Next.js).
 - **Sliding expiration:** Jika masa token tersisa < 15 menit, token baru digenerate dan dikirim via header `X-New-Access-Token` + cookie.
 - Set `user_id`, `public_id`, `role` ke context Gin.
 
 ### RoleMiddleware (`middleware/role_middleware.go`)
+
 - Cek apakah role user (dari token) termasuk dalam daftar role yang diizinkan.
 - Error code: `AUTH_002` (role tidak ditemukan), `AUTH_003` (tidak punya izin).
 
 ### OwnershipMiddleware (`middleware/ownership_middleware.go`)
+
 - Cek kepemilikan resource berdasarkan `public_id` di URL.
 - **Admin selalu bypass** pengecekan ini.
 - Error code: `AUTH_004`.
 
 ### Authentication Flow
+
 | Endpoint                          | Method | Middleware         |
 |-----------------------------------|--------|--------------------|
 | `POST /api/v1/login`              | Public | -                  |
@@ -231,6 +250,7 @@ MANTRA menggunakan **MinIO** (self-hosted, S3-compatible) untuk menyimpan file:
 - **Banner diskon** → folder `diskon/`
 
 Konfigurasi di `.env`:
+
 ```env
 MINIO_ENDPOINT=localhost:9000
 MINIO_ACCESS_KEY=your_access_key
@@ -242,7 +262,50 @@ URL publik file: `https://storage.mantra.web.id/mantra-storage/{folder}/{tahun}/
 
 ---
 
-## 7. Referensi Dokumentasi
+## 8. API Testing (Bruno)
+
+**Bruno** adalah API client open-source alternatif Postman. Semua file request disimpan dalam format `.bru` — bisa di-version control.
+
+### Setup
+
+1. Download [Bruno Desktop](https://www.usebruno.com/downloads) atau CLI (`npm i -g @usebruno/cli`)
+2. Buka Bruno → **Open Collection** → pilih folder `docs/api-collections/`
+3. Pilih environment **local** (sudah tersedia di `docs/api-collections/environments/`)
+
+### Alur Testing
+
+| Langkah | Aksi |
+|:---|---|
+| 1 | Pilih folder aktor: `Public`, `Customer`, `Kasir`, atau `Admin` |
+| 2 | Jalankan request **Login** — token otomatis tersimpan ke `{{accessToken}}` |
+| 3 | Semua request selanjutnya sudah ter-autentikasi via Bearer token |
+
+### Environment Variables
+
+| Variable | Lokasi | Default |
+|:---|---|:---:|
+| `{{baseUrl}}` | `collection.bru` | `http://localhost:8080/api/v1` |
+| `{{accessToken}}` | `collection.bru` | auto-fill setelah login |
+| `{{publicId}}` | `collection.bru` | diisi manual per resource |
+
+### Struktur Collection
+
+```text
+docs/api-collections/
+├── bruno.json
+├── collection.bru        # Base URL, auth, headers
+├── environments/
+│   ├── local.bru         # http://localhost:8080
+│   └── production.bru    # https://api.mantra.web.id
+├── Public/               # Login, Register, Scan
+├── Customer/             # Keranjang, Pesanan, Alamat
+├── Kasir/                # POS, Laporan, Dashboard
+└── Admin/                # Kategori, Barang, Diskon, Karyawan
+```
+
+---
+
+## 9. Referensi Dokumentasi
 
 | Dokumen                             | Kegunaan                                         |
 |-------------------------------------|--------------------------------------------------|
