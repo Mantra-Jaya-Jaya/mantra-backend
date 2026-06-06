@@ -1,0 +1,15 @@
+meta {
+  name: Laporan Detail Produk
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/kasir/laporan/produk/{{idProduk}}/{{idPesanan}}
+  auth: bearer
+}
+
+params:path {
+  idProduk: 1
+  idPesanan: 1
+}

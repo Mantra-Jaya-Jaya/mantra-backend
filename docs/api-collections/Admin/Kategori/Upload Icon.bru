@@ -1,0 +1,15 @@
+meta {
+  name: Upload Icon
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/admin/kategori/upload
+  body: multipart-form
+  auth: bearer
+}
+
+body:multipart-form {
+  icon: @file(pilih_file_icon.png)
+}

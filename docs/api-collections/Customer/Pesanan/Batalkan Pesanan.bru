@@ -1,0 +1,14 @@
+meta {
+  name: Batalkan Pesanan
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/customer/pesanan/{{idPesanan}}/batal
+  auth: bearer
+}
+
+params:path {
+  idPesanan: 1
+}

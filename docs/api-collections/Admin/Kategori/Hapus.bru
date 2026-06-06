@@ -1,0 +1,14 @@
+meta {
+  name: Hapus
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/admin/kategori/{{idKategori}}
+  auth: bearer
+}
+
+params:path {
+  idKategori: 1
+}

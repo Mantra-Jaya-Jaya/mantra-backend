@@ -1,0 +1,14 @@
+meta {
+  name: Lacak Pesanan
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/customer/pesanan/{{idPesanan}}/lacak
+  auth: bearer
+}
+
+params:path {
+  idPesanan: 1
+}

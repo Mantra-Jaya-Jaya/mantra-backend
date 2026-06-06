@@ -1,0 +1,14 @@
+meta {
+  name: Detail
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/admin/karyawan/{{idKaryawan}}
+  auth: bearer
+}
+
+params:path {
+  idKaryawan: 1
+}

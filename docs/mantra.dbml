@@ -1,7 +1,7 @@
 // =============================================================================
 // MANTRA - Database Schema (DBML)
-// Version    : 1.1.0
-// Updated    : 2026-05-17
+// Version    : 2.0.0
+// Updated    : 2026-06-05
 // =============================================================================
 //
 // CARA PAKAI FILE INI:
@@ -16,17 +16,17 @@
 // - Komentar tabel ditulis sebagai // di atas Table
 // - Kolom penting diberi [note: '...']
 //
-// CARA TAMBAH TABEL BARU:
-// 1. Tulis Table nama_tabel { ... } di section yang sesuai
-// 2. Ikuti konvensi tipe data di atas
-// 3. Tambahkan relasi di bagian "RELASI" paling bawah
-// 4. Gunakan simbol: > (many-to-one), < (one-to-many), - (one-to-one)
+// SINGLE SOURCE OF TRUTH:
+// File ini adalah representasi dari 25 struct GORM di folder models/.
+// Setiap perubahan tabel WAJIB diikuti update struct GORM dan file ini.
 //
 // ARSITEKTUR SINGKAT:
 // - Single-tenant: satu instalasi = satu toko
 // - Client: Flutter (Customer & Kasir), Next.js (Admin Web)
 // - Auth: JWT Bearer Token untuk Flutter, httpOnly Cookie untuk Next.js
 // - Semua nilai uang disimpan sebagai integer (Rupiah), bukan float
+// - ID Obfuscation: UUID (public_id) untuk endpoint eksternal
+// - Password: bcrypt cost factor 12
 // =============================================================================
 
 
@@ -34,19 +34,19 @@
 // AUTH & USER MANAGEMENT
 // -----------------------------------------------------------------------------
 
-// Master role untuk semua user
+// Master role untuk semua user (seeder: Customer, Admin, Kasir, Kurir)
 Table role {
   id_role   int     [pk]
-  nama_role varchar [note: 'customer | kasir | admin | kurir']
+  nama_role varchar [note: 'Customer | Admin | Kasir | Kurir']
 }
 
 // Tabel utama autentikasi semua role
 Table user {
   id_user      int       [pk]
-  public_id    uuid      [note: 'gen_random_uuid()']
+  public_id    uuid      [note: 'gen_random_uuid() - untuk endpoint eksternal']
   id_role      int
   username     varchar
-  email        varchar
+  email        varchar   [note: 'unique']
   password     varchar   [note: 'bcrypt hashed, cost factor 12']
   nama_lengkap varchar
   foto_profil  varchar
@@ -54,7 +54,7 @@ Table user {
   updated_at   timestamp
 }
 
-// Refresh token untuk strategi auto-login. Access token: 15 menit, Refresh: 7 hari
+// Refresh token untuk auto-login. Access token: 30 menit, Refresh: 7 hari
 Table refresh_token {
   id_token   int       [pk]
   id_user    int
@@ -69,24 +69,6 @@ Table refresh_token {
 // PROFIL PER ROLE
 // -----------------------------------------------------------------------------
 
-// Profil kasir. Dibuat oleh Admin
-Table kasir {
-  id_kasir            int       [pk]
-  public_id           uuid      [note: 'gen_random_uuid()']
-  id_user             int
-  no_telp             varchar
-  tempat_lahir        varchar
-  tanggal_lahir       date
-  jenis_kelamin       varchar
-  alamat              text
-  pendidikan_terakhir varchar
-  nik                 varchar
-  status              varchar
-  shift               varchar   [note: 'Pagi | Siang | Malam']
-  created_at          timestamp
-  updated_at          timestamp
-}
-
 // Profil customer. Dibuat saat register mandiri
 Table customer {
   id_customer int       [pk]
@@ -97,9 +79,9 @@ Table customer {
   updated_at  timestamp
 }
 
-// Profil kurir internal. Endpoint belum diimplementasi - roadmap
-Table kurir {
-  id_kurir            int       [pk]
+// Data karyawan (induk dari kasir & kurir). Dibuat oleh Admin
+Table karyawan {
+  id_karyawan         int       [pk]
   public_id           uuid      [note: 'gen_random_uuid()']
   id_user             int
   no_telp             varchar
@@ -108,10 +90,25 @@ Table kurir {
   jenis_kelamin       varchar
   alamat              text
   pendidikan_terakhir varchar
-  nik                 varchar
+  nik                 varchar   [note: 'unique']
   status              varchar
   created_at          timestamp
   updated_at          timestamp
+}
+
+// Profil kasir. Dibuat dari data karyawan yang sudah ada
+Table kasir {
+  id_kasir    int       [pk]
+  public_id   uuid      [note: 'gen_random_uuid()']
+  id_karyawan int       [note: 'unique - merujuk ke tabel karyawan']
+  shift       varchar   [note: 'Pagi | Siang | Malam']
+}
+
+// Profil kurir internal. Dibuat dari data karyawan yang sudah ada
+Table kurir {
+  id_kurir    int       [pk]
+  public_id   uuid      [note: 'gen_random_uuid()']
+  id_karyawan int       [note: 'unique - merujuk ke tabel karyawan']
 }
 
 
@@ -122,6 +119,7 @@ Table kurir {
 // Daftar alamat pengiriman milik customer
 Table alamat {
   id_alamat        int       [pk]
+  public_id        uuid      [note: 'gen_random_uuid()']
   id_customer      int
   nama_penerima    varchar
   label_alamat     varchar   [note: 'Rumah | Kantor | Kos | Lainnya']
@@ -155,9 +153,9 @@ Table satuan {
 
 // Master diskon yang bisa diterapkan ke barang
 Table diskon {
-  id_diskon     int     [pk]
+  id_diskon     int       [pk]
   nama_diskon   varchar
-  besar_diskon  int     [note: 'Persentase: 0-100']
+  besar_diskon  int       [note: 'Persentase: 0-100']
   banner_diskon varchar
   tgl_mulai     date
   tgl_selesai   date
@@ -167,7 +165,8 @@ Table diskon {
 // Harga & stok dikelola per varian di tabel spesifikasi_barang
 Table barang {
   id_barang     int       [pk]
-  id_diskon     int       [note: 'Nullable: barang bisa tidak punya diskon']
+  public_id     uuid      [note: 'gen_random_uuid()']
+  id_diskon     int       [note: 'Nullable - barang bisa tidak punya diskon']
   id_satuan     int
   id_kategori   int
   nama_barang   varchar
@@ -200,11 +199,11 @@ Table spesifikasi_barang {
   harga_barang          int [note: 'Harga per varian dalam Rupiah (integer)']
 }
 
-// Pemetaan kode barcode ke barang. Satu barang bisa punya beberapa barcode
+// Pemetaan kode barcode ke varian spesifikasi_barang
 Table barcode {
   id_barcode            int     [pk]
   id_spesifikasi_barang int
-  id_satuan             int
+  kode_barcode          varchar
   kuantitas             int     [note: 'Jumlah per scan, misal 1 dus = 12 pcs']
 }
 
@@ -219,7 +218,7 @@ Table pesanan {
   public_id        uuid      [note: 'gen_random_uuid()']
   id_customer      int       [note: 'Null jika pesanan offline/walk-in']
   id_kasir         int       [note: 'Null jika pesanan online mandiri']
-  id_alamat        int       [note: 'Null jika pesanan offline']
+  id_alamat        int       [note: 'Null jika pesanan offline/takeaway']
   total_pembayaran int
   tanggal_pesanan  timestamp
   tipe_pesanan     varchar   [note: 'online | offline']
@@ -227,7 +226,7 @@ Table pesanan {
   updated_at       timestamp
 }
 
-// Detail item per pesanan. harga_satuan adalah snapshot saat transaksi
+// Detail item per pesanan. harga_satuan adalah snapshot harga saat transaksi
 Table detail_pesanan {
   id_detail_pesanan     int [pk]
   id_pesanan            int
@@ -270,14 +269,15 @@ Table status_pengantaran {
 // Data pengantaran per pesanan.
 // Kurir internal: isi id_kurir, kosongkan id_ekspedisi. Sebaliknya untuk eksternal
 Table pengantaran {
-  id_pengantaran        int      [pk]
+  id_pengantaran        int       [pk]
+  public_id             uuid      [note: 'gen_random_uuid()']
   id_pesanan            int
-  id_kurir              int      [note: 'Null jika pakai ekspedisi eksternal']
+  id_kurir              int       [note: 'Null jika pakai ekspedisi eksternal']
   id_status_pengantaran int
-  id_ekspedisi          int      [note: 'Null jika pakai kurir internal']
+  id_ekspedisi          int       [note: 'Null jika pakai kurir internal']
   waktu_pickup          datetime
   waktu_sampai          datetime
-  last_latitude         float    [note: 'Koordinat terakhir kurir - realtime update']
+  last_latitude         float     [note: 'Koordinat terakhir kurir - realtime update']
   last_longitude        float
   foto_bukti_pengiriman varchar
 }
@@ -293,7 +293,7 @@ Table stok_opname {
   id_spesifikasi_barang int
   harga_beli            int       [note: 'Harga beli/modal dalam Rupiah']
   status                bool      [note: 'true = stok masuk, false = stok keluar']
-  jumlah_stok           int
+  jumlah_stok           int       [note: 'Jumlah yg masuk/keluar (bukan total stok)']
   keterangan            text
   tanggal               timestamp
 }
@@ -321,6 +321,7 @@ Table notifikasi {
 // Keranjang belanja customer. FK ke spesifikasi_barang agar stok dan varian sinkron
 Table keranjang {
   id_keranjang          int [pk]
+  public_id             uuid [note: 'gen_random_uuid()']
   id_customer           int
   id_spesifikasi_barang int
   quantity              int
@@ -334,10 +335,15 @@ Table keranjang {
 
 // Auth & User
 Ref: user.id_role > role.id_role
-Ref: kasir.id_user > user.id_user
-Ref: customer.id_user > user.id_user
-Ref: kurir.id_user > user.id_user
 Ref: refresh_token.id_user > user.id_user
+
+// Profil
+Ref: customer.id_user > user.id_user
+Ref: karyawan.id_user > user.id_user
+
+// Karyawan → Kasir/Kurir (one-to-one via id_karyawan unique)
+Ref: kasir.id_karyawan - karyawan.id_karyawan
+Ref: kurir.id_karyawan - karyawan.id_karyawan
 
 // Alamat
 Ref: alamat.id_customer > customer.id_customer
@@ -350,7 +356,6 @@ Ref: detail_spesifikasi.id_spesifikasi > spesifikasi.id_spesifikasi
 Ref: spesifikasi_barang.id_barang > barang.id_barang
 Ref: spesifikasi_barang.id_detail_spesifikasi > detail_spesifikasi.id_detail_spesifikasi
 Ref: barcode.id_spesifikasi_barang - spesifikasi_barang.id_spesifikasi_barang
-Ref: barcode.id_satuan > satuan.id_satuan
 
 // Transaksi & Pesanan
 Ref: pesanan.id_customer > customer.id_customer

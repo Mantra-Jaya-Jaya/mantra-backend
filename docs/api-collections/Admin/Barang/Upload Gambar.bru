@@ -1,0 +1,15 @@
+meta {
+  name: Upload Gambar
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/admin/barang/upload
+  body: multipart-form
+  auth: bearer
+}
+
+body:multipart-form {
+  gambar: @file(pilih_file_gambar.jpg)
+}

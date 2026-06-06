@@ -1,0 +1,14 @@
+meta {
+  name: Hapus
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/admin/karyawan/{{idKaryawan}}
+  auth: bearer
+}
+
+params:path {
+  idKaryawan: 1
+}
