@@ -5,10 +5,11 @@ meta {
 }
 
 delete {
-  url: {{baseUrl}}/admin/diskon/{{idDiskon}}
+  url: {{baseUrl}}/admin/diskon/:publicId
+  body: none
   auth: bearer
 }
 
 params:path {
-  idDiskon: 1
+  publicId: 5f830e4d-d48f-4fb6-b177-fc7ceccfa781
 }

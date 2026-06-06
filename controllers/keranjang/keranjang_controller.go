@@ -82,7 +82,7 @@ func TambahKeKeranjang(c *gin.Context) {
 // Auth: Wajib login, role customer
 // Ownership: item keranjang harus milik customer yang login
 func UpdateKeranjang(c *gin.Context) {
-	idKeranjang := c.Param("id_keranjang")
+	idKeranjang := c.Param("public_id")
 
 	type UpdateKeranjangInput struct {
 		Quantity int `json:"quantity" binding:"required"`
@@ -143,7 +143,7 @@ func UpdateKeranjang(c *gin.Context) {
 // Auth: Wajib login, role customer
 // Ownership: item keranjang harus milik customer yang login
 func HapusItemKeranjang(c *gin.Context) {
-	idKeranjang := c.Param("id_keranjang")
+	idKeranjang := c.Param("public_id")
 
 	userID := c.GetInt64("user_id")
 

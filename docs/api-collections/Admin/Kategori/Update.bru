@@ -5,13 +5,13 @@ meta {
 }
 
 put {
-  url: {{baseUrl}}/admin/kategori/{{idKategori}}
+  url: {{baseUrl}}/admin/kategori/:publicId
   body: json
   auth: bearer
 }
 
 params:path {
-  idKategori: 1
+  publicId: 123e4567-e89b-12d3-a456-426614174000
 }
 
 headers {

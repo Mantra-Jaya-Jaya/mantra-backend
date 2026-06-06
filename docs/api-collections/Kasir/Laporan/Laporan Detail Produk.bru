@@ -5,11 +5,11 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/kasir/laporan/produk/{{idProduk}}/{{idPesanan}}
+  url: {{baseUrl}}/kasir/laporan/produk/:publicId/:pesananId
   auth: bearer
 }
 
 params:path {
-  idProduk: 1
-  idPesanan: 1
+  publicId: 123e4567-e89b-12d3-a456-426614174000
+  pesananId: 123e4567-e89b-12d3-a456-426614174000
 }

@@ -10,6 +10,7 @@ import (
 	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -33,6 +34,7 @@ func GetPromo(c *gin.Context) {
 	for _, d := range diskons {
 		responseData = append(responseData, gin.H{
 			"id_diskon":   d.IdDiskon,
+			"public_id":   d.PublicId,
 			"nama_diskon": d.NamaDiskon,
 			"banner_url":  d.BannerDiskon,
 			"tgl_selesai": d.TglSelesai,
@@ -110,6 +112,7 @@ func TambahDiskon(c *gin.Context) {
 		"message": "Diskon berhasil ditambahkan",
 		"data": gin.H{
 			"id_diskon":    diskon.IdDiskon,
+			"public_id":    diskon.PublicId,
 			"nama_diskon":  diskon.NamaDiskon,
 			"besar_diskon": diskon.BesarDiskon,
 			"tgl_mulai":    diskon.TglMulai.Format(layoutDate),
@@ -148,6 +151,7 @@ func GetAllDiskon(c *gin.Context) {
 		aktif := d.TglMulai.Before(now) && d.TglSelesai.After(now)
 		responseData = append(responseData, gin.H{
 			"id_diskon":    d.IdDiskon,
+			"public_id":    d.PublicId,
 			"nama_diskon":  d.NamaDiskon,
 			"besar_diskon": d.BesarDiskon,
 			"banner_url":   d.BannerDiskon,
@@ -180,21 +184,21 @@ func GetAllDiskon(c *gin.Context) {
 }
 
 // HapusDiskon menghapus diskon berdasarkan ID.
-// Dipakai oleh: admin (DELETE /admin/diskon/:id_diskon)
+// Dipakai oleh: admin (DELETE /admin/diskon/:public_id)
 // Auth: Wajib login, role admin
 func HapusDiskon(c *gin.Context) {
-	idDiskonStr := c.Param("id_diskon")
-	idDiskon, err := strconv.Atoi(idDiskonStr)
+	publicIdStr := c.Param("public_id")
+	publicId, err := uuid.Parse(publicIdStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
-			"message": "ID diskon tidak valid",
+			"message": "ID diskon tidak valid (harus UUID)",
 		})
 		return
 	}
 
 	var diskon models.Diskon
-	if err := config.DB.First(&diskon, "id_diskon = ?", idDiskon).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", publicId).First(&diskon).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Diskon tidak ditemukan",
@@ -205,7 +209,7 @@ func HapusDiskon(c *gin.Context) {
 	// PUTUS HUBUNGAN DULU (SET NULL)
 	// Biar barang yang tadinya dapet diskon ini, balik ke harga normal, dan database gak error
 	errLepasRelasi := config.DB.Model(&models.Barang{}).
-		Where("id_diskon = ?", idDiskon).
+		Where("id_diskon = ?", diskon.IdDiskon).
 		Update("id_diskon", gorm.Expr("NULL")).Error
 
 	if errLepasRelasi != nil {

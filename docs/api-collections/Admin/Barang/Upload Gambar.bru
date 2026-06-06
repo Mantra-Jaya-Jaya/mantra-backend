@@ -6,10 +6,10 @@ meta {
 
 post {
   url: {{baseUrl}}/admin/barang/upload
-  body: multipart-form
+  body: multipartForm
   auth: bearer
 }
 
 body:multipart-form {
-  gambar: @file(pilih_file_gambar.jpg)
+  gambar: @file(../../dummy.jpg)
 }

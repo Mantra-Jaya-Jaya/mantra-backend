@@ -200,15 +200,25 @@ func GetDashboardAdmin(c *gin.Context) {
 	startOfThisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 	startOfLastMonth := startOfThisMonth.AddDate(0, -1, 0)
 	
-	// 1. Total Revenue
-	var penjualanHariIni int64
+	// 1. Total Revenue (Net vs Gross)
+	var penjualanHariIni, penjualanKotorHariIni int64
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
+	
+	// Net (Hanya Selesai)
 	config.DB.Model(&models.Pesanan{}).
 		Where("status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", "Selesai", startOfDay, endOfDay).
 		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&penjualanHariIni)
+		
+	// Gross (Semua status)
+	config.DB.Model(&models.Pesanan{}).
+		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
+		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&penjualanKotorHariIni)
 
 	var revenueBulanIni, revenueBulanLalu int64
+	var revenueKotorBulanIni, revenueKotorBulanLalu int64
+
+	// Net
 	config.DB.Model(&models.Pesanan{}).
 		Where("status_pesanan = ? AND tanggal_pesanan >= ?", "Selesai", startOfThisMonth).
 		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&revenueBulanIni)
@@ -216,11 +226,21 @@ func GetDashboardAdmin(c *gin.Context) {
 		Where("status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", "Selesai", startOfLastMonth, startOfThisMonth).
 		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&revenueBulanLalu)
 
+	// Gross
+	config.DB.Model(&models.Pesanan{}).
+		Where("tanggal_pesanan >= ?", startOfThisMonth).
+		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&revenueKotorBulanIni)
+	config.DB.Model(&models.Pesanan{}).
+		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfLastMonth, startOfThisMonth).
+		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&revenueKotorBulanLalu)
+
 	trendRevenue := hitungTrendPersen(revenueBulanIni, revenueBulanLalu)
+	trendRevenueKotor := hitungTrendPersen(revenueKotorBulanIni, revenueKotorBulanLalu)
 
 	// 2. Total Orders
-	var totalPesanan int64
+	var totalPesanan, totalPesananSelesai int64
 	config.DB.Model(&models.Pesanan{}).Count(&totalPesanan)
+	config.DB.Model(&models.Pesanan{}).Where("status_pesanan = ?", "Selesai").Count(&totalPesananSelesai)
 
 	var pesananBulanIni, pesananBulanLalu int64
 	config.DB.Model(&models.Pesanan{}).Where("tanggal_pesanan >= ?", startOfThisMonth).Count(&pesananBulanIni)
@@ -325,15 +345,18 @@ func GetDashboardAdmin(c *gin.Context) {
 		"status":  "success",
 		"message": "Data dashboard berhasil diambil",
 		"data": gin.H{
-			"penjualan_hari_ini":   penjualanHariIni,
-			"total_pesanan":        totalPesanan,
-			"total_customer_aktif": totalCustomerAktif,
-			"total_stok_menipis":   totalStokMenipis,
-			"trend_revenue":        trendRevenue,
-			"trend_pesanan":        trendPesanan,
-			"trend_customer":       trendCustomer,
-			"stok_menipis":         stokMenipisResponse,
-			"transaksi_terbaru":    transaksiResponse,
+			"penjualan_hari_ini":       penjualanHariIni,
+			"penjualan_kotor_hari_ini": penjualanKotorHariIni,
+			"total_pesanan":            totalPesanan,
+			"total_pesanan_selesai":    totalPesananSelesai,
+			"total_customer_aktif":     totalCustomerAktif,
+			"total_stok_menipis":       totalStokMenipis,
+			"trend_revenue":            trendRevenue,
+			"trend_revenue_kotor":      trendRevenueKotor,
+			"trend_pesanan":            trendPesanan,
+			"trend_customer":           trendCustomer,
+			"stok_menipis":             stokMenipisResponse,
+			"transaksi_terbaru":        transaksiResponse,
 		},
 	})
 }

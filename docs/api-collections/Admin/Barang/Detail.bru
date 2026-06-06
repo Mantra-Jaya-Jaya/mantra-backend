@@ -5,10 +5,10 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/admin/barang/detail/{{publicId}}
+  url: {{baseUrl}}/admin/barang/detail/:publicId
   auth: bearer
 }
 
 params:path {
-  publicId: {{publicId}}
+  publicId: :publicId
 }
