@@ -1,0 +1,38 @@
+meta {
+  name: Login - Flutter
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "username": "customer",
+    "password": "password123"
+  }
+}
+
+script:post-response {
+  const token = res.body.data?.access_token;
+  if (token) {
+    bru.setVar("accessToken", token);
+  }
+  const refresh = res.body.data?.refresh_token;
+  if (refresh) {
+    bru.setVar("refreshToken", refresh);
+  }
+  const publicId = res.body.data?.user?.public_id;
+  if (publicId) {
+    bru.setVar("publicId", publicId);
+  }
+}

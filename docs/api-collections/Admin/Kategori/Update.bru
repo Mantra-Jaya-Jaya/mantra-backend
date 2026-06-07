@@ -1,0 +1,25 @@
+meta {
+  name: Update
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/admin/kategori/:publicId
+  body: json
+  auth: bearer
+}
+
+params:path {
+  publicId: 123e4567-e89b-12d3-a456-426614174000
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_kategori": "Minuman Segar"
+  }
+}

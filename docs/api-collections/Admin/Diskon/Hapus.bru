@@ -1,0 +1,15 @@
+meta {
+  name: Hapus
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/admin/diskon/:publicId
+  body: none
+  auth: bearer
+}
+
+params:path {
+  publicId: 5f830e4d-d48f-4fb6-b177-fc7ceccfa781
+}

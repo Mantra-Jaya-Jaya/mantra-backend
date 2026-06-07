@@ -1,0 +1,25 @@
+meta {
+  name: Tambah
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/admin/barang
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_barang": "Produk Baru",
+    "id_kategori": 1,
+    "id_satuan": 1,
+    "id_diskon": 1,
+    "deskripsi": "Deskripsi produk baru"
+  }
+}

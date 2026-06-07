@@ -1,0 +1,23 @@
+meta {
+  name: Edit Akun Customer
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/customer/akun
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_lengkap": "John Updated",
+    "email": "john.baru@example.com",
+    "no_telp": "08123456780"
+  }
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/admin/karyawan/:publicId
+  body: json
+  auth: bearer
+}
+
+params:path {
+  publicId: 0986dfa9-cb01-4536-a32e-9f45230c4dcc
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_lengkap": "Karyawan Updated",
+    "shift": "Siang"
+  }
+}

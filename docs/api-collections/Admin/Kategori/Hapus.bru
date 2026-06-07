@@ -1,0 +1,14 @@
+meta {
+  name: Hapus
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/admin/kategori/:publicId
+  auth: bearer
+}
+
+params:path {
+  publicId: 123e4567-e89b-12d3-a456-426614174000
+}

@@ -1,0 +1,14 @@
+meta {
+  name: Hapus
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/admin/karyawan/:publicId
+  auth: bearer
+}
+
+params:path {
+  publicId: 0986dfa9-cb01-4536-a32e-9f45230c4dcc
+}

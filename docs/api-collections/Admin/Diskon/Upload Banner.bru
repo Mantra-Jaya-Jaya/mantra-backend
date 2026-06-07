@@ -1,0 +1,15 @@
+meta {
+  name: Upload Banner
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/admin/diskon/upload
+  body: multipartForm
+  auth: bearer
+}
+
+body:multipart-form {
+  banner: @file(/home/surya/Pictures/Screenshots/Screenshot_20260417_110111.png)
+}

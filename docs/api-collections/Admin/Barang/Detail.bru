@@ -1,0 +1,14 @@
+meta {
+  name: Detail
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/admin/barang/detail/:publicId
+  auth: bearer
+}
+
+params:path {
+  publicId: :publicId
+}
