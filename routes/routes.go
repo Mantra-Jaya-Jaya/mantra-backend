@@ -7,6 +7,8 @@ import (
 	"backend-mantra/controllers/notifikasi"
 	"backend-mantra/controllers/transaksi"
 	"backend-mantra/controllers/user"
+	"backend-mantra/controllers/pengantaran"
+	"backend-mantra/controllers/pemesanan"
 	"backend-mantra/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -73,6 +75,17 @@ func SetupRoutes(r *gin.Engine) {
 			kasirGroup.POST("/transaksi/bayar/non-tunai", transaksi.BayarNonTunai)
 			kasirGroup.GET("/profil", user.GetProfilKasir)
 			kasirGroup.GET("/notifikasi", notifikasi.GetNotifikasi)
+		}
+
+		//Kurir Routes
+		kurirGroup := v1.Group("/kurir")
+		kurirGroup.Use(middleware.AuthMiddleware())
+		{
+			kurirGroup.GET("/tugas", pengantaran.GetDaftarPengantaran)
+			kurirGroup.GET("/laporan", pengantaran.GetLaporanHariIni)
+			kurirGroup.GET("/profile", user.GetProfilKurir)
+			kurirGroup.GET("/pesanan/new", pemesanan.GetPesananTerbaru)
+			kurirGroup.GET("/pesanan", pemesanan.GetAllPesananOnline)
 		}
 
 		// Admin Routes

@@ -24,4 +24,5 @@ type Pesanan struct {
 	Customer   Customer `gorm:"foreignKey:CustomerId;references:IdCustomer" json:"customer"`
 	Kasir      Kasir    `gorm:"foreignKey:KasirId;references:IdKasir" json:"kasir"`
 	Alamat     *Alamat  `gorm:"foreignKey:AlamatId;references:IdAlamat" json:"alamat"` // Pake pointer karena bisa NULL (jika takeaway/offline)
+	DetailPesanan []DetailPesanan `gorm:"foreignKey:PesananId;references:IdPesanan" json:"detail_pesanan"`
 }

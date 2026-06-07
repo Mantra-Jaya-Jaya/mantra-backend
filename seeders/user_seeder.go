@@ -1,4 +1,4 @@
-package seeders
+	package seeders
 
 import (
 	"backend-mantra/config"
@@ -19,7 +19,7 @@ func SeedUser() {
 	usersData := []struct {
 		Username     string
 		Email        string
-		NamaLengkap  string
+		NamaLengkap  string	
 		NamaRole     string
 		PasswordAsli string
 	}{

@@ -10,6 +10,7 @@ import (
 func SeedPengantaran() {
 	fmt.Println("⏳ Menyiapkan data pengantaran...")
 
+	// 🚀 LOGIKA AMAN: Cek apakah tabel pengantaran udah ada isinya
 	var count int64
 	config.DB.Model(&models.Pengantaran{}).Count(&count)
 	if count > 0 {
@@ -48,21 +49,32 @@ func SeedPengantaran() {
 	}
 
 	for i, pesanan := range daftarPesanan {
+		// 🚀 1. BIKIN VARIABEL PENAMPUNG BUAT POINTER SEBELUM STRUCT
+		waktuPickup := time.Now().Add(-2 * time.Hour)
+		waktuSampai := time.Now().Add(-1 * time.Hour)
+		idKurir := kurir.IdKurir
+		idEkspedisi := ekspedisi.IdEkspedisi
+
 		statusID := statusSelesai.IdStatusPengantaran
+		var ptrWaktuSampai *time.Time = &waktuSampai // Default: Udah sampai
+
 		if i%2 != 0 {
 			statusID = statusJalan.IdStatusPengantaran
+			// 🚀 LOGIKA SAKTI: Kalau masih di jalan, waktu sampainya kita set NULL!
+			ptrWaktuSampai = nil 
 		}
 
+		// 🚀 2. MASUKIN ALAMAT MEMORI (&) KE DALAM STRUCT PENGANTARAN
 		pengantaran := models.Pengantaran{
-			WaktuPickup:         time.Now().Add(-2 * time.Hour),
-			WaktuSampai:         time.Now().Add(-1 * time.Hour),
+			WaktuPickup:         &waktuPickup,   // Pakai & (Pointer)
+			WaktuSampai:         ptrWaktuSampai, // Bisa terisi nilai pointer, atau nil (NULL)
 			LastLatitude:        -7.051410,
 			LastLongitude:       110.438125,
 			FotoBuktiPengiriman: "https://picsum.photos/400/400",
 			PesananID:           pesanan.IdPesanan,
-			KurirID:             kurir.IdKurir,
+			KurirID:             &idKurir,       // Pakai & (Pointer)
 			StatusPengantaranID: statusID,
-			EkspedisiID:         ekspedisi.IdEkspedisi,
+			EkspedisiID:         &idEkspedisi,   // Pakai & (Pointer)
 		}
 
 		if err := config.DB.Create(&pengantaran).Error; err != nil {
