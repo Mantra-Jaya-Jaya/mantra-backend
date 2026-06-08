@@ -102,56 +102,69 @@ func UpdateQuantityItem(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "Format inputan salah",
-		})
-		return
-	}
-
-	var detail models.DetailPesanan
-	if err := config.DB.Where("id_pesanan = ? AND id_spesifikasi_barang = ?", input.IdPesanan, input.IdSpesifikasiBarang).First(&detail).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Item pesanan tidak ditemukan",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Format inputan salah"})
 		return
 	}
 
 	tx := config.DB.Begin()
 
-	if input.Jumlah <= 0 {
-		if err := tx.Delete(&detail).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "error",
-				"message": "Gagal menghapus item dari transaksi",
-			})
-			return
+	var detail models.DetailPesanan
+	// 1. Cek apakah barang udah ada di dalam pesanan
+	err := tx.Where("id_pesanan = ? AND id_spesifikasi_barang = ?", input.IdPesanan, input.IdSpesifikasiBarang).First(&detail).Error
+
+	if err != nil {
+		// 🚀 2. LOGIKA PINTAR: KALAU BELUM ADA (BARU DI-SCAN), BIKIN BARU!
+		if input.Jumlah > 0 {
+			// Cari tahu harga barangnya dulu dari database
+			var spek models.SpesifikasiBarang
+			if errSpek := tx.First(&spek, input.IdSpesifikasiBarang).Error; errSpek != nil {
+				tx.Rollback()
+				c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Data Spesifikasi Barang tidak ditemukan"})
+				return
+			}
+
+			// Masukin barang ke Detail Pesanan
+			detailBaru := models.DetailPesanan{
+				PesananId:           input.IdPesanan,           
+				SpesifikasiBarangId: input.IdSpesifikasiBarang, 
+				Jumlah:              input.Jumlah,
+				HargaSatuan:         spek.HargaBarang, 
+				Subtotal:            input.Jumlah * spek.HargaBarang,
+			}
+			if errCreate := tx.Create(&detailBaru).Error; errCreate != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memasukkan barang baru ke pesanan"})
+				return
+			}
 		}
 	} else {
-		detail.Jumlah = input.Jumlah
-		detail.Subtotal = detail.Jumlah * detail.HargaSatuan
-		if err := tx.Save(&detail).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "error",
-				"message": "Gagal memperbarui jumlah item",
-			})
-			return
+		// 🚀 3. KALAU BARANGNYA UDAH ADA DI KERANJANG KASIR
+		if input.Jumlah <= 0 {
+			// Kalau minus atau 0, hapus dari daftar
+			if errDel := tx.Delete(&detail).Error; errDel != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menghapus item"})
+				return
+			}
+		} else {
+			// Kalau nambah jumlah, update qty dan subtotalnya
+			detail.Jumlah = input.Jumlah
+			detail.Subtotal = detail.Jumlah * detail.HargaSatuan
+			if errUpdate := tx.Save(&detail).Error; errUpdate != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memperbarui jumlah item"})
+				return
+			}
 		}
 	}
 
-	// Hitung ulang total_pembayaran
+	// 4. Hitung ulang Total Pembayaran untuk pesanan ini
 	var totalBayar int64
 	tx.Model(&models.DetailPesanan{}).Where("id_pesanan = ?", input.IdPesanan).Select("COALESCE(SUM(subtotal), 0)").Scan(&totalBayar)
 
 	if err := tx.Model(&models.Pesanan{}).Where("id_pesanan = ?", input.IdPesanan).Update("total_pembayaran", totalBayar).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal memperbarui total pembayaran pesanan",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memperbarui total pembayaran"})
 		return
 	}
 
@@ -159,7 +172,7 @@ func UpdateQuantityItem(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Quantity berhasil diperbarui",
+		"message": "Item berhasil diperbarui di transaksi",
 		"data":    nil,
 	})
 }

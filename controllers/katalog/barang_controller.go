@@ -653,7 +653,7 @@ func GetDetailBarangByScan(c *gin.Context) {
 	var barcode models.Barcode
 
 	// Cari barcode berdasarkan kode
-	if err := config.DB.Preload("SpesifikasiBarang.Barang.Kategori").Preload("SpesifikasiBarang.Barang.Diskon").Preload("SpesifikasiBarang.Barang.Satuan").Where("id_barcode = ?", kodeBarcode).First(&barcode).Error; err != nil {
+	if err := config.DB.Preload("SpesifikasiBarang.Barang.Kategori").Preload("SpesifikasiBarang.Barang.Diskon").Preload("SpesifikasiBarang.Barang.Satuan").Where("kode_barcode = ?", kodeBarcode).First(&barcode).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Data barang tidak ditemukan",
