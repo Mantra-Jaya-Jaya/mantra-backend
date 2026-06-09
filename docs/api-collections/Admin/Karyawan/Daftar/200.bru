@@ -1,0 +1,36 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/admin/karyawan
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if(body && body.data && body.data.length > 0) {
+    // Ambil data paling terakhir di daftar untuk menghindari menghapus Seed Data utama
+    const lastIndex = body.data.length - 1;
+    bru.setEnvVar("karyawan_public_id", body.data[lastIndex].public_id);
+    bru.setEnvVar("karyawan_email", body.data[lastIndex].email);
+    bru.setEnvVar("karyawan_username", body.data[lastIndex].username);
+    bru.setVar("karyawan_public_id", body.data[lastIndex].public_id);
+    bru.setVar("karyawan_email", body.data[lastIndex].email);
+    bru.setVar("karyawan_username", body.data[lastIndex].username);
+
+    // Cari seed karyawan (misal username "kasir" atau email "kasir@mantra.com") untuk skenario Hapus/500
+    const seedKaryawan = body.data.find(k => k.username === "kasir" || k.email === "kasir@mantra.com");
+    if(seedKaryawan) {
+      bru.setEnvVar("karyawan_seed_id", seedKaryawan.public_id);
+      bru.setVar("karyawan_seed_id", seedKaryawan.public_id);
+    }
+  }
+}
+

@@ -1,0 +1,22 @@
+meta {
+  name: 404
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/customer/pesanan/:publicId
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  X-Client-Type: flutter
+}
+
+params:path {
+  publicId: 00000000-0000-0000-0000-000000000000
+}

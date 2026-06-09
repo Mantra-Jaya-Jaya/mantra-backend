@@ -1,0 +1,26 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/logout
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "refresh_token": "{{refreshToken}}"
+  }
+}

@@ -1,0 +1,26 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/admin/profil
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_lengkap": "Admin Updated",
+    "email": "admin@mantra.web.id"
+  }
+}

@@ -1,0 +1,30 @@
+meta {
+  name: 401
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/admin/karyawan/:publicId
+  body: json
+  auth: bearer
+}
+
+params:path {
+  publicId: {{karyawan_public_id}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: token-palsu-yang-salah-123
+}
+
+body:json {
+  {
+    "nama_lengkap": "Surya",
+    "email": "surya@mantra.web.id"
+  }
+}

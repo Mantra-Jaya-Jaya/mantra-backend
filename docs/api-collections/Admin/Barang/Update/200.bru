@@ -1,0 +1,50 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/admin/barang/{{barang_tester_id}}
+  body: json
+  auth: bearer
+}
+
+
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "media": "https://minio.mantra.com/gambar/produk-updated.jpg",
+    "informasi_barang": {
+      "nama": "Kopi Susu Gula Aren (Updated)",
+      "hargaBeli": "12500",
+      "kategori": "Minuman",
+      "satuan": "Cup",
+      "diskon": "1",
+      "deskripsi": "Deskripsi kopi susu telah diupdate"
+    },
+    "spesifikasi": [
+      {
+        "atribut": "Ukuran",
+        "nilai": "Large",
+        "hargaJual": "20000",
+        "penyesuaian_stok": {
+          "isMasuk": true,
+          "jumlah": 10,
+          "keterangan": "Restock mingguan"
+        },
+        "barcodes": [
+          { "code": "899123456001", "qty": "1" }
+        ]
+      }
+    ]
+  }
+}

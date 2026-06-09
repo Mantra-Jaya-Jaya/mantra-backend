@@ -1,0 +1,15 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/admin/barang/detail/{{barang_tester_id}}
+  auth: bearer
+}
+
+
+auth:bearer {
+  token: {{accessToken}}
+}

@@ -66,9 +66,10 @@ func TambahDiskon(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+		c.JSON(http.StatusUnprocessableEntity, gin.H{
 			"status":  "error",
-			"message": "Format inputan salah: " + err.Error(),
+			"message": "Validasi gagal",
+			"error":   err.Error(),
 		})
 		return
 	}

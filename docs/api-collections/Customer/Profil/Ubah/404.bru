@@ -1,0 +1,27 @@
+meta {
+  name: 404
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/customer/akun
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "nama_lengkap": "Ghost User",
+    "email": "ghost@example.com"
+  }
+}

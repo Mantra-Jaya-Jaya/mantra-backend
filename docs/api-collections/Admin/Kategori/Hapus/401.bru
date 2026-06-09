@@ -1,0 +1,18 @@
+meta {
+  name: 401
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/admin/kategori/:publicId
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+params:path {
+  publicId: {{kategori_public_id}}
+}

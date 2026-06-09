@@ -1,0 +1,29 @@
+meta {
+  name: 422
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/admin/karyawan/:publicId
+  body: json
+  auth: bearer
+}
+
+params:path {
+  publicId: {{karyawan_public_id}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_lengkap": 123
+  }
+}

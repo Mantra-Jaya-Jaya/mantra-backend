@@ -1,0 +1,23 @@
+meta {
+  name: 404
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/admin/karyawan/upload/:publicId
+  body: multipartForm
+  auth: bearer
+}
+
+params:path {
+  publicId: 00000000-0000-0000-0000-000000000000
+}
+
+body:multipart-form {
+  foto: @file(../../dummy.jpg)
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

@@ -1,0 +1,25 @@
+meta {
+  name: 422
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/admin/profil
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_lengkap": 123
+  }
+}

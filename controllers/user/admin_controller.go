@@ -166,8 +166,11 @@ func UpdateProfilAdmin(c *gin.Context) {
 
 // Helper: Format Nominal Rupiah
 func formatNominalRupiah(amount int64) string {
+	if amount >= 1000000000 {
+		return fmt.Sprintf("Rp %.1fM", float64(amount)/1000000000.0)
+	}
 	if amount >= 1000000 {
-		return fmt.Sprintf("Rp %.1fM", float64(amount)/1000000.0)
+		return fmt.Sprintf("Rp %.1fJt", float64(amount)/1000000.0)
 	}
 	if amount >= 1000 {
 		return fmt.Sprintf("Rp %.1fK", float64(amount)/1000.0)

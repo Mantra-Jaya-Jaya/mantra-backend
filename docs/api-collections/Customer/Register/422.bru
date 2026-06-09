@@ -1,0 +1,27 @@
+meta {
+  name: 422
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "username": "test",
+    "email": "not-an-email",
+    "password": "short",
+    "konfirmasi_password": "different",
+    "nama_lengkap": "",
+    "no_telp": ""
+  }
+}

@@ -1,0 +1,14 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/admin/notifikasi
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

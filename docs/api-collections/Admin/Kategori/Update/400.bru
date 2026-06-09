@@ -1,0 +1,27 @@
+meta {
+  name: 400
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/admin/kategori/:publicId
+  body: json
+  auth: bearer
+}
+
+params:path {
+  publicId: {{kategori_public_id}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {}
+}

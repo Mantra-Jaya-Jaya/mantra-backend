@@ -1,0 +1,29 @@
+meta {
+  name: 401
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/admin/kategori/:publicId
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+params:path {
+  publicId: {{kategori_public_id}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_kategori": "Minuman Segar"
+  }
+}

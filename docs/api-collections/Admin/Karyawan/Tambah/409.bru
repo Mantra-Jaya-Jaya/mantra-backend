@@ -1,0 +1,37 @@
+meta {
+  name: 409
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/admin/karyawan
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_lengkap": "Karyawan Duplikat",
+    "username": "{{karyawan_username}}",
+    "email": "{{karyawan_email}}",
+    "password": "password123",
+    "no_telp": "081234567890",
+    "tempat_lahir": "Jakarta",
+    "tanggal_lahir": "1995-01-01",
+    "jenis_kelamin": "L",
+    "alamat": "Jl. Contoh No. 1",
+    "pendidikan_terakhir": "SMA",
+    "nik": "1234567890123456",
+    "role": "Kasir",
+    "shift": "Pagi"
+  }
+}

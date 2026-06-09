@@ -1,0 +1,26 @@
+meta {
+  name: 409
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/customer/akun
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "email": "admin@mantra.com"
+  }
+}

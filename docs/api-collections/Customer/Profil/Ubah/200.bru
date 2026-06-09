@@ -1,0 +1,28 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/customer/akun
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "nama_lengkap": "John Updated",
+    "email": "john.baru@example.com",
+    "no_telp": "08123456780"
+  }
+}

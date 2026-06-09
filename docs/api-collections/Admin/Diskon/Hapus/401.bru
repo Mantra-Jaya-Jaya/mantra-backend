@@ -1,0 +1,19 @@
+meta {
+  name: 401
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/admin/diskon/:publicId
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+params:path {
+  publicId: {{diskon_public_id}}
+}
