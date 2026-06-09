@@ -1,0 +1,19 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/admin/dashboard/chart
+  auth: bearer
+}
+
+query {
+  ~periode: minggu
+  ~tanggal: 2006-01-02
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

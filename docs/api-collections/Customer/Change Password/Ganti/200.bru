@@ -1,0 +1,28 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/change-password
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "password_lama": "Customer#123",
+    "password_baru": "CustomerBaru#456",
+    "konfirmasi_password": "CustomerBaru#456"
+  }
+}

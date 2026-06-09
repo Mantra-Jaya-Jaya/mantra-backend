@@ -1,0 +1,33 @@
+meta {
+  name: 201
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/customer/alamat
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "nama_penerima": "John Doe",
+    "label_alamat": "Rumah",
+    "no_telp_penerima": "08123456789",
+    "alamat_lengkap": "Jl. Contoh No. 1, Jakarta",
+    "latitude": -6.2,
+    "longitude": 106.8,
+    "catatan_lokasi": "Depan masjid",
+    "is_utama": true
+  }
+}

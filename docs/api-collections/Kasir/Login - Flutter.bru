@@ -17,8 +17,8 @@ headers {
 
 body:json {
   {
-    "username": "kasir",
-    "password": "password123"
+    "username": "nabila_kasir",
+    "password": "Kasir#123"
   }
 }
 
@@ -26,10 +26,12 @@ script:post-response {
   const token = res.body.data?.access_token;
   if (token) {
     bru.setVar("accessToken", token);
+    bru.setEnvVar("accessToken", token);
   }
   const refresh = res.body.data?.refresh_token;
   if (refresh) {
     bru.setVar("refreshToken", refresh);
+    bru.setEnvVar("refreshToken", refresh);
   }
   const publicId = res.body.data?.user?.public_id;
   if (publicId) {

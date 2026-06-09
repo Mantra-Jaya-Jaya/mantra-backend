@@ -1,0 +1,30 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+patch {
+  url: {{baseUrl}}/customer/keranjang/:publicId
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+params:path {
+  publicId: 123e4567-e89b-12d3-a456-426614174000
+}
+
+body:json {
+  {
+    "quantity": 5
+  }
+}

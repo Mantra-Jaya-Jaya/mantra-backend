@@ -1,0 +1,22 @@
+meta {
+  name: 403
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/customer/keranjang/:publicId
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  X-Client-Type: flutter
+}
+
+params:path {
+  publicId: 00000000-0000-0000-0000-000000000000
+}

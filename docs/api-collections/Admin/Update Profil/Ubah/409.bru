@@ -1,0 +1,25 @@
+meta {
+  name: 409
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/admin/profil
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "terra_admin@mantra.web.id"
+  }
+}

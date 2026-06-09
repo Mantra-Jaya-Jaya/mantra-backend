@@ -1,0 +1,27 @@
+meta {
+  name: 401
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/customer/keranjang
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "id_spesifikasi_barang": 1,
+    "quantity": 2
+  }
+}

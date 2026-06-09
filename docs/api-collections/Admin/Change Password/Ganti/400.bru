@@ -1,0 +1,27 @@
+meta {
+  name: 400
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/change-password
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "password_lama": "SalahPassword#999",
+    "password_baru": "AdminBaru#789",
+    "konfirmasi_password": "AdminBaru#789"
+  }
+}

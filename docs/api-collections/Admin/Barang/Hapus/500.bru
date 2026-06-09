@@ -1,0 +1,28 @@
+meta {
+  name: 500
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/admin/barang/{{barang_seed_id}}
+  body: none
+  auth: bearer
+}
+
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  /**
+   * PENTING: Skenario 500 (Foreign Key Violation)
+   * 
+   * File ini secara otomatis membidik "unbarang_tester_id" (Barang Seed Data ID <= 20).
+   * Karena barang ini sudah tercatat di tabel `detail_pesanan`, 
+   * database PostgreSQL secara paksa menolak penghapusan ini untuk menjaga integritas data.
+   * 
+   * Hasil yang diekspektasikan adalah 500 Internal Server Error: "Gagal menghapus induk barang".
+   */
+}

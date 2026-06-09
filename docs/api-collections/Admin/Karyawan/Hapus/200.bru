@@ -1,0 +1,20 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{baseUrl}}/admin/karyawan/:publicId
+  body: none
+  auth: bearer
+}
+
+params:path {
+  publicId: {{karyawan_public_id}}
+}
+
+
+auth:bearer {
+  token: {{accessToken}}
+}

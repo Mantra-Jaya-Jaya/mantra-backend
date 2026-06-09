@@ -1,0 +1,18 @@
+meta {
+  name: 404
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{baseUrl}}/admin/barang/:publicId
+  auth: bearer
+}
+
+params:path {
+  publicId: 00000000-0000-0000-0000-000000000000
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

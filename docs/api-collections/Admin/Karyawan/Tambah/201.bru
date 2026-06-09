@@ -1,0 +1,37 @@
+meta {
+  name: 201
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/admin/karyawan
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_lengkap": "Karyawan Baru",
+    "username": "karyawan{{$randomInt}}",
+    "email": "karyawan{{$randomInt}}@mantra.web.id",
+    "password": "password123",
+    "no_telp": "0812{{$randomInt}}",
+    "tempat_lahir": "Jakarta",
+    "tanggal_lahir": "1995-01-01",
+    "jenis_kelamin": "L",
+    "alamat": "Jl. Contoh No. 1",
+    "pendidikan_terakhir": "SMA",
+    "nik": "{{$randomInt}}",
+    "role": "Kasir",
+    "shift": "Pagi"
+  }
+}

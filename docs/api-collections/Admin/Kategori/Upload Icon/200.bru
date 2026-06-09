@@ -1,0 +1,19 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/admin/kategori/upload
+  body: multipartForm
+  auth: bearer
+}
+
+body:multipart-form {
+  icon: @file(../../dummy.jpg)
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

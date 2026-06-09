@@ -1,0 +1,33 @@
+meta {
+  name: 422
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/admin/barang/{{barang_tester_id}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "media": "https://minio.mantra.com/gambar/produk.jpg",
+    "informasi_barang": {
+      "hargaBeli": "12000",
+      "kategori": "Minuman",
+      "diskon": "1",
+      "satuan": "Cup",
+      "deskripsi": "Sengaja menghilangkan nama untuk memicu 422"
+    },
+    "spesifikasi": []
+  }
+}

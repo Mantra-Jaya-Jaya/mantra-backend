@@ -1,0 +1,23 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/admin/kategori
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if(body && body.data && body.data.length > 0) {
+    const lastIndex = body.data.length - 1;
+    bru.setEnvVar("kategori_public_id", body.data[lastIndex].public_id);
+    bru.setVar("kategori_public_id", body.data[lastIndex].public_id);
+  }
+}

@@ -33,7 +33,7 @@ func RunAllSeeders() {
 	SeedPembayaran()
 	SeedPengantaran()
 	SeedKeranjang()
-	SeedNotifikasi()          
+	SeedNotifikasi()
 
 	fmt.Println("======================================")
 	fmt.Println("SEMUA DATA BERHASIL DI-SEED!")

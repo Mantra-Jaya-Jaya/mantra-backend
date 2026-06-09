@@ -1,0 +1,32 @@
+meta {
+  name: 401
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/admin/barang/:publicId
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+params:path {
+  publicId: 00000000-0000-0000-0000-000000000000
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_barang": "Produk Updated",
+    "id_kategori": 1,
+    "id_satuan": 1,
+    "deskripsi": "Deskripsi updated"
+  }
+}

@@ -1,0 +1,21 @@
+meta {
+  name: 401
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/admin/karyawan?page=1&limit=10&search=
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 10
+  search: 
+}
+
+auth:bearer {
+  token: token-palsu-yang-salah-123
+}

@@ -1,0 +1,18 @@
+meta {
+  name: 401
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/customer/promo
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+headers {
+  X-Client-Type: flutter
+}

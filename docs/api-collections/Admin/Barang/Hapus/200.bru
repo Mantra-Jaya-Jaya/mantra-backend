@@ -1,0 +1,15 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{baseUrl}}/admin/barang/{{barang_tester_id}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
