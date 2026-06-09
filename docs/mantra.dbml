@@ -1,7 +1,7 @@
 // =============================================================================
 // MANTRA - Database Schema (DBML)
-// Version    : 2.0.0
-// Updated    : 2026-06-05
+// Version    : 2.1.0
+// Updated    : 2026-06-09
 // =============================================================================
 //
 // CARA PAKAI FILE INI:
@@ -17,7 +17,7 @@
 // - Kolom penting diberi [note: '...']
 //
 // SINGLE SOURCE OF TRUTH:
-// File ini adalah representasi dari 25 struct GORM di folder models/.
+// File ini adalah representasi dari 28 struct GORM di folder models/.
 // Setiap perubahan tabel WAJIB diikuti update struct GORM dan file ini.
 //
 // ARSITEKTUR SINGKAT:
@@ -27,6 +27,8 @@
 // - Semua nilai uang disimpan sebagai integer (Rupiah), bukan float
 // - ID Obfuscation: UUID (public_id) untuk endpoint eksternal
 // - Password: bcrypt cost factor 12
+// - Ongkir: Biteship API untuk kalkulasi ongkos kirim
+// - Pembayaran: Midtrans Snap untuk pemrosesan pembayaran online
 // =============================================================================
 
 
@@ -216,16 +218,20 @@ Table barcode {
 
 // Tabel utama pesanan online (Flutter Customer) dan offline (Kasir POS)
 Table pesanan {
-  id_pesanan       int       [pk]
-  public_id        uuid      [note: 'gen_random_uuid()']
-  id_customer      int       [note: 'Null jika pesanan offline/walk-in']
-  id_kasir         int       [note: 'Null jika pesanan online mandiri']
-  id_alamat        int       [note: 'Null jika pesanan offline/takeaway']
-  total_pembayaran int
-  tanggal_pesanan  timestamp
-  tipe_pesanan     varchar   [note: 'online | offline']
-  status_pesanan   varchar   [note: 'menunggu_pembayaran | diproses | dikemas | dikirim | selesai | dibatalkan']
-  updated_at       timestamp
+  id_pesanan           int       [pk]
+  public_id            uuid      [note: 'gen_random_uuid()']
+  id_customer          int       [note: 'Wajib, dibuat otomatis dari JWT saat checkout']
+  id_kasir             int       [note: 'Null jika customer checkout mandiri']
+  id_alamat            int       [note: 'Null jika tanpa pengiriman/takeaway']
+  id_ekspedisi         int       [note: 'Null jika offline/tanpa kirim']
+  id_layanan_ekspedisi int       [note: 'Null jika offline/tanpa kirim']
+  total_pembayaran     int
+  ongkos_kirim         int       [note: 'default 0']
+  catatan              text
+  tanggal_pesanan      timestamp
+  tipe_pesanan         varchar   [note: 'online | offline']
+  status_pesanan       varchar   [note: 'diproses | dikemas | dikirim | selesai | dibatalkan']
+  updated_at           timestamp
 }
 
 // Detail item per pesanan. harga_satuan adalah snapshot harga saat transaksi
@@ -240,26 +246,72 @@ Table detail_pesanan {
 
 // Record pembayaran. Satu pesanan satu pembayaran
 Table pembayaran {
-  id_pembayaran     int       [pk]
-  id_pesanan        int
-  order_id_midtrans varchar   [note: 'Dari Midtrans, null jika bayar tunai']
-  payment_type      varchar   [note: 'cash | qris | ewallet | va | kartu']
-  status_transaksi  varchar   [note: 'pending | settlement | cancel | expire | deny']
-  fraud_status      varchar   [note: 'Dari Midtrans: accept | challenge | deny']
-  created_at        timestamp
-  updated_at        timestamp
+  id_pembayaran         int       [pk]
+  id_pesanan            int
+  id_metode_pembayaran  int       [note: 'Null jika legacy/pra-migrasi']
+  order_id_midtrans     varchar   [note: 'order_id dari Midtrans Snap']
+  transaksi_midtrans_id varchar   [note: 'transaction_id dari Midtrans']
+  payment_type          varchar   [note: 'cash | qris | ewallet | va | midtrans']
+  status_transaksi      varchar   [note: 'pending | settlement | cancel | expire | deny']
+  fraud_status          varchar   [note: 'Dari Midtrans: accept | challenge | deny']
+  total_dibayar         int       [note: 'Nilai yg dibayar, default 0']
+  waktu_pembayaran      timestamp [note: 'Diisi saat settlement']
+  created_at            timestamp
+  updated_at            timestamp
 }
 
+
+// Master metode pembayaran yang tersedia (cash, qris, va, ewallet, cod)
+Table metode_pembayaran {
+  id_metode_pembayaran int     [pk]
+  public_id            uuid    [note: 'gen_random_uuid()']
+  nama_metode          varchar [note: 'Cash, QRIS, Virtual Account, E-Wallet, COD']
+  kode_metode          varchar [note: 'cash | qris | va | ewallet | cod']
+  penyedia             varchar [note: 'internal | midtrans']
+  icon                 varchar [note: 'URL icon metode pembayaran']
+  urutan               int     [note: 'Urutan tampilan, default 0']
+  is_active            bool    [note: 'default true']
+}
+
+// Detail kanal pembayaran dari Midtrans (VA, QRIS, Convenience Store)
+Table detail_pembayaran {
+  id_detail_pembayaran int     [pk]
+  public_id            uuid    [note: 'gen_random_uuid()']
+  id_pembayaran        int
+  kanal_pembayaran     varchar [note: 'qris | bank_transfer | cstore | echannel']
+  nomor_va             varchar [note: 'Nomor Virtual Account']
+  bill_key             varchar [note: 'Bill key untuk Mandiri Bill']
+  bill_code            varchar [note: 'Bill code untuk Mandiri Bill']
+  nama_bank            varchar [note: 'Nama bank penerbit VA']
+  merchant_id          varchar [note: 'Merchant ID dari Midtrans']
+  qr_code_url          varchar [note: 'URL QR Code untuk pembayaran QRIS']
+}
 
 // -----------------------------------------------------------------------------
 // PENGANTARAN (DELIVERY)
 // -----------------------------------------------------------------------------
 
-// Master data ekspedisi. Internal atau eksternal (JNE, J&T, dll) - roadmap
+// Master data ekspedisi. Internal (Ninja Xpress, Anteraja) atau eksternal (JNE, J&T)
 Table ekspedisi {
   id_ekspedisi   int     [pk]
+  public_id      uuid    [note: 'gen_random_uuid()']
   nama_ekspedisi varchar
+  logo           varchar [note: 'URL logo ekspedisi']
+  deskripsi      text
   kode_api       varchar [note: 'Untuk integrasi API ekspedisi eksternal - roadmap']
+  is_active      bool    [note: 'default true']
+}
+
+// Layanan pengiriman per ekspedisi (REG, YES, OKE, SameDay, dll)
+Table ekspedisi_layanan {
+  id_ekspedisi_layanan int     [pk]
+  public_id            uuid    [note: 'gen_random_uuid()']
+  id_ekspedisi         int
+  nama_layanan         varchar [note: 'REG, YES, OKE, SameDay, dll']
+  deskripsi            text
+  estimasi_min         int     [note: 'Estimasi minimum (hari)']
+  estimasi_max         int     [note: 'Estimasi maksimum (hari)']
+  is_active            bool    [note: 'default true']
 }
 
 // Master status pengantaran
@@ -363,9 +415,16 @@ Ref: barcode.id_spesifikasi_barang - spesifikasi_barang.id_spesifikasi_barang
 Ref: pesanan.id_customer > customer.id_customer
 Ref: pesanan.id_kasir > kasir.id_kasir
 Ref: pesanan.id_alamat > alamat.id_alamat
+Ref: pesanan.id_ekspedisi > ekspedisi.id_ekspedisi
+Ref: pesanan.id_layanan_ekspedisi > ekspedisi_layanan.id_ekspedisi_layanan
 Ref: detail_pesanan.id_pesanan > pesanan.id_pesanan
 Ref: detail_pesanan.id_spesifikasi_barang > spesifikasi_barang.id_spesifikasi_barang
 Ref: pembayaran.id_pesanan > pesanan.id_pesanan
+Ref: pembayaran.id_metode_pembayaran > metode_pembayaran.id_metode_pembayaran
+Ref: detail_pembayaran.id_pembayaran > pembayaran.id_pembayaran
+
+// Ekspedisi & Layanan
+Ref: ekspedisi_layanan.id_ekspedisi > ekspedisi.id_ekspedisi
 
 // Pengantaran
 Ref: pengantaran.id_pesanan > pesanan.id_pesanan

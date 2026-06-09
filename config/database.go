@@ -68,10 +68,15 @@ func ConnectDatabase() {
 		&models.Pesanan{},
 		&models.DetailPesanan{},
 		&models.Pembayaran{},
+		// Metode Pembayaran (master data)
+		&models.MetodePembayaran{},
 		// Pengantaran (butuh Pesanan, Kurir, Ekspedisi)
 		&models.StatusPengantaran{},
 		&models.Ekspedisi{},
+		&models.EkspedisiLayanan{},
 		&models.Pengantaran{},
+		// Detail Pembayaran (butuh Pembayaran)
+		&models.DetailPembayaran{},
 	)
 
 	if err != nil {

@@ -16,6 +16,7 @@ type Alamat struct {
 	LabelAlamat    string  `gorm:"column:label_alamat" json:"label_alamat"`
 	NoTelpPenerima string  `gorm:"column:no_telp_penerima" json:"no_telp_penerima"`
 	AlamatLengkap  string  `gorm:"column:alamat_lengkap" json:"alamat_lengkap"`
+	KodePos        string  `gorm:"column:kode_pos" json:"kode_pos"`
 	Latitude       float64 `gorm:"column:latitude" json:"latitude"`
 	Longitude      float64 `gorm:"column:longitude" json:"longitude"`
 	CatatanLokasi  string  `gorm:"column:catatan_lokasi" json:"catatan_lokasi"`

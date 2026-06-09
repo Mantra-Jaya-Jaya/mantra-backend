@@ -1,0 +1,19 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{baseUrl}}/admin/ekspedisi/:publicId
+  body: none
+  auth: bearer
+}
+
+params:path {
+  publicId: {{ekspedisi_public_id}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

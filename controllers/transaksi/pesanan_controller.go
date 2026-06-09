@@ -3,6 +3,7 @@ package transaksi
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	"backend-mantra/models"
 
 	"github.com/gin-gonic/gin"
+	"github.com/midtrans/midtrans-go"
+	"github.com/midtrans/midtrans-go/snap"
 )
 
 // GetDaftarPesanan mengambil daftar pesanan.
@@ -226,31 +229,34 @@ func GetDetailPesanan(c *gin.Context) {
 func CheckoutPesanan(c *gin.Context) {
 	userID := c.GetInt64("user_id")
 
-	// Cari id_customer berdasarkan user_id dari JWT
+	var input struct {
+		IdAlamat           string `json:"id_alamat"`
+		IdEkspedisi        *uint  `json:"id_ekspedisi"`
+		IdLayananEkspedisi *uint  `json:"id_layanan_ekspedisi"`
+		OngkosKirim        int    `json:"ongkos_kirim"`
+		Catatan            string `json:"catatan"`
+		IdMetodePembayaran *uint  `json:"id_metode_pembayaran"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Input tidak valid"})
+		return
+	}
+
 	var customerIDResult struct{ IdCustomer uint }
 	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&customerIDResult).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal mengidentifikasi customer",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengidentifikasi customer"})
 		return
 	}
 	customerID := customerIDResult.IdCustomer
 
 	var cartItems []models.Keranjang
 	if err := config.DB.Preload("SpesifikasiBarang.Barang.Diskon").Where("id_customer = ?", customerID).Find(&cartItems).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal mengambil data keranjang",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengambil data keranjang"})
 		return
 	}
 
 	if len(cartItems) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "Keranjang belanja masih kosong",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Keranjang belanja masih kosong"})
 		return
 	}
 
@@ -287,22 +293,37 @@ func CheckoutPesanan(c *gin.Context) {
 		})
 	}
 
+	// Cari alamat jika ada
+	var alamat models.Alamat
+	if input.IdAlamat != "" {
+		config.DB.Where("public_id = ?", input.IdAlamat).First(&alamat)
+	}
+
+	// Hitung grand total: subtotal + ongkir + pajak (11%)
+	ongkir := input.OngkosKirim
+	pajak := int(float64(totalBayar+ongkir) * 0.11)
+	grandTotal := totalBayar + ongkir + pajak
+
 	tx := config.DB.Begin()
 
 	pesanan := models.Pesanan{
 		CustomerId:      customerID,
-		TotalPembayaran: totalBayar,
+		TotalPembayaran: grandTotal,
 		TanggalPesanan:  now,
 		TipePesanan:     "Online",
 		StatusPesanan:   "Diproses",
+		OngkosKirim:     ongkir,
+		Catatan:         input.Catatan,
+		EkspedisiID:     input.IdEkspedisi,
+		LayananEkspedisiID: input.IdLayananEkspedisi,
+	}
+	if alamat.IdAlamat != 0 {
+		pesanan.AlamatId = &alamat.IdAlamat
 	}
 
 	if err := tx.Create(&pesanan).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal membuat pesanan",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat pesanan"})
 		return
 	}
 
@@ -316,32 +337,94 @@ func CheckoutPesanan(c *gin.Context) {
 		}
 		if err := tx.Create(&detail).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "error",
-				"message": "Gagal menyimpan detail pesanan",
-			})
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan detail pesanan"})
 			return
 		}
 	}
 
 	if err := tx.Where("id_customer = ?", customerID).Delete(&models.Keranjang{}).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal mengosongkan keranjang",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengosongkan keranjang"})
+		return
+	}
+
+	// Buat record pembayaran
+	statusTransaksi := "pending"
+	fraudStatus := "accept"
+	if input.IdMetodePembayaran != nil {
+		var metode models.MetodePembayaran
+		config.DB.First(&metode, *input.IdMetodePembayaran)
+
+		if metode.KodeMetode == "cod" || metode.KodeMetode == "cash" {
+			statusTransaksi = "settlement"
+		}
+	}
+
+	pembayaran := models.Pembayaran{
+		PesananID:          pesanan.IdPesanan,
+		PaymentType:        "pending",
+		StatusTransaksi:    statusTransaksi,
+		FraudStatus:        fraudStatus,
+		MetodePembayaranID: input.IdMetodePembayaran,
+	}
+
+	if statusTransaksi == "settlement" {
+		pembayaran.TotalDibayar = grandTotal
+		nowTime := time.Now()
+		pembayaran.WaktuPembayaran = &nowTime
+		pesanan.StatusPesanan = "Selesai"
+		tx.Save(&pesanan)
+	}
+
+	if err := tx.Create(&pembayaran).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mencatat pembayaran"})
 		return
 	}
 
 	tx.Commit()
 
+	// Generate Midtrans Snap jika metode dari Midtrans
+	var midtransToken string
+	var redirectURL string
+
+	if input.IdMetodePembayaran != nil {
+		var metode models.MetodePembayaran
+		if err := config.DB.First(&metode, *input.IdMetodePembayaran).Error; err == nil {
+			if metode.Penyedia == "midtrans" && statusTransaksi != "settlement" {
+				orderID := "MID-" + pesanan.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(pesanan.IdPesanan))
+				pembayaran.OrderIdMidtrans = orderID
+				config.DB.Save(&pembayaran)
+
+				var s snap.Client
+				s.New(os.Getenv("MIDTRANS_SERVER_KEY"), midtrans.Sandbox)
+
+				req := &snap.Request{
+					TransactionDetails: midtrans.TransactionDetails{
+						OrderID:  orderID,
+						GrossAmt: int64(grandTotal),
+					},
+				}
+
+				snapResp, err := s.CreateTransaction(req)
+				if err == nil {
+					midtransToken = snapResp.Token
+					redirectURL = snapResp.RedirectURL
+				}
+			}
+		}
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"status":  "success",
 		"message": "Pesanan berhasil dibuat",
 		"data": gin.H{
-			"id_pesanan":     pesanan.PublicId,
-			"midtrans_token": "token-untuk-sdk-flutter",
-			"redirect_url":   "https://app.sandbox.midtrans.com/snap/v2/vtweb/...",
+			"id_pesanan":      pesanan.PublicId,
+			"total_bayar":     grandTotal,
+			"ongkos_kirim":    ongkir,
+			"pajak":           pajak,
+			"midtrans_token":  midtransToken,
+			"redirect_url":    redirectURL,
 		},
 	})
 }
@@ -448,7 +531,7 @@ func LacakPesanan(c *gin.Context) {
 // Dipakai oleh: kasir (GET /kasir/dashboard)
 // Auth: Wajib login, role kasir
 func GetDashboardKasir(c *gin.Context) {
-	userID := c.GetUint("user_id")
+	userID := uint(c.GetInt64("user_id"))
 
 	// Ambil nama kasir dari data user yang login
 	var kasir models.Kasir

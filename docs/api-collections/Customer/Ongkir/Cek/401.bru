@@ -1,0 +1,32 @@
+meta {
+  name: 401
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/customer/ongkir/cek
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "id_alamat": "00000000-0000-0000-0000-000000000000",
+    "items": [
+      {
+        "id_spesifikasi_barang": 1,
+        "quantity": 1
+      }
+    ]
+  }
+}

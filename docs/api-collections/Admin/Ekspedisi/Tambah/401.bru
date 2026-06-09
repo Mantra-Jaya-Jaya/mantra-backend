@@ -1,0 +1,26 @@
+meta {
+  name: 401
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/admin/ekspedisi
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_ekspedisi": "JNE",
+    "kode_api": "jne"
+  }
+}

@@ -1,0 +1,19 @@
+meta {
+  name: 401
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{baseUrl}}/admin/metode-pembayaran/:publicId
+  body: none
+  auth: bearer
+}
+
+params:path {
+  publicId: {{metode_pembayaran_id}}
+}
+
+auth:bearer {
+  token: token-palsu-123
+}

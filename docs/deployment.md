@@ -31,6 +31,20 @@ JWT_REFRESH_SECRET=generate_different_secret_here
 ```env
 MIDTRANS_SERVER_KEY=your_server_key
 MIDTRANS_CLIENT_KEY=your_client_key
+MIDTRANS_MERCHANT_ID=your_merchant_id
+```
+
+### Biteship (Shipping)
+```env
+BITESHIP_API_KEY=your_biteship_api_key
+BITESHIP_MODE=sandbox
+BITESHIP_STORE_NAME=Toko Anda
+BITESHIP_STORE_ADDRESS=Alamat toko
+BITESHIP_STORE_CITY=Kota
+BITESHIP_STORE_POSTAL_CODE=kode_pos
+BITESHIP_STORE_REGION=Provinsi
+BITESHIP_STORE_COORDINATE_LAT=-6.9175
+BITESHIP_STORE_COORDINATE_LONG=107.6191
 ```
 
 ### MinIO (File Storage)
@@ -51,7 +65,8 @@ ALLOWED_ORIGIN=https://admin.mantra.web.id
 - [ ] Ganti `JWT_SECRET` dengan secret kuat (min 32 karakter)
 - [ ] Ganti `JWT_REFRESH_SECRET` dengan secret berbeda
 - [ ] Setup MinIO dengan bucket `mantra-storage` dan akses publik untuk folder upload
-- [ ] Setup Midtrans dengan server key production
+- [ ] Setup Midtrans dengan server key production, merchant ID
+- [ ] Setup Biteship dengan API key production, koordinat toko, alamat toko
 - [ ] Konfigurasi CORS `ALLOWED_ORIGIN` sesuai domain admin web
 - [ ] Nonaktifkan `gin.Default()` recovery atau ganti dengan custom recovery
 - [ ] Setup reverse proxy (Nginx/Caddy) untuk TLS/SSL

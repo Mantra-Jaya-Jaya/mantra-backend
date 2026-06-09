@@ -33,6 +33,9 @@ func SetupRoutes(r *gin.Engine) {
 		// Shared Routes
 		v1.GET("/scan/:kode_barcode", katalog.GetDetailBarangByScan)
 
+		// Public Webhook (tanpa auth)
+		v1.POST("/payment/notification", transaksi.MidtransNotificationHandler)
+
 		// Customer Routes
 		customerGroup := v1.Group("/customer")
 		customerGroup.Use(middleware.AuthMiddleware())
@@ -49,6 +52,8 @@ func SetupRoutes(r *gin.Engine) {
 			customerGroup.PATCH("/pesanan/:public_id/batal", transaksi.BatalkanPesanan)
 			customerGroup.GET("/pesanan/:public_id", transaksi.GetDetailPesanan)
 			customerGroup.GET("/pesanan/:public_id/lacak", transaksi.LacakPesanan)
+			customerGroup.POST("/ongkir/cek", transaksi.CekOngkir)
+			customerGroup.GET("/metode-pembayaran", transaksi.GetMetodePembayaranAktif)
 			customerGroup.GET("/profil", user.GetProfilCustomer)
 			customerGroup.PUT("/akun", user.EditAkunCustomer)
 			customerGroup.GET("/alamat", user.GetAlamat)
@@ -121,6 +126,17 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.GET("/notifikasi", notifikasi.GetNotifikasiAdmin)
 			adminGroup.GET("/profil", user.GetProfilAdmin)
 			adminGroup.PUT("/profil", user.UpdateProfilAdmin)
+			adminGroup.GET("/ekspedisi", katalog.GetDaftarEkspedisi)
+			adminGroup.POST("/ekspedisi", katalog.TambahEkspedisi)
+			adminGroup.PUT("/ekspedisi/:public_id", katalog.UpdateEkspedisi)
+			adminGroup.DELETE("/ekspedisi/:public_id", katalog.HapusEkspedisi)
+			adminGroup.POST("/ekspedisi/layanan", katalog.TambahLayanan)
+			adminGroup.PUT("/ekspedisi/layanan/:id", katalog.UpdateLayanan)
+			adminGroup.DELETE("/ekspedisi/layanan/:id", katalog.HapusLayanan)
+			adminGroup.GET("/metode-pembayaran", transaksi.GetMetodePembayaran)
+			adminGroup.POST("/metode-pembayaran", transaksi.TambahMetodePembayaran)
+			adminGroup.PUT("/metode-pembayaran/:public_id", transaksi.UpdateMetodePembayaran)
+			adminGroup.DELETE("/metode-pembayaran/:public_id", transaksi.HapusMetodePembayaran)
 		}
 	}
 }

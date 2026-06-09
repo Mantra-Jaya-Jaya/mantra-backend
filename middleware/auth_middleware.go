@@ -92,7 +92,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		// Save to context for next handlers
-		c.Set("user_id", claims.UserID)
+		c.Set("user_id", int64(claims.UserID))
 		c.Set("public_id", claims.PublicID)
 		c.Set("role", claims.Role)
 		c.Next()
