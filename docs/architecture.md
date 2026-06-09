@@ -72,10 +72,15 @@ role ───< user ───< customer
 customer ───< alamat
 customer ───< keranjang ───> spesifikasi_barang
 customer ───< pesanan ───< detail_pesanan ───> spesifikasi_barang
-pesanan  ───< pembayaran
+pesanan  ───< pembayaran ───< detail_pembayaran
 pesanan  ───< pengantaran ───> kurir
-                            ───> ekspedisi
-                            ───> status_pengantaran
+                             ───> ekspedisi
+                             ───> status_pengantaran
+pesanan  ───> ekspedisi
+pesanan  ───> ekspedisi_layanan
+pembayaran ──> metode_pembayaran
+
+ekspedisi ───< ekspedisi_layanan
 
 kategori ───< barang ───< spesifikasi_barang ───< barcode
 satuan   ───< barang              └──> detail_spesifikasi ───> spesifikasi
@@ -95,3 +100,6 @@ user ───< notifikasi
 | UUID public_id | Mencegah ID enumeration di endpoint publik |
 | Karyawan sebagai induk | Kasir & Kurir berbagi data karyawan (nama, alamat, NIK, dll) |
 | Snapshot harga di detail_pesanan | Harga barang bisa berubah, invoice harus tetap akurat |
+| Ongkir via Biteship API | Kalkulasi ongkos kirim real-time dari berbagai ekspedisi |
+| Pembayaran via Midtrans Snap | QRIS, Virtual Account, E-Wallet: diproses oleh Midtrans |
+| WEBHOOK Midtrans | Endpoint `/payment/notification` diverifikasi via SHA-512 |
