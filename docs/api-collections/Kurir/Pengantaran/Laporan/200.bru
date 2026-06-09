@@ -1,0 +1,20 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/kurir/laporan
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODA5OTQ3MDksImlhdCI6MTc4MDk5MjkwOSwicHVibGljX2lkIjoiYjJlNTY3YmEtYjIxZC00NDcyLTgyZGMtMGYxOWQwYTNhMTc0Iiwicm9sZSI6Ikt1cmlyIiwidXNlcl9pZCI6M30.xXI5zV580XEdcRePdp5H8D0TdE9tXHYByPZccK0sY4Q
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
