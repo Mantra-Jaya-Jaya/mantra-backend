@@ -531,7 +531,7 @@ func LacakPesanan(c *gin.Context) {
 // Dipakai oleh: kasir (GET /kasir/dashboard)
 // Auth: Wajib login, role kasir
 func GetDashboardKasir(c *gin.Context) {
-	userID := c.GetUint("user_id")
+	userID := uint(c.GetInt64("user_id"))
 
 	// Ambil nama kasir dari data user yang login
 	var kasir models.Kasir

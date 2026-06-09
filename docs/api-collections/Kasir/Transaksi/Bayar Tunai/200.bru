@@ -1,0 +1,26 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/kasir/transaksi/bayar/tunai
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "total_bayar": 100000,
+    "id_pesanan": 1
+  }
+}
