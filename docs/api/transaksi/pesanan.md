@@ -29,11 +29,17 @@ Auth. Mendapatkan daftar pesanan.
 
 Auth (Customer). Membuat pesanan baru dari keranjang.
 
+Mendukung ekspedisi dan metode pembayaran. Jika metode dari Midtrans, response menyertakan `midtrans_token` dan `redirect_url`.
+
 **Request:**
 ```json
 {
-  "id_alamat": 1,
-  "catatan": "Tolong dibungkus rapih"
+  "id_alamat": "uuid-...",
+  "id_ekspedisi": 1,
+  "id_layanan_ekspedisi": 1,
+  "ongkos_kirim": 20000,
+  "catatan": "Tolong dibungkus rapih",
+  "id_metode_pembayaran": 2
 }
 ```
 
@@ -43,9 +49,12 @@ Auth (Customer). Membuat pesanan baru dari keranjang.
   "status": "success",
   "message": "Pesanan berhasil dibuat",
   "data": {
-    "id_pesanan": 1,
-    "public_id": "uuid-...",
-    "total_pembayaran": 150000
+    "id_pesanan": "uuid-...",
+    "total_bayar": 24270556,
+    "ongkos_kirim": 20000,
+    "pajak": 2405190,
+    "midtrans_token": "3f0d242e-...",
+    "redirect_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/..."
   }
 }
 ```

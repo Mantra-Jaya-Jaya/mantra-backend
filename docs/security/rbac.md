@@ -47,6 +47,14 @@
 | `/admin/karyawan` | * | - | - | - | ✔ |
 | `/admin/notifikasi` | GET | - | - | - | ✔ |
 | `/admin/profil` | * | - | - | - | ✔ |
+| `/admin/ekspedisi` | * | - | - | - | ✔ |
+| `/admin/ekspedisi/layanan/:id` | PUT, DELETE | - | - | - | ✔ |
+| `/admin/metode-pembayaran` | * | - | - | - | ✔ |
+| **Customer (baru)** ||||||
+| `/customer/ongkir/cek` | POST | - | ✔ | - | - |
+| `/customer/metode-pembayaran` | GET | - | ✔ | - | - |
+| **Public (baru)** ||||||
+| `/payment/notification` | POST | ✔ | - | - | - |
 
 > `*` = Multiple HTTP methods (GET, POST, PUT, PATCH, DELETE)
 

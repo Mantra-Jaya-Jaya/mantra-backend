@@ -2,7 +2,7 @@
 
 ## Sumber Skema
 
-Dua file berikut adalah representasi visual dari 25 tabel:
+Dua file berikut adalah representasi visual dari 28 tabel:
 
 | File | Format | Cara Baca |
 |------|--------|-----------|
@@ -12,7 +12,7 @@ Dua file berikut adalah representasi visual dari 25 tabel:
 ## Konvensi Penamaan
 
 ### Tabel
-- Snake case, jamak: `role`, `user`, `refresh_token`, `spesifikasi_barang`, `stok_opname`
+- Snake case, jamak: `role`, `user`, `refresh_token`, `spesifikasi_barang`, `stok_opname`, `ekspedisi_layanan`, `metode_pembayaran`, `detail_pembayaran`
 - Nama tabel di struct GORM via method `TableName()`
 
 ### Kolom

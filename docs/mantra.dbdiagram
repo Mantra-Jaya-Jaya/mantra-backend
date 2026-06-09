@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0",
+  "version": "2.1.0",
   "darkMode": true,
   "gridEnabling": false,
   "currentViewName": null,
@@ -155,6 +155,24 @@
         "schemaName": "public",
         "x": 1731,
         "y": 537
+      },
+      {
+        "name": "ekspedisi_layanan",
+        "schemaName": "public",
+        "x": 549,
+        "y": 882
+      },
+      {
+        "name": "metode_pembayaran",
+        "schemaName": "public",
+        "x": 2268,
+        "y": 346
+      },
+      {
+        "name": "detail_pembayaran",
+        "schemaName": "public",
+        "x": 2832,
+        "y": 200
       }
     ],
     "tableGroupCollapseStates": [],
@@ -464,6 +482,61 @@
         "firstRelation": "*",
         "secondFieldNames": ["id_spesifikasi_barang"],
         "secondTableName": "spesifikasi_barang",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": ["id_ekspedisi"],
+        "firstTableName": "ekspedisi_layanan",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": ["id_ekspedisi"],
+        "secondTableName": "ekspedisi",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": ["id_metode_pembayaran"],
+        "firstTableName": "pembayaran",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": ["id_metode_pembayaran"],
+        "secondTableName": "metode_pembayaran",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": ["id_pembayaran"],
+        "firstTableName": "detail_pembayaran",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": ["id_pembayaran"],
+        "secondTableName": "pembayaran",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": ["id_ekspedisi"],
+        "firstTableName": "pesanan",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": ["id_ekspedisi"],
+        "secondTableName": "ekspedisi",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": ["id_layanan_ekspedisi"],
+        "firstTableName": "pesanan",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": ["id_ekspedisi_layanan"],
+        "secondTableName": "ekspedisi_layanan",
         "secondSchemaName": "public",
         "secondRelation": "1",
         "checkPoints": []
