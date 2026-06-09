@@ -1,0 +1,32 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/payment/notification
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "transaction_time": "2026-06-09 12:00:00",
+    "transaction_id": "trx-midtrans-001",
+    "transaction_status": "settlement",
+    "transaction_type": "qris",
+    "status_code": "200",
+    "signature_key": "8cffc4e9b102065e8d39430aa23ca8cdac67cf46be486042cb3dd3fc5d9d99917ff304262cb8e1f25bf78cd5360996d7d6c4754a63e9e3d72bf52c853932c3c0",
+    "payment_type": "qris",
+    "order_id": "MID-20260609-227",
+    "merchant_id": "M913788146",
+    "gross_amount": "24270556.00",
+    "fraud_status": "accept",
+    "currency": "IDR"
+  }
+}

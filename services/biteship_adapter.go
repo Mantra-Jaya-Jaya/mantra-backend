@@ -1,0 +1,194 @@
+package services
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+)
+
+type BiteshipAdapter struct {
+	apiKey  string
+	baseURL string
+	client  *http.Client
+}
+
+func NewBiteshipAdapter() *BiteshipAdapter {
+	apiKey := os.Getenv("BITESHIP_API_KEY")
+	baseURL := "https://api.biteship.com"
+	if os.Getenv("BITESHIP_MODE") == "production" {
+		baseURL = "https://api.biteship.com"
+	}
+
+	return &BiteshipAdapter{
+		apiKey:  apiKey,
+		baseURL: baseURL,
+		client:  &http.Client{},
+	}
+}
+
+type biteshipRateRequest struct {
+	OriginPostalCode      string         `json:"origin_postal_code,omitempty"`
+	DestinationPostalCode string         `json:"destination_postal_code,omitempty"`
+	OriginCoordinates     string         `json:"origin_coordinates,omitempty"`
+	DestinationCoordinates string        `json:"destination_coordinates,omitempty"`
+	Couriers              string         `json:"couriers"`
+	Items                 []biteshipItem `json:"items"`
+}
+
+type biteshipItem struct {
+	Name     string `json:"name"`
+	Weight   int    `json:"weight"`
+	Length   int    `json:"length"`
+	Width    int    `json:"width"`
+	Height   int    `json:"height"`
+	Value    int    `json:"value"`
+}
+
+type biteshipRateResponse struct {
+	Success bool                   `json:"success"`
+	Object  string                 `json:"object"`
+	Pricing []biteshipPricing      `json:"pricing"`
+}
+
+type biteshipPricing struct {
+	Company             string `json:"company"`
+	CourierName         string `json:"courier_name"`
+	CourierCode         string `json:"courier_code"`
+	CourierServiceName  string `json:"courier_service_name"`
+	CourierServiceCode  string `json:"courier_service_code"`
+	Description         string `json:"description"`
+	Duration            string `json:"duration"`
+	ShipmentDurationRange string `json:"shipment_duration_range"`
+	ShipmentDurationUnit string `json:"shipment_duration_unit"`
+	Price               int    `json:"price"`
+}
+
+func (b *BiteshipAdapter) CekOngkir(req OngkirRequest) ([]OngkirResult, error) {
+	originPostal := req.OriginPostal
+	destPostal := req.DestPostal
+
+	var items []biteshipItem
+	for _, it := range req.Items {
+		items = append(items, biteshipItem{
+			Name:   it.Name,
+			Weight: it.Weight,
+			Length: it.Length,
+			Width:  it.Width,
+			Height: it.Height,
+			Value:  it.Value,
+		})
+	}
+
+	if len(items) == 0 {
+		items = []biteshipItem{
+			{Name: "Barang", Weight: 1000, Value: 0},
+		}
+	}
+
+	payload := biteshipRateRequest{
+		Couriers: "jne,jnt,sicepat,anteraja,ninja",
+		Items:    items,
+	}
+
+	originLatStr := os.Getenv("BITESHIP_STORE_COORDINATE_LAT")
+	originLngStr := os.Getenv("BITESHIP_STORE_COORDINATE_LONG")
+
+	if originPostal != "" && destPostal != "" {
+		payload.OriginPostalCode = originPostal
+		payload.DestinationPostalCode = destPostal
+	} else if originLatStr != "" && originLngStr != "" && (req.OriginLat != 0 || req.DestLat != 0) {
+		payload.OriginCoordinates = originLatStr + "," + originLngStr
+		payload.DestinationCoordinates = fmt.Sprintf("%f,%f", req.DestLat, req.DestLng)
+	} else if originPostal != "" {
+		payload.OriginPostalCode = originPostal
+		payload.DestinationPostalCode = b.getOriginPostalCode("")
+	} else {
+		payload.OriginPostalCode = b.getOriginPostalCode("")
+		payload.DestinationPostalCode = destPostal
+	}
+
+	bodyBytes, _ := json.Marshal(payload)
+	reqHttp, _ := http.NewRequest("POST", b.baseURL+"/v1/rates/couriers", strings.NewReader(string(bodyBytes)))
+	reqHttp.Header.Set("Content-Type", "application/json")
+	reqHttp.Header.Set("Authorization", b.apiKey)
+
+	resp, err := b.client.Do(reqHttp)
+	if err != nil {
+		return nil, fmt.Errorf("biteship request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("biteship error status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var rateResp biteshipRateResponse
+	if err := json.Unmarshal(respBody, &rateResp); err != nil {
+		return nil, fmt.Errorf("biteship parse error: %w", err)
+	}
+
+	if !rateResp.Success {
+		return nil, fmt.Errorf("biteship response not successful")
+	}
+
+	if rateResp.Pricing == nil {
+		return []OngkirResult{}, nil
+	}
+
+	ekspedisiMap := make(map[string]*OngkirResult)
+	for _, p := range rateResp.Pricing {
+		eks, exists := ekspedisiMap[p.CourierCode]
+		if !exists {
+			eks = &OngkirResult{
+				EkspedisiKode: p.CourierCode,
+				NamaEkspedisi: p.CourierName,
+			}
+			ekspedisiMap[p.CourierCode] = eks
+		}
+
+		estimasiMin, estimasiMax := parseDuration(p.ShipmentDurationRange)
+
+		eks.Layanan = append(eks.Layanan, OngkirLayanan{
+			KodeLayanan: p.CourierServiceCode,
+			NamaLayanan: p.CourierServiceName,
+			Deskripsi:   p.Description,
+			Harga:       p.Price,
+			EstimasiMin: estimasiMin,
+			EstimasiMax: estimasiMax,
+			Durasi:      p.Duration,
+		})
+	}
+
+	var results []OngkirResult
+	for _, v := range ekspedisiMap {
+		results = append(results, *v)
+	}
+
+	return results, nil
+}
+
+func (b *BiteshipAdapter) getOriginPostalCode(fallback string) string {
+	if fallback != "" {
+		return fallback
+	}
+	return os.Getenv("BITESHIP_STORE_POSTAL_CODE")
+}
+
+func parseDuration(rangeStr string) (min, max int) {
+	if rangeStr == "" {
+		return 0, 0
+	}
+	parts := strings.Split(rangeStr, " - ")
+	if len(parts) != 2 {
+		return 0, 0
+	}
+	min, _ = strconv.Atoi(strings.TrimSpace(parts[0]))
+	max, _ = strconv.Atoi(strings.TrimSpace(parts[1]))
+	return
+}

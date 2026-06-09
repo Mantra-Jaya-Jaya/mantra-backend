@@ -1,0 +1,29 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/admin/ekspedisi
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.data && body.data.length > 0) {
+    const last = body.data[body.data.length - 1];
+    if (last.public_id) {
+      bru.setVar("ekspedisi_public_id", last.public_id);
+    }
+    // fallback ke id_ekspedisi untuk Tambah Layanan yg masih pake integer FK
+    if (last.id_ekspedisi) {
+      bru.setVar("ekspedisi_id", String(last.id_ekspedisi));
+    }
+  }
+}

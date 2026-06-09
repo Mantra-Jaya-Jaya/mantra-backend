@@ -14,6 +14,9 @@ type Barang struct {
 	NamaBarang   string `gorm:"column:nama_barang" json:"nama_barang"`
 	GambarBarang string `gorm:"column:gambar_barang" json:"gambar_barang"`
 	Deskripsi    string `gorm:"column:deskripsi" json:"deskripsi"`
+	PanjangBarang int  `gorm:"column:panjang_barang;default:0" json:"panjang_barang"`
+	LebarBarang   int  `gorm:"column:lebar_barang;default:0" json:"lebar_barang"`
+	TinggiBarang  int  `gorm:"column:tinggi_barang;default:0" json:"tinggi_barang"`
 
 	//Relasi
 	DiskonId   *uint `gorm:"column:id_diskon" json:"id_diskon"`

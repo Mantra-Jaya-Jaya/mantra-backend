@@ -1,0 +1,25 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/admin/metode-pembayaran
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.data && body.data.length > 0) {
+    const last = body.data[body.data.length - 1];
+    if (last.public_id) {
+      bru.setVar("metode_pembayaran_id", last.public_id);
+    }
+  }
+}

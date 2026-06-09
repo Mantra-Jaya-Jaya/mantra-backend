@@ -1,0 +1,19 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{baseUrl}}/admin/metode-pembayaran/:publicId
+  body: none
+  auth: bearer
+}
+
+params:path {
+  publicId: {{metode_pembayaran_id}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

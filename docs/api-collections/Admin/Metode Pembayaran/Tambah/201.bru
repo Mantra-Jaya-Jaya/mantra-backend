@@ -1,0 +1,36 @@
+meta {
+  name: 201
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/admin/metode-pembayaran
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_metode": "GoPay",
+    "kode_metode": "gopay",
+    "penyedia": "midtrans",
+    "urutan": 6,
+    "is_active": true
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.data && body.data.public_id) {
+    bru.setVar("metode_pembayaran_id", body.data.public_id);
+  }
+}

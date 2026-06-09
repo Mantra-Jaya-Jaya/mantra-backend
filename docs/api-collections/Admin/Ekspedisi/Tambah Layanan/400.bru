@@ -1,0 +1,23 @@
+meta {
+  name: 422
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/admin/ekspedisi/layanan
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {}
+}

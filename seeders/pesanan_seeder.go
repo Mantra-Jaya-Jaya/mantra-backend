@@ -89,7 +89,7 @@ func SeedPesanan() {
 			TipePesanan:     tipePesanan,
 			StatusPesanan:   status,
 			CustomerId:      cId,
-			KasirId:         kId,
+			KasirId:         &kId,
 			AlamatId:        alamatId,
 		}
 
