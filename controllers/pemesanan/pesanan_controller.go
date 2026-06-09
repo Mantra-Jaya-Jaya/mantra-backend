@@ -3,6 +3,7 @@ package pemesanan
 import (
 	"net/http"
 	"time"
+	"fmt"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -291,4 +292,84 @@ func GetAllPesananOnline(c *gin.Context) {
 		"message": "Daftar pesanan online berhasil diambil",
 		"data":    hasilAkhir,
 	})
+}
+
+func GetDetailPesanan(c *gin.Context) {
+    publicID := c.Param("public_id") // Ambil public_id dari URL
+
+    // 1. Definisikan struct response yang bakal dikirim ke Flutter
+    type ItemBarangDTO struct {
+        NamaBarang     string `json:"nama_barang"`
+        Variasi        string `json:"variasi"`
+        JumlahBeli     int    `json:"jumlah_beli"`
+        HargaSatuan    int    `json:"harga_satuan"`
+        SubtotalItem   int    `json:"subtotal_item"`
+    }
+
+    type MetodeBayarDTO struct {
+        ID         string `json:"id_metode_bayar"`
+        NamaMetode string `json:"nama_metode"`
+    }
+
+    type DetailPesananDTO struct {
+        PublicID        string           `json:"public_id"`
+        TotalPembayaran int              `json:"total_pembayaran"`
+        MetodeBayar     MetodeBayarDTO   `json:"metode_bayar"`
+        DaftarBarang    []ItemBarangDTO  `json:"daftar_barang"`
+    }
+
+    // 2. Query Database dengan Preload Super Lengkap
+    var pesanan models.Pesanan
+    err := config.DB.
+        Preload("Pembayaran.MetodeBayar"). // 🚀 Pastikan relasi ini ada di model!
+        Preload("DetailPesanan.SpesifikasiBarang.Barang").
+        Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
+        Where("public_id = ?", publicID).
+        First(&pesanan).Error
+
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pesanan tidak ditemukan"})
+        return
+    }
+
+    // 3. Mapping Data Barang
+    var listBarang []ItemBarangDTO
+    for _, detail := range pesanan.DetailPesanan {
+        // Logika gabungin variasi (Warna: Hitam, Size: XL)
+        varian := "Default"
+        if detail.SpesifikasiBarang.DetailSpesifikasi.IdDetailSpesifikasi != 0 {
+            varian = detail.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi + ": " + 
+                     detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi
+        }
+
+        listBarang = append(listBarang, ItemBarangDTO{
+            NamaBarang:   detail.SpesifikasiBarang.Barang.NamaBarang,
+            Variasi:      varian,
+            JumlahBeli:   detail.Jumlah,
+            HargaSatuan:  detail.HargaSatuan, // Pastikan field ini ada di tabel DetailPesanan
+            SubtotalItem: detail.Subtotal,    // Pastikan field ini ada di tabel DetailPesanan
+        })
+    }
+
+    // 4. Mapping Data Metode Bayar
+    metodeBayar := MetodeBayarDTO{
+        ID:         "", 
+        NamaMetode: "Belum Ada Metode",
+    }
+    if pesanan.Pembayaran.MetodePembayaran.IdMetodePembayaran != 0 {
+        metodeBayar = MetodeBayarDTO{
+            ID:         fmt.Sprintf("%d", pesanan.Pembayaran.MetodePembayaran.IdMetodePembayaran),
+            NamaMetode: pesanan.Pembayaran.MetodePembayaran.NamaMetode, 
+        }
+    }
+
+    // 5. Bungkus Final
+    response := DetailPesananDTO{
+        PublicID:        pesanan.PublicId.String(),
+        TotalPembayaran: pesanan.TotalPembayaran,
+        MetodeBayar:     metodeBayar,
+        DaftarBarang:    listBarang,
+    }
+
+    c.JSON(http.StatusOK, gin.H{"status": "success", "data": response})
 }
