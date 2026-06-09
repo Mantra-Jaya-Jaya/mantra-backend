@@ -1,0 +1,31 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/admin/ekspedisi/layanan/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: {{layanan_id}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "deskripsi": "Layanan Reguler — estimasi update",
+    "estimasi_min": 1,
+    "estimasi_max": 2
+  }
+}

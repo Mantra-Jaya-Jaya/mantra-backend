@@ -20,5 +20,24 @@ headers {
 }
 
 body:json {
-  {}
+  {
+    "id_ekspedisi": "{{ekspedisi_public_id}}",
+    "id_layanan_ekspedisi": 1,
+    "ongkos_kirim": 15000,
+    "catatan": "Hati-hati, barang mudah pecah",
+    "id_metode_pembayaran": 2
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.data && body.data.public_id) {
+    bru.setVar("pesanan_public_id", body.data.public_id);
+  }
+  if (body && body.data && body.data.midtrans_token) {
+    bru.setVar("midtrans_token", body.data.midtrans_token);
+  }
+  if (body && body.data && body.data.midtrans_redirect_url) {
+    bru.setVar("midtrans_redirect_url", body.data.midtrans_redirect_url);
+  }
 }

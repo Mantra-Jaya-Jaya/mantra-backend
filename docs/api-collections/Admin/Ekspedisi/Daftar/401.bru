@@ -1,0 +1,15 @@
+meta {
+  name: 401
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/admin/ekspedisi
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}

@@ -1,0 +1,30 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/admin/metode-pembayaran/:publicId
+  body: json
+  auth: bearer
+}
+
+params:path {
+  publicId: {{metode_pembayaran_id}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "urutan": 1,
+    "is_active": true
+  }
+}

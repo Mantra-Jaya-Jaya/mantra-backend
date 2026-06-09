@@ -1,0 +1,28 @@
+meta {
+  name: 401
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/admin/ekspedisi/layanan
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "id_ekspedisi": "{{ekspedisi_public_id}}",
+    "nama_layanan": "REG",
+    "estimasi_min": 2,
+    "estimasi_max": 3
+  }
+}

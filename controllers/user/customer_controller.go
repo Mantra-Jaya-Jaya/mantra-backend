@@ -18,12 +18,13 @@ func getUserIDFromContext(c *gin.Context) (uint, bool) {
 		return 0, false
 	}
 
-	if uid, ok := userID.(uint); ok {
-		return uid, true
-	}
-
-	if uidFloat, ok := userID.(float64); ok {
-		return uint(uidFloat), true
+	switch v := userID.(type) {
+	case uint:
+		return v, true
+	case int64:
+		return uint(v), true
+	case float64:
+		return uint(v), true
 	}
 
 	return 0, false

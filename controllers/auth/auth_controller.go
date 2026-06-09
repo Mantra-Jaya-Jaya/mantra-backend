@@ -220,17 +220,19 @@ func Logout(c *gin.Context) {
 		return
 	}
 
-	uid, ok := userID.(uint)
-	if !ok {
-		if uidFloat, ok := userID.(float64); ok {
-			uid = uint(uidFloat)
-		} else {
-			RespondWithError(c, http.StatusInternalServerError, "Kesalahan sistem", "SERVER_001", "Format ID user tidak valid")
-			return
-		}
+	var uid uint
+	switch v := userID.(type) {
+	case uint:
+		uid = v
+	case int64:
+		uid = uint(v)
+	case float64:
+		uid = uint(v)
+	default:
+		RespondWithError(c, http.StatusInternalServerError, "Kesalahan sistem", "SERVER_001", "Format ID user tidak valid")
+		return
 	}
-
-	if tokenStr != "" {
+		if tokenStr != "" {
 		now := time.Now()
 		// Update RevokedAt untuk token yang bersangkutan & milik user tsb
 		result := config.DB.Model(&models.RefreshToken{}).

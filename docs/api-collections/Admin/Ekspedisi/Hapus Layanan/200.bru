@@ -1,0 +1,19 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{baseUrl}}/admin/ekspedisi/layanan/:id
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: {{layanan_id}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

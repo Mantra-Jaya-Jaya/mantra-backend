@@ -1,0 +1,36 @@
+meta {
+  name: 201
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/admin/ekspedisi/layanan
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "id_ekspedisi": {{ekspedisi_id}},
+    "nama_layanan": "REG",
+    "deskripsi": "Layanan Reguler",
+    "estimasi_min": 2,
+    "estimasi_max": 3
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.data && body.data.id_ekspedisi_layanan) {
+    bru.setVar("layanan_id", String(body.data.id_ekspedisi_layanan));
+  }
+}
