@@ -7,9 +7,9 @@ func (Notifikasi) TableName() string {
 }
 
 type Notifikasi struct {
-	IdNotifikasi uint `gorm:"primaryKey;column:id_notifikasi" json:"id_notifikasi"`
+	IdNotifikasi int64 `gorm:"primaryKey;column:id_notifikasi" json:"id_notifikasi"`
 
-	UserID uint `gorm:"column:id_user" json:"id_user"`
+	UserID int64 `gorm:"column:id_user" json:"id_user"`
 	User   User `gorm:"foreignKey:UserID;references:IdUser" json:"user"`
 
 	Judul  string `gorm:"column:judul" json:"judul"`
