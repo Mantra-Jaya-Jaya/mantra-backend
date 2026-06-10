@@ -193,12 +193,16 @@ func GetDetailPesanan(c *gin.Context) {
 	}
 
 	var kurirData interface{} = nil
-	if pengantaran.IdPengantaran != 0 {
+	if pengantaran.IdPengantaran != 0 && pengantaran.Kurir != nil {
+		ekspedisi := ""
+		if pengantaran.Ekspedisi != nil {
+			ekspedisi = pengantaran.Ekspedisi.NamaEkspedisi
+		}
 		kurirData = gin.H{
 			"nama_kurir": pengantaran.Kurir.Karyawan.User.NamaLengkap,
-			"plat_nomor": "H 6582 TH", // Mock karena tidak ada di DB
-			"ekspedisi":  pengantaran.Ekspedisi.NamaEkspedisi,
-			"foto_kurir": "https://api.mantra.com/storage/kurir/ricardo.jpg", // Mock
+			"plat_nomor": "",
+			"ekspedisi":  ekspedisi,
+			"foto_kurir": pengantaran.Kurir.Karyawan.User.FotoProfil,
 		}
 	}
 
@@ -214,9 +218,9 @@ func GetDetailPesanan(c *gin.Context) {
 			"kurir":              kurirData,
 			"rincian_pembayaran": gin.H{
 				"subtotal_items": subtotalItems,
-				"ongkir":         20000, // Mock karena belum ada kalkulasi ongkir
-				"biaya_proteksi": 2000,  // Mock
-				"total":          subtotalItems + 20000 + 2000,
+				"ongkir":         pesanan.OngkosKirim,
+				"biaya_proteksi": 0,
+				"total":          pesanan.TotalPembayaran,
 			},
 		},
 	})
@@ -494,6 +498,27 @@ func BatalkanPesanan(c *gin.Context) {
 // Auth: Wajib login, role customer
 func LacakPesanan(c *gin.Context) {
 	idPesanan := c.Param("public_id")
+	userID := c.GetInt64("user_id")
+
+	// Ownership check
+	var count int64
+	config.DB.Raw(`
+		SELECT COUNT(*) FROM pesanan p
+		JOIN customer c ON c.id_customer = p.id_customer
+		WHERE p.public_id = ? AND c.id_user = ?
+	`, idPesanan, userID).Scan(&count)
+
+	if count == 0 {
+		c.JSON(http.StatusForbidden, gin.H{
+			"status":  "error",
+			"message": "Anda tidak memiliki akses ke resource ini",
+			"error": gin.H{
+				"code":   "AUTH_002",
+				"detail": "Pesanan ini bukan milik Anda",
+			},
+		})
+		return
+	}
 
 	var pengantaran models.Pengantaran
 	if err := config.DB.Preload("Kurir.Karyawan.User").
@@ -507,6 +532,11 @@ func LacakPesanan(c *gin.Context) {
 		return
 	}
 
+	fotoKurir := ""
+	if pengantaran.Kurir != nil && pengantaran.Kurir.Karyawan.User.FotoProfil != "" {
+		fotoKurir = pengantaran.Kurir.Karyawan.User.FotoProfil
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Data lacak pesanan berhasil diambil",
@@ -514,15 +544,15 @@ func LacakPesanan(c *gin.Context) {
 			"id_pesanan": idPesanan,
 			"kurir": gin.H{
 				"nama":       pengantaran.Kurir.Karyawan.User.NamaLengkap,
-				"plat_nomor": "H 6582 TH",                                        // Mock karena tidak ada di DB
-				"foto":       "https://api.mantra.com/storage/kurir/ricardo.jpg", // Mock
+				"plat_nomor": "",
+				"foto":       fotoKurir,
 			},
 			"lokasi_kurir": gin.H{
 				"latitude":  pengantaran.LastLatitude,
 				"longitude": pengantaran.LastLongitude,
 			},
-			"estimasi_tiba": "8 mins", // Mock
-			"jarak_meter":   1500,     // Mock
+			"estimasi_tiba": "",
+			"jarak_meter":   0,
 		},
 	})
 }
