@@ -295,112 +295,122 @@ func GetLaporanHariIni(c *gin.Context) {
 
 // GetDetailPengantaran mengambil detail lengkap untuk halaman Peta Kurir
 func GetDetailPengantaran(c *gin.Context) {
-	idPengantaran := c.Param("id_pengantaran") // Ambil public_id dari URL
-	
-	// 🚀 1. PENJINAK TOKEN (Copy dari GetDaftarPengantaran biar aman 100%)
-	val, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "User belum login"})
-		return
-	}
+  // 🚀 1. PERBAIKAN PARAMETER: Harus sama kayak di Route!
+  idPengantaran := c.Param("public_id") 
+  
+  // ==========================================
+  // PENJINAK TOKEN
+  // ==========================================
+  val, exists := c.Get("user_id")
+  if !exists {
+    c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "User belum login"})
+    return
+  }
 
-	var userID int64
-	switch v := val.(type) {
-	case float64:
-		userID = int64(v)
-	case int64:
-		userID = v
-	case int:
-		userID = int64(v)
-	case uint:
-		userID = int64(v)
-	default:
-		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Format token tidak valid"})
-		return
-	}
+  var userID int64
+  switch v := val.(type) {
+  case float64: userID = int64(v)
+  case int64: userID = v
+  case int: userID = int64(v)
+  case uint: userID = int64(v)
+  default:
+    c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Format token tidak valid"})
+    return
+  }
 
-	// 🚨 [ERROR 500: INTERNAL SERVER ERROR] 
-	var result struct{ IdKurir uint }
-	if err := config.DB.Raw("SELECT id_kurir FROM kurir JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan WHERE karyawan.id_user = ?", userID).Scan(&result).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{ 
-			"status":  "error",
-			"code":    500,
-			"message": "Gagal mengidentifikasi data kurir di server",
-		})
-		return
-	}
-	kurirID := result.IdKurir
+  // Cari ID Kurir
+  var result struct{ IdKurir uint }
+  if err := config.DB.Raw("SELECT id_kurir FROM kurir JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan WHERE karyawan.id_user = ?", userID).Scan(&result).Error; err != nil || result.IdKurir == 0 {
+    c.JSON(http.StatusInternalServerError, gin.H{ 
+      "status":  "error",
+      "code":    500, // Cek juga result.IdKurir == 0 buat jaga-jaga
+      "message": "Gagal mengidentifikasi data kurir di server",
+    })
+    return
+  }
+  kurirID := result.IdKurir
 
-	// 🚨 [ERROR 404: NOT FOUND]
-	var pengantaran models.Pengantaran
-	err := config.DB.
-		Preload("Pesanan.Alamat").       
-		Preload("Pesanan.Customer.User"). // 🚀 2. TAMBAHIN ".User" BIAR BISA NGAMBIL NAMA LENGKAP
-		Preload("StatusPengantaran").    
-		Where("public_id = ?", idPengantaran).
-		First(&pengantaran).Error
+  // ==========================================
+  // TARIK DATA DATABASE
+  // ==========================================
+  var pengantaran models.Pengantaran
+  err := config.DB.
+    Preload("Pesanan.Alamat").       
+    Preload("Pesanan.Customer.User"). 
+    Preload("StatusPengantaran").    
+    Where("public_id = ?", idPengantaran).
+    First(&pengantaran).Error
 
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{ 
-			"status":  "error",
-			"code":    404,
-			"message": "Data pengantaran tidak ditemukan",
-		})
-		return
-	}
+  if err != nil {
+    c.JSON(http.StatusNotFound, gin.H{ 
+      "status":  "error",
+      "code":    404,
+      "message": "Data pengantaran tidak ditemukan",
+    })
+    return
+  }
 
-	// 🚨 [ERROR 403: FORBIDDEN]
-	if pengantaran.KurirID == nil || *pengantaran.KurirID != kurirID {
-		c.JSON(http.StatusForbidden, gin.H{ 
-			"status":  "error",
-			"code":    403,
-			"message": "Akses Ditolak: Pengantaran ini tidak ditugaskan kepada Anda",
-		})
-		return
-	}
+  if pengantaran.KurirID == nil || *pengantaran.KurirID != kurirID {
+    c.JSON(http.StatusForbidden, gin.H{ 
+      "status":  "error",
+      "code":    403,
+      "message": "Akses Ditolak: Pengantaran ini tidak ditugaskan kepada Anda",
+    })
+    return
+  }
 
-	// ==========================================
-	// Susun Data
-	// ==========================================
+  // ==========================================
+  // 🚀 2. SUSUN DATA DENGAN PELINDUNG NIL POINTER
+  // ==========================================
+  namaPenerima := "Customer"
+  noTelpPenerima := "-"
+  alamatLengkap := "Alamat tidak tersedia"
+  var lat, lng float64
 
-	namaPenerima := "Customer"
-	noTelpPenerima := "-"
-	
-	// 🚀 3. NGAMBIL NAMA LENGKAP DARI TABEL USER
-	if pengantaran.Pesanan.Customer.User.NamaLengkap != "" {
-		namaPenerima = pengantaran.Pesanan.Customer.User.NamaLengkap
-	}
-	if pengantaran.Pesanan.Customer.NoTelp != "" {
-		noTelpPenerima = pengantaran.Pesanan.Customer.NoTelp
-	}
+  // Pelindung Pesanan & Customer
+  if pengantaran.Pesanan != nil {
+      if pengantaran.Pesanan.Customer.User.NamaLengkap != "" {
+          namaPenerima = pengantaran.Pesanan.Customer.User.NamaLengkap
+      }
+      // Asumsi ada field NoTelp di Customer lu (sesuaikan kalau beda)
+      if pengantaran.Pesanan.Customer.NoTelp != "" {
+          noTelpPenerima = pengantaran.Pesanan.Customer.NoTelp
+      }
 
-	statusNama := "Diproses"
-	if pengantaran.StatusPengantaran != nil && pengantaran.StatusPengantaran.NamaStatus != "" {
-		statusNama = pengantaran.StatusPengantaran.NamaStatus
-	}
+      // Pelindung Alamat
+      if pengantaran.Pesanan.Alamat != nil {
+          alamatLengkap = pengantaran.Pesanan.Alamat.AlamatLengkap
+          lat = pengantaran.Pesanan.Alamat.Latitude
+          lng = pengantaran.Pesanan.Alamat.Longitude
+      }
+  }
 
-	// ✅ [SUCCESS 200: OK]
-	c.JSON(http.StatusOK, gin.H{ 
-		"status":  "success",
-		"code":    200,
-		"message": "Detail pengantaran berhasil ditarik",
-		"data": gin.H{
-			"id_pengantaran":     pengantaran.PublicId,
-			"status_pengantaran": statusNama,
-			"waktu_pickup":       pengantaran.WaktuPickup,
-			"waktu_sampai":       pengantaran.WaktuSampai,
-			
-			// Data buat ditampilin di layar
-			"penerima": gin.H{
-				"nama":    namaPenerima,
-				"no_telp": noTelpPenerima,
-			},
-			// Data buat Google Maps (Latitude & Longitude)
-			"tujuan": gin.H{
-				"alamat_lengkap": pengantaran.Pesanan.Alamat.AlamatLengkap,
-				"latitude":       pengantaran.Pesanan.Alamat.Latitude,
-				"longitude":      pengantaran.Pesanan.Alamat.Longitude,
-			},
-		},
-	})
+  // Pelindung Status Pengantaran
+  statusNama := "Diproses"
+  if pengantaran.StatusPengantaran != nil && pengantaran.StatusPengantaran.NamaStatus != "" {
+    statusNama = pengantaran.StatusPengantaran.NamaStatus
+  }
+
+  // ✅ [SUCCESS 200: OK]
+  c.JSON(http.StatusOK, gin.H{ 
+    "status":  "success",
+    "code":    200,
+    "message": "Detail pengantaran berhasil ditarik",
+    "data": gin.H{
+      "id_pengantaran":     pengantaran.PublicId,
+      "status_pengantaran": statusNama,
+      "waktu_pickup":       pengantaran.WaktuPickup,
+      "waktu_sampai":       pengantaran.WaktuSampai,
+      
+      "penerima": gin.H{
+        "nama":    namaPenerima,
+        "no_telp": noTelpPenerima,
+      },
+      "tujuan": gin.H{
+        "alamat_lengkap": alamatLengkap,
+        "latitude":       lat,
+        "longitude":      lng,
+      },
+    },
+  })
 }
