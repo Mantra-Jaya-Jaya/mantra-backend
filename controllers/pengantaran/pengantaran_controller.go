@@ -6,6 +6,7 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -336,7 +337,9 @@ func GetDetailPengantaran(c *gin.Context) {
 	var pengantaran models.Pengantaran
 	err := config.DB.
 		Preload("Pesanan.Alamat").       
-		Preload("Pesanan.Customer.User"). // 🚀 2. TAMBAHIN ".User" BIAR BISA NGAMBIL NAMA LENGKAP
+		Preload("Pesanan.Customer.User").
+		Preload("Pesanan.DetailPesanan.SpesifikasiBarang.Barang").
+		Preload("Pesanan.DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
 		Preload("StatusPengantaran").    
 		Where("public_id = ?", idPengantaran).
 		First(&pengantaran).Error
@@ -380,6 +383,22 @@ func GetDetailPengantaran(c *gin.Context) {
 		statusNama = pengantaran.StatusPengantaran.NamaStatus
 	}
 
+	var listBarang []gin.H
+	for _, detail := range pengantaran.Pesanan.DetailPesanan {
+		varian := "Default"
+		if detail.SpesifikasiBarang.DetailSpesifikasi.IdDetailSpesifikasi != 0 {
+			varian = detail.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi + ": " + 
+			         detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi
+		}
+		listBarang = append(listBarang, gin.H{
+			"nama_barang":   detail.SpesifikasiBarang.Barang.NamaBarang,
+			"variasi":       varian,
+			"jumlah_beli":   detail.Jumlah,
+			"harga_satuan":  detail.HargaSatuan,
+			"subtotal_item": detail.Subtotal,
+		})
+	}
+
 	// ✅ [SUCCESS 200: OK]
 	c.JSON(http.StatusOK, gin.H{ 
 		"status":  "success",
@@ -402,6 +421,203 @@ func GetDetailPengantaran(c *gin.Context) {
 				"latitude":       pengantaran.Pesanan.Alamat.Latitude,
 				"longitude":      pengantaran.Pesanan.Alamat.Longitude,
 			},
+			"total_pembayaran":   pengantaran.Pesanan.TotalPembayaran,
+			"daftar_barang":      listBarang,
+		},
+	})
+}
+
+// AmbilPesanan membuat/mengupdate record pengantaran untuk kurir yang mengambil pesanan.
+// Dipakai oleh: kurir (POST /kurir/pengantaran/:public_id/ambil)
+// Auth: Wajib login, role kurir
+func AmbilPesanan(c *gin.Context) {
+	pesananPublicID := c.Param("public_id")
+	userID := c.GetInt64("user_id")
+
+	// 1. Cari ID Kurir berdasarkan user_id dari JWT
+	var result struct{ IdKurir uint }
+	if err := config.DB.Raw("SELECT id_kurir FROM kurir JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan WHERE karyawan.id_user = ?", userID).Scan(&result).Error; err != nil || result.IdKurir == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "Data kurir tidak ditemukan",
+		})
+		return
+	}
+	kurirID := result.IdKurir
+
+	// 2. Cari Pesanan berdasarkan public_id
+	var pesanan models.Pesanan
+	if err := config.DB.Where("public_id = ?", pesananPublicID).First(&pesanan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Pesanan tidak ditemukan",
+		})
+		return
+	}
+
+	if pesanan.StatusPesanan != "Dikemas" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Pesanan tidak dapat diambil karena status bukan Dikemas",
+		})
+		return
+	}
+
+	// 3. Cari status "Dalam Perjalanan"
+	var status models.StatusPengantaran
+	if err := config.DB.Where("nama_status = ?", "Dalam Perjalanan").First(&status).Error; err != nil {
+		status.IdStatusPengantaran = 2
+	}
+
+	tx := config.DB.Begin()
+
+	// Update status pesanan ke "Dikirim"
+	pesanan.StatusPesanan = "Dikirim"
+	if err := tx.Save(&pesanan).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memperbarui status pesanan"})
+		return
+	}
+
+	// 4. Buat atau update record Pengantaran
+	var pengantaran models.Pengantaran
+	now := time.Now()
+	if err := tx.Where("id_pesanan = ?", pesanan.IdPesanan).First(&pengantaran).Error; err == nil {
+		pengantaran.KurirID = &kurirID
+		pengantaran.WaktuPickup = &now
+		pengantaran.StatusPengantaranID = status.IdStatusPengantaran
+		if err := tx.Save(&pengantaran).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memperbarui data pengantaran"})
+			return
+		}
+	} else {
+		pengantaran = models.Pengantaran{
+			WaktuPickup:         &now,
+			PesananID:           pesanan.IdPesanan,
+			KurirID:             &kurirID,
+			StatusPengantaranID: status.IdStatusPengantaran,
+		}
+		if err := tx.Create(&pengantaran).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat data pengantaran"})
+			return
+		}
+	}
+
+	tx.Commit()
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Pesanan berhasil diambil",
+		"data": gin.H{
+			"id_pengantaran": pengantaran.PublicId,
+			"status":         "Dalam Perjalanan",
+		},
+	})
+}
+
+// UpdateStatusPengantaran memperbarui status pengantaran dan mengunggah foto bukti jika statusnya Selesai.
+// Dipakai oleh: kurir (POST /kurir/pengantaran/:public_id/status)
+// Auth: Wajib login, role kurir
+func UpdateStatusPengantaran(c *gin.Context) {
+	idPengantaran := c.Param("public_id")
+	userID := c.GetInt64("user_id")
+
+	// Ambil status dari form-data atau JSON
+	statusInput := c.PostForm("status")
+	if statusInput == "" {
+		var jsonInput struct {
+			Status string `json:"status"`
+		}
+		if err := c.ShouldBindJSON(&jsonInput); err == nil {
+			statusInput = jsonInput.Status
+		}
+	}
+
+	if statusInput == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Status harus diisi"})
+		return
+	}
+
+	// 1. Cari ID Kurir berdasarkan user_id dari JWT
+	var result struct{ IdKurir uint }
+	if err := config.DB.Raw("SELECT id_kurir FROM kurir JOIN karyawan ON kurir.id_karyawan = kurir.id_karyawan WHERE karyawan.id_user = ?", userID).Scan(&result).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengidentifikasi kurir"})
+		return
+	}
+	kurirID := result.IdKurir
+
+	// 2. Cari data pengantaran dan periksa kepemilikan
+	var pengantaran models.Pengantaran
+	if err := config.DB.Preload("Pesanan").Where("public_id = ?", idPengantaran).First(&pengantaran).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Data pengantaran tidak ditemukan"})
+		return
+	}
+
+	if pengantaran.KurirID == nil || *pengantaran.KurirID != kurirID {
+		c.JSON(http.StatusForbidden, gin.H{"status": "error", "message": "Akses ditolak: Tugas ini bukan milik Anda"})
+		return
+	}
+
+	// 3. Cari status di database berdasarkan nama status
+	var status models.StatusPengantaran
+	if err := config.DB.Where("nama_status = ?", statusInput).First(&status).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Status pengantaran tidak valid"})
+		return
+	}
+
+	tx := config.DB.Begin()
+
+	pengantaran.StatusPengantaranID = status.IdStatusPengantaran
+
+	// 4. Logika tambahan jika status adalah Selesai
+	if statusInput == "Selesai" {
+		now := time.Now()
+		pengantaran.WaktuSampai = &now
+
+		// Upload foto ke MinIO jika ada file "foto" terunggah
+		fileUrl, err := utils.UploadFileToMinio(c, "foto", "pengantaran")
+		if err == nil && fileUrl != "" {
+			pengantaran.FotoBuktiPengiriman = fileUrl
+		}
+
+		// Update status pesanan ke "Selesai"
+		if err := tx.Model(&models.Pesanan{}).Where("id_pesanan = ?", pengantaran.PesananID).Update("status_pesanan", "Selesai").Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengupdate status pesanan"})
+			return
+		}
+
+		// Update status pembayaran ke settlement jika COD/Cash
+		var pembayaran models.Pembayaran
+		if err := tx.Where("id_pesanan = ?", pengantaran.PesananID).First(&pembayaran).Error; err == nil {
+			var metode models.MetodePembayaran
+			if err := tx.First(&metode, pembayaran.MetodePembayaranID).Error; err == nil {
+				if metode.KodeMetode == "cod" || metode.KodeMetode == "cash" {
+					pembayaran.StatusTransaksi = "settlement"
+					pembayaran.TotalDibayar = pengantaran.Pesanan.TotalPembayaran
+					pembayaran.WaktuPembayaran = &now
+					tx.Save(&pembayaran)
+				}
+			}
+		}
+	}
+
+	if err := tx.Save(&pengantaran).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memperbarui status pengantaran"})
+		return
+	}
+
+	tx.Commit()
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Status pengantaran berhasil diperbarui",
+		"data": gin.H{
+			"foto_bukti": pengantaran.FotoBuktiPengiriman,
+			"status":     statusInput,
 		},
 	})
 }

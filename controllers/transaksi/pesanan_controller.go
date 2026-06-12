@@ -9,6 +9,7 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/midtrans/midtrans-go"
@@ -520,30 +521,85 @@ func LacakPesanan(c *gin.Context) {
 		return
 	}
 
+	var pesanan models.Pesanan
+	if err := config.DB.Preload("Ekspedisi").Where("public_id = ?", idPesanan).First(&pesanan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Pesanan tidak ditemukan",
+		})
+		return
+	}
+
+	// 1. Ekspedisi Eksternal (Biteship) - memiliki NomorResi dan Ekspedisi
+	if pesanan.NomorResi != nil && *pesanan.NomorResi != "" && pesanan.Ekspedisi != nil && pesanan.Ekspedisi.KodeApi != "" {
+		biteship := services.NewBiteshipAdapter()
+		history, err := biteship.TrackShipment(*pesanan.NomorResi, pesanan.Ekspedisi.KodeApi)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"status":  "success",
+				"message": "Data lacak pesanan berhasil diambil (Biteship offline/pending)",
+				"data": gin.H{
+					"id_pesanan":      idPesanan,
+					"nomor_resi":      *pesanan.NomorResi,
+					"ekspedisi":      pesanan.Ekspedisi.NamaEkspedisi,
+					"tipe_ekspedisi": "eksternal",
+					"history":        []interface{}{},
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"message": "Data lacak pesanan berhasil diambil",
+			"data": gin.H{
+				"id_pesanan":      idPesanan,
+				"nomor_resi":      *pesanan.NomorResi,
+				"ekspedisi":      pesanan.Ekspedisi.NamaEkspedisi,
+				"tipe_ekspedisi": "eksternal",
+				"history":        history,
+			},
+		})
+		return
+	}
+
+	// 2. Ekspedisi Internal (Kurir Toko)
 	var pengantaran models.Pengantaran
 	if err := config.DB.Preload("Kurir.Karyawan.User").
 		Joins("JOIN pesanan ON pesanan.id_pesanan = pengantaran.id_pesanan").
 		Where("pesanan.public_id = ?", idPesanan).
 		First(&pengantaran).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Data pelacakan untuk pesanan ini tidak ditemukan",
+		// Jika tidak ada record pengantaran, return status default
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"message": "Pesanan sedang dipersiapkan di toko",
+			"data": gin.H{
+				"id_pesanan":      idPesanan,
+				"tipe_ekspedisi": "internal",
+				"status":         pesanan.StatusPesanan,
+				"kurir":          nil,
+			},
 		})
 		return
 	}
 
 	fotoKurir := ""
-	if pengantaran.Kurir != nil && pengantaran.Kurir.Karyawan.User.FotoProfil != "" {
-		fotoKurir = pengantaran.Kurir.Karyawan.User.FotoProfil
+	var namaKurir string
+	if pengantaran.Kurir != nil {
+		namaKurir = pengantaran.Kurir.Karyawan.User.NamaLengkap
+		if pengantaran.Kurir.Karyawan.User.FotoProfil != "" {
+			fotoKurir = pengantaran.Kurir.Karyawan.User.FotoProfil
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Data lacak pesanan berhasil diambil",
 		"data": gin.H{
-			"id_pesanan": idPesanan,
+			"id_pesanan":      idPesanan,
+			"tipe_ekspedisi": "internal",
 			"kurir": gin.H{
-				"nama":       pengantaran.Kurir.Karyawan.User.NamaLengkap,
+				"nama":       namaKurir,
 				"plat_nomor": "",
 				"foto":       fotoKurir,
 			},

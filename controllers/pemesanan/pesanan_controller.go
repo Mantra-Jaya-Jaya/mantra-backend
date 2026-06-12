@@ -314,6 +314,9 @@ func GetDetailPesanan(c *gin.Context) {
     type DetailPesananDTO struct {
         PublicID        string           `json:"public_id"`
         TotalPembayaran int              `json:"total_pembayaran"`
+        NamaCustomer    string           `json:"nama_customer"`
+        NoTelp          string           `json:"no_telp"`
+        AlamatLengkap   string           `json:"alamat_lengkap"`
         MetodeBayar     MetodeBayarDTO   `json:"metode_bayar"`
         DaftarBarang    []ItemBarangDTO  `json:"daftar_barang"`
     }
@@ -321,7 +324,9 @@ func GetDetailPesanan(c *gin.Context) {
     // 2. Query Database dengan Preload Super Lengkap
     var pesanan models.Pesanan
     err := config.DB.
-        Preload("Pembayaran.MetodeBayar"). // 🚀 Pastikan relasi ini ada di model!
+        Preload("Alamat").
+        Preload("Customer.User").
+        Preload("Pembayaran.MetodeBayar"). 
         Preload("DetailPesanan.SpesifikasiBarang.Barang").
         Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
         Where("public_id = ?", publicID).
@@ -346,8 +351,8 @@ func GetDetailPesanan(c *gin.Context) {
             NamaBarang:   detail.SpesifikasiBarang.Barang.NamaBarang,
             Variasi:      varian,
             JumlahBeli:   detail.Jumlah,
-            HargaSatuan:  detail.HargaSatuan, // Pastikan field ini ada di tabel DetailPesanan
-            SubtotalItem: detail.Subtotal,    // Pastikan field ini ada di tabel DetailPesanan
+            HargaSatuan:  detail.HargaSatuan, 
+            SubtotalItem: detail.Subtotal,    
         })
     }
 
@@ -356,17 +361,32 @@ func GetDetailPesanan(c *gin.Context) {
         ID:         "", 
         NamaMetode: "Belum Ada Metode",
     }
-    if pesanan.Pembayaran.MetodePembayaran.IdMetodePembayaran != 0 {
+    if pesanan.Pembayaran != nil && pesanan.Pembayaran.MetodePembayaran.IdMetodePembayaran != 0 {
         metodeBayar = MetodeBayarDTO{
             ID:         fmt.Sprintf("%d", pesanan.Pembayaran.MetodePembayaran.IdMetodePembayaran),
             NamaMetode: pesanan.Pembayaran.MetodePembayaran.NamaMetode, 
         }
     }
 
+    namaCust := "Customer Offline"
+    noTelp := "-"
+    alamatLengkap := "Ambil di Toko"
+
+    if pesanan.Alamat != nil {
+        namaCust = pesanan.Alamat.NamaPenerima
+        noTelp = pesanan.Alamat.NoTelpPenerima
+        alamatLengkap = pesanan.Alamat.AlamatLengkap
+    } else if pesanan.Customer.User.NamaLengkap != "" {
+        namaCust = pesanan.Customer.User.NamaLengkap
+    }
+
     // 5. Bungkus Final
     response := DetailPesananDTO{
         PublicID:        pesanan.PublicId.String(),
         TotalPembayaran: pesanan.TotalPembayaran,
+        NamaCustomer:    namaCust,
+        NoTelp:          noTelp,
+        AlamatLengkap:   alamatLengkap,
         MetodeBayar:     metodeBayar,
         DaftarBarang:    listBarang,
     }

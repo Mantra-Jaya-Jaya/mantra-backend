@@ -90,8 +90,15 @@ func MidtransNotificationHandler(c *gin.Context) {
 	config.DB.Save(&pembayaran)
 
 	if notif.TransactionStatus == "settlement" || notif.TransactionStatus == "capture" {
-		config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pembayaran.PesananID).
-			Update("status_pesanan", "Selesai")
+		var pesanan models.Pesanan
+		if err := config.DB.First(&pesanan, pembayaran.PesananID).Error; err == nil {
+			if pesanan.TipePesanan == "Online" {
+				pesanan.StatusPesanan = "Dikemas" // Masuk ke antrean packing/kurir toko
+			} else {
+				pesanan.StatusPesanan = "Selesai" // Pembayaran kasir langsung selesai
+			}
+			config.DB.Save(&pesanan)
+		}
 	}
 
 	savePaymentDetails(&pembayaran, &notif)
