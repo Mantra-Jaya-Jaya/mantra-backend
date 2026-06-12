@@ -51,7 +51,7 @@ func SeedNotifikasi() {
 		}
 
 		for _, notif := range notifs {
-			notif.UserID = user.IdUser
+			notif.UserID = int64(user.IdUser)
 			if err := config.DB.Create(&notif).Error; err != nil {
 				fmt.Println("Error insert notifikasi:", err)
 			}

@@ -67,6 +67,7 @@ func SetupRoutes(r *gin.Engine) {
 		kasirGroup.Use(middleware.AuthMiddleware())
 		{
 			kasirGroup.GET("/dashboard", transaksi.GetDashboardKasir)
+			kasirGroup.GET("/aktivitas-hari-ini", transaksi.GetSemuaAktivitasHariIni)
 			kasirGroup.GET("/laporan", transaksi.GetLaporanRingkasan)
 			kasirGroup.GET("/laporan/produk/:public_id", transaksi.GetDetailLaporanProduk)
 			kasirGroup.GET("/laporan/produk/:public_id/:pesanan_id", transaksi.GetDetailPesananDariLaporan)
