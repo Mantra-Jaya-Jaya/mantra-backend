@@ -94,6 +94,8 @@ func SetupRoutes(r *gin.Engine) {
 			kurirGroup.GET("/pesanan/:public_id", pemesanan.GetDetailPesanan)
 			kurirGroup.POST("/pesanan/:public_id/terima", pemesanan.TerimaPesanan)
 			kurirGroup.GET("/pengantaran/:public_id/detail", pengantaran.GetDetailPengantaran)
+			kurirGroup.PUT("/pengantaran/:public_id/lokasi", pengantaran.UpdateLokasiKurir)
+			kurirGroup.PUT("/pengantaran/:public_id/selesai", pengantaran.UploadBuktiPengiriman)
 		}
 
 		// Admin Routes

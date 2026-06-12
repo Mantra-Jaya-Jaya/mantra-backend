@@ -6,6 +6,7 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -145,7 +146,7 @@ func GetDaftarPengantaran(c *gin.Context) {
 // Auth: Wajib login, role kurir
 // Ownership: kurir hanya bisa update lokasi pengantaran yang ditugaskan kepadanya
 func UpdateLokasiKurir(c *gin.Context) {
-	idPengantaran := c.Param("id_pengantaran")
+	idPengantaran := c.Param("public_id")
 	userID := c.GetInt64("user_id")
 
 	type UpdateLokasiInput struct {
@@ -401,6 +402,7 @@ func GetDetailPengantaran(c *gin.Context) {
       "status_pengantaran": statusNama,
       "waktu_pickup":       pengantaran.WaktuPickup,
       "waktu_sampai":       pengantaran.WaktuSampai,
+			"foto_bukti":         pengantaran.FotoBuktiPengiriman,
       
       "penerima": gin.H{
         "nama":    namaPenerima,
@@ -413,4 +415,88 @@ func GetDetailPengantaran(c *gin.Context) {
       },
     },
   })
+}
+
+func UploadBuktiPengiriman(c *gin.Context) {
+	// 🚀 1. TANGKAP PUBLIC ID & CEK AUTH
+	idPengantaran := c.Param("public_id")
+
+	val, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "User belum login"})
+		return
+	}
+
+	var userID int64
+	switch v := val.(type) {
+	case float64: userID = int64(v)
+	case int64: userID = v
+	case int: userID = int64(v)
+	case uint: userID = int64(v)
+	default:
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Format token tidak valid"})
+		return
+	}
+
+	// Cari ID Kurir buat proteksi
+	var result struct{ IdKurir uint }
+	if err := config.DB.Raw("SELECT id_kurir FROM kurir JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan WHERE karyawan.id_user = ?", userID).Scan(&result).Error; err != nil || result.IdKurir == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengidentifikasi kurir"})
+		return
+	}
+	kurirID := result.IdKurir
+
+	// 🚀 2. CARI DATA PENGANTARAN DARI DATABASE
+	var pengantaran models.Pengantaran
+	// Kita Preload Pesanan sekalian biar nanti bisa gampang update status pesanan
+	if err := config.DB.Preload("Pesanan").Where("public_id = ?", idPengantaran).First(&pengantaran).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Data pengantaran tidak ditemukan"})
+		return
+	}
+
+	// Proteksi: Cuma kurir yang bawa paket ini yang boleh upload!
+	if pengantaran.KurirID == nil || *pengantaran.KurirID != kurirID {
+		c.JSON(http.StatusForbidden, gin.H{"status": "error", "message": "Akses Ditolak: Bukan paket Anda!"})
+		return
+	}
+
+	// 🚀 3. UPLOAD GAMBAR KE MINIO
+	// Kita set form data key-nya "foto_bukti" dan folder-nya "bukti_pengantaran"
+	fileUrl, err := utils.UploadFileToMinio(c, "foto_bukti", "bukti_pengantaran")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Gagal mengunggah foto bukti: " + err.Error(),
+		})
+		return
+	}
+
+	// 🚀 4. UPDATE DATA DI DATABASE (TABEL PENGANTARAN)
+	waktuSekarang := time.Now()
+	
+	pengantaran.FotoBuktiPengiriman = fileUrl // Simpan URL dari MinIO
+	pengantaran.StatusPengantaranID = 4       // ID 4 = "Selesai" (Sesuai database lu)
+	pengantaran.WaktuSampai = &waktuSekarang  // Catat waktu selesai realtime
+
+	if err := config.DB.Save(&pengantaran).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gambar berhasil diupload, tapi gagal update database"})
+		return
+	}
+
+	// 🚀 5. UPDATE STATUS DI TABEL PESANAN (Biar sinkron!)
+	if pengantaran.Pesanan != nil {
+		config.DB.Model(&models.Pesanan{}).
+			Where("id_pesanan = ?", pengantaran.PesananID).
+			Update("status_pesanan", "Selesai")
+	}
+
+	// 🚀 6. KEMBALIKAN RESPON SUKSES
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Mantap! Bukti pengiriman berhasil diupload dan pesanan diselesaikan.",
+		"data": gin.H{
+			"url_bukti":    fileUrl,
+			"waktu_sampai": waktuSekarang,
+		},
+	})
 }
