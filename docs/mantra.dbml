@@ -1,7 +1,7 @@
 // =============================================================================
 // MANTRA - Database Schema (DBML)
-// Version    : 2.1.0
-// Updated    : 2026-06-09
+// Version    : 2.2.0
+// Updated    : 2026-06-12
 // =============================================================================
 //
 // CARA PAKAI FILE INI:
@@ -228,6 +228,7 @@ Table pesanan {
   total_pembayaran     int
   ongkos_kirim         int       [note: 'default 0']
   catatan              text
+  nomor_resi           varchar   [note: 'Nomor resi untuk pengiriman eksternal (Biteship), nullable']
   tanggal_pesanan      timestamp
   tipe_pesanan         varchar   [note: 'online | offline']
   status_pesanan       varchar   [note: 'diproses | dikemas | dikirim | selesai | dibatalkan']

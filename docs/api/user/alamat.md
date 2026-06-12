@@ -4,7 +4,7 @@ Auth (Customer). CRUD alamat pengiriman.
 
 ---
 
-## GET /customer/alamat
+## GET /api/v1/customer/alamat
 
 Mendapatkan daftar alamat customer yang login.
 
@@ -28,7 +28,7 @@ Mendapatkan daftar alamat customer yang login.
 
 ---
 
-## POST /customer/alamat
+## POST /api/v1/customer/alamat
 
 Tambah alamat baru.
 
@@ -48,12 +48,12 @@ Tambah alamat baru.
 
 ---
 
-## PUT /customer/alamat/:id_alamat
+## PUT /api/v1/customer/alamat/:public_id
 
 Update data alamat.
 
 ---
 
-## DELETE /customer/alamat/:id_alamat
+## DELETE /api/v1/customer/alamat/:public_id
 
 Hapus alamat.

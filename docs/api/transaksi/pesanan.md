@@ -2,9 +2,9 @@
 
 ---
 
-## GET /customer/pesanan (Customer) / GET /kasir/pesanan (Kasir)
+## GET /api/v1/customer/pesanan (Customer) / GET /api/v1/kasir/pesanan (Kasir)
 
-Auth. Mendapatkan daftar pesanan.
+Auth. Mendapatkan daftar pesanan online/offline.
 
 **Response:**
 ```json
@@ -13,10 +13,10 @@ Auth. Mendapatkan daftar pesanan.
   "data": [
     {
       "id_pesanan": 1,
-      "public_id": "uuid-...",
+      "public_id": "9e3c8162-...",
       "total_pembayaran": 150000,
-      "status_pesanan": "diproses",
-      "tipe_pesanan": "online",
+      "status_pesanan": "Diproses",
+      "tipe_pesanan": "Online",
       "tanggal_pesanan": "2026-06-05T10:00:00Z"
     }
   ]
@@ -25,20 +25,18 @@ Auth. Mendapatkan daftar pesanan.
 
 ---
 
-## POST /customer/pesanan/checkout
+## POST /api/v1/customer/pesanan/checkout
 
-Auth (Customer). Membuat pesanan baru dari keranjang.
-
-Mendukung ekspedisi dan metode pembayaran. Jika metode dari Midtrans, response menyertakan `midtrans_token` dan `redirect_url`.
+Auth (Customer). Membuat pesanan online baru dari isi keranjang.
 
 **Request:**
 ```json
 {
-  "id_alamat": "uuid-...",
+  "id_alamat": "9e3c8162-...",
   "id_ekspedisi": 1,
   "id_layanan_ekspedisi": 1,
   "ongkos_kirim": 20000,
-  "catatan": "Tolong dibungkus rapih",
+  "catatan": "Tolong dibungkus rapi",
   "id_metode_pembayaran": 2
 }
 ```
@@ -49,10 +47,10 @@ Mendukung ekspedisi dan metode pembayaran. Jika metode dari Midtrans, response m
   "status": "success",
   "message": "Pesanan berhasil dibuat",
   "data": {
-    "id_pesanan": "uuid-...",
-    "total_bayar": 24270556,
+    "id_pesanan": "9e3c8162-...",
+    "total_bayar": 172000,
     "ongkos_kirim": 20000,
-    "pajak": 2405190,
+    "pajak": 15000,
     "midtrans_token": "3f0d242e-...",
     "redirect_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/..."
   }
@@ -61,35 +59,52 @@ Mendukung ekspedisi dan metode pembayaran. Jika metode dari Midtrans, response m
 
 ---
 
-## GET /customer/pesanan/:id_pesanan (Customer) / GET /kasir/pesanan/:id_order (Kasir)
+## GET /api/v1/customer/pesanan/:public_id (Customer) / GET /api/v1/kasir/pesanan/:public_id (Kasir) / GET /api/v1/kurir/pesanan/:public_id (Kurir)
 
-Auth. Mendapatkan detail pesanan.
+Auth. Mendapatkan detail pesanan lengkap beserta info pengiriman dan rincian item.
 
 **Response:**
 ```json
 {
   "status": "success",
+  "message": "Detail pesanan berhasil diambil",
   "data": {
-    "id_pesanan": 1,
-    "public_id": "uuid-...",
-    "status_pesanan": "diproses",
-    "detail_pesanan": [
+    "no_pesanan": "9e3c8162-...",
+    "status": "Diproses",
+    "tanggal_pesan": "2026-06-05T10:00:00Z",
+    "items": [
       {
         "id_barang": 1,
         "nama_barang": "Produk A",
+        "varian": "Ukuran: L",
         "jumlah": 2,
         "harga_satuan": 50000,
-        "subtotal": 100000
+        "gambar": "http://minio:9000/products/item.png"
       }
     ],
-    "total_pembayaran": 150000
+    "tujuan_pengantaran": {
+      "nama_penerima": "Surya",
+      "alamat_lengkap": "Semarang"
+    },
+    "kurir": {
+      "nama_kurir": "Ricardo Holahilo",
+      "plat_nomor": "",
+      "ekspedisi": "Internal Toko",
+      "foto_kurir": ""
+    },
+    "rincian_pembayaran": {
+      "subtotal_items": 100000,
+      "ongkir": 20000,
+      "biaya_proteksi": 0,
+      "total": 120000
+    }
   }
 }
 ```
 
 ---
 
-## PATCH /customer/pesanan/:id_pesanan/batal
+## PATCH /api/v1/customer/pesanan/:public_id/batal
 
 Auth (Customer). Membatalkan pesanan.
 
@@ -103,6 +118,6 @@ Auth (Customer). Membatalkan pesanan.
 
 ---
 
-## GET /customer/pesanan/:id_pesanan/lacak
+## GET /api/v1/customer/pesanan/:public_id/lacak
 
-Auth (Customer). Lihat status pengiriman. Detail di `pengantaran.md`.
+Auth (Customer). Lihat status pengiriman. Detail skema kembalian dapat dilihat di `pengantaran.md`.
