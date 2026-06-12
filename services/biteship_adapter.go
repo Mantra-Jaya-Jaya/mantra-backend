@@ -192,3 +192,42 @@ func parseDuration(rangeStr string) (min, max int) {
 	max, _ = strconv.Atoi(strings.TrimSpace(parts[1]))
 	return
 }
+
+type BiteshipTrackingEvent struct {
+	Time        string `json:"time"`
+	Description string `json:"description"`
+	Status      string `json:"status"`
+	City        string `json:"city"`
+}
+
+type BiteshipTrackingResponse struct {
+	Success bool                    `json:"success"`
+	History []BiteshipTrackingEvent `json:"history"`
+}
+
+// TrackShipment tracks a waybill code via Biteship API
+func (b *BiteshipAdapter) TrackShipment(waybill string, courierCode string) ([]BiteshipTrackingEvent, error) {
+	reqHttp, _ := http.NewRequest("GET", b.baseURL+fmt.Sprintf("/v1/trackings/%s/couriers/%s", waybill, courierCode), nil)
+	reqHttp.Header.Set("Authorization", b.apiKey)
+
+	resp, err := b.client.Do(reqHttp)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("biteship error status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		Success bool                    `json:"success"`
+		History []BiteshipTrackingEvent `json:"history"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return result.History, nil
+}
+
