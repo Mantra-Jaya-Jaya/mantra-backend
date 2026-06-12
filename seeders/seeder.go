@@ -33,7 +33,7 @@ func RunAllSeeders() {
 	SeedSpesifikasiBarang()
 	SeedBarcode()
 	SeedStokOpname()
-	SeedPesanan()
+	//SeedPesanan()
 	SeedDetailPesanan()
 	SeedPembayaran()
 	SeedPengantaran()

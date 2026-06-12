@@ -33,5 +33,5 @@ type Pesanan struct {
 	Catatan            string            `gorm:"column:catatan" json:"catatan"`
 
 	DetailPesanan []DetailPesanan `gorm:"foreignKey:PesananId;references:IdPesanan" json:"detail_pesanan,omitempty"`
-	Pembayaran *Pembayaran `gorm:"foreignKey:PesananID" json:"pembayaran,omitempty"`
+	Pembayaran    *Pembayaran     `gorm:"foreignKey:PesananID" json:"pembayaran,omitempty"`
 }

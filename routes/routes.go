@@ -43,6 +43,8 @@ func SetupRoutes(r *gin.Engine) {
 			customerGroup.GET("/promo", katalog.GetPromo)
 			customerGroup.GET("/kategori", katalog.GetKategori)
 			customerGroup.GET("/barang", katalog.GetDaftarBarang)
+			customerGroup.GET("/barang/detail/:public_id", katalog.GetDetailBarang)
+			customerGroup.GET("/keranjang", keranjang.GetKeranjang)
 			customerGroup.POST("/keranjang", keranjang.TambahKeKeranjang)
 			customerGroup.PATCH("/keranjang/:public_id", keranjang.UpdateKeranjang)
 			customerGroup.DELETE("/keranjang/:public_id", keranjang.HapusItemKeranjang)
