@@ -11,6 +11,7 @@ import (
 	"backend-mantra/models"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/midtrans/midtrans-go"
 	"github.com/midtrans/midtrans-go/snap"
 )
@@ -58,6 +59,9 @@ func StartTransaksi(c *gin.Context) {
 // GetRingkasanCheckout mengambil ringkasan belanja sebelum pembayaran di POS kasir.
 // Dipakai oleh: kasir (GET /kasir/transaksi/checkout)
 // Auth: Wajib login, role kasir
+// Support dual mode query param:
+//   - ?id_pesanan=<UUID>    → lookup by public_id (preferred)
+//   - ?id_pesanan=<integer> → lookup by id_pesanan (backward compat)
 func GetRingkasanCheckout(c *gin.Context) {
 	idPesananStr := c.Query("id_pesanan")
 	if idPesananStr == "" {
@@ -67,7 +71,13 @@ func GetRingkasanCheckout(c *gin.Context) {
 	var pesanan models.Pesanan
 	var err error
 	if idPesananStr != "" {
-		err = config.DB.First(&pesanan, "id_pesanan = ?", idPesananStr).Error
+		// Coba parse sebagai UUID (public_id) dulu
+		if parsed, parseErr := uuid.Parse(idPesananStr); parseErr == nil {
+			err = config.DB.First(&pesanan, "public_id = ?", parsed).Error
+		} else {
+			// Fallback: anggap sebagai integer id_pesanan (backward compat POS kasir)
+			err = config.DB.First(&pesanan, "id_pesanan = ?", idPesananStr).Error
+		}
 	} else {
 		err = config.DB.Order("id_pesanan DESC").First(&pesanan).Error
 	}

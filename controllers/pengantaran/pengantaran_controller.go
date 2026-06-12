@@ -141,11 +141,11 @@ func GetDaftarPengantaran(c *gin.Context) {
 }
 
 // UpdateLokasiKurir memperbarui koordinat lokasi kurir yang sedang bertugas.
-// Dipakai oleh: kurir (PATCH /kurir/pengantaran/:id_pengantaran/lokasi)
+// Dipakai oleh: kurir (PATCH /kurir/pengantaran/:public_id/lokasi)
 // Auth: Wajib login, role kurir
 // Ownership: kurir hanya bisa update lokasi pengantaran yang ditugaskan kepadanya
 func UpdateLokasiKurir(c *gin.Context) {
-	idPengantaran := c.Param("id_pengantaran")
+	idPengantaran := c.Param("public_id")
 	userID := c.GetInt64("user_id")
 
 	type UpdateLokasiInput struct {
@@ -294,8 +294,9 @@ func GetLaporanHariIni(c *gin.Context) {
 
 
 // GetDetailPengantaran mengambil detail lengkap untuk halaman Peta Kurir
+// Dipakai oleh: kurir (GET /kurir/pengantaran/:public_id/detail)
 func GetDetailPengantaran(c *gin.Context) {
-	idPengantaran := c.Param("id_pengantaran") // Ambil public_id dari URL
+	idPengantaran := c.Param("public_id") // Ambil public_id dari URL
 	
 	// 🚀 1. PENJINAK TOKEN (Copy dari GetDaftarPengantaran biar aman 100%)
 	val, exists := c.Get("user_id")
