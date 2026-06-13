@@ -30,13 +30,11 @@ db-ui:
 # PERINGATAN: Hanya gunakan ini di environment lokal saat butuh reset total!
 db-clean:
 	atlas schema clean --env local --auto-approve
-	PGPASSWORD=${DB_PASSWORD} psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -c 'CREATE SCHEMA IF NOT EXISTS public;'
+	set PGPASSWORD=openpgpwd&& "C:\Program Files\Odoo 19.0.20260315\PostgreSQL\bin\psql.exe" -h localhost -p 5432 -U openpg -d mantra_db -c "CREATE SCHEMA IF NOT EXISTS public; CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";"
 
-# Menghapus seluruh skema di database sandbox (mantra_dev)
 db-clean-dev:
-	atlas schema clean --url "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/mantra_dev?sslmode=disable" --auto-approve
-	PGPASSWORD=${DB_PASSWORD} psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d mantra_dev -c 'CREATE SCHEMA IF NOT EXISTS public;'
-
+	atlas schema clean --url "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/mantra_db?sslmode=disable" --auto-approve
+	set PGPASSWORD=${DB_PASSWORD}&& "C:\Program Files\Odoo 19.0.20260315\PostgreSQL\bin\psql.exe" -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d mantra_db -c "CREATE SCHEMA IF NOT EXISTS public; CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";"
 # Membersihkan skema dari database utama dan sandbox sekaligus
 db-clean-all: db-clean db-clean-dev
 

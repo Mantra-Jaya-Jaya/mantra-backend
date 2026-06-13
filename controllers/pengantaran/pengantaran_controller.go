@@ -142,7 +142,7 @@ func GetDaftarPengantaran(c *gin.Context) {
 }
 
 // UpdateLokasiKurir memperbarui koordinat lokasi kurir yang sedang bertugas.
-// Dipakai oleh: kurir (PATCH /kurir/pengantaran/:id_pengantaran/lokasi)
+// Dipakai oleh: kurir (PATCH /kurir/pengantaran/:public_id/lokasi)
 // Auth: Wajib login, role kurir
 // Ownership: kurir hanya bisa update lokasi pengantaran yang ditugaskan kepadanya
 func UpdateLokasiKurir(c *gin.Context) {
@@ -295,6 +295,7 @@ func GetLaporanHariIni(c *gin.Context) {
 
 
 // GetDetailPengantaran mengambil detail lengkap untuk halaman Peta Kurir
+// Dipakai oleh: kurir (GET /kurir/pengantaran/:public_id/detail)
 func GetDetailPengantaran(c *gin.Context) {
   // 🚀 1. PERBAIKAN PARAMETER: Harus sama kayak di Route!
   idPengantaran := c.Param("public_id") 

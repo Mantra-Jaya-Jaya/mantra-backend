@@ -41,3 +41,7 @@ vendor/
 Thumbs.db
 .vscode/
 .idea/
+
+# Mengabaikan file konfigurasi Atlas dan Makefile
+atlas.hcl
+Makefile

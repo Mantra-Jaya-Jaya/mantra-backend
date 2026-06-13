@@ -67,6 +67,7 @@ func SetupRoutes(r *gin.Engine) {
 		kasirGroup.Use(middleware.AuthMiddleware())
 		{
 			kasirGroup.GET("/dashboard", transaksi.GetDashboardKasir)
+			kasirGroup.GET("/aktivitas-hari-ini", transaksi.GetSemuaAktivitasHariIni)
 			kasirGroup.GET("/laporan", transaksi.GetLaporanRingkasan)
 			kasirGroup.GET("/laporan/produk/:public_id", transaksi.GetDetailLaporanProduk)
 			kasirGroup.GET("/laporan/produk/:public_id/:pesanan_id", transaksi.GetDetailPesananDariLaporan)
@@ -135,8 +136,8 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.PUT("/ekspedisi/:public_id", katalog.UpdateEkspedisi)
 			adminGroup.DELETE("/ekspedisi/:public_id", katalog.HapusEkspedisi)
 			adminGroup.POST("/ekspedisi/layanan", katalog.TambahLayanan)
-			adminGroup.PUT("/ekspedisi/layanan/:id", katalog.UpdateLayanan)
-			adminGroup.DELETE("/ekspedisi/layanan/:id", katalog.HapusLayanan)
+			adminGroup.PUT("/ekspedisi/layanan/:public_id", katalog.UpdateLayanan)
+			adminGroup.DELETE("/ekspedisi/layanan/:public_id", katalog.HapusLayanan)
 			adminGroup.GET("/metode-pembayaran", transaksi.GetMetodePembayaran)
 			adminGroup.POST("/metode-pembayaran", transaksi.TambahMetodePembayaran)
 			adminGroup.PUT("/metode-pembayaran/:public_id", transaksi.UpdateMetodePembayaran)

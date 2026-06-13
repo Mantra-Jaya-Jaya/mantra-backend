@@ -1,6 +1,7 @@
 package transaksi
 
 import (
+	"fmt"
 	"net/http"
 
 	"backend-mantra/config"
@@ -36,7 +37,7 @@ func CekOngkir(c *gin.Context) {
 	}
 
 	var alamat models.Alamat
-	if err := config.DB.Where("public_id = ?", input.IdAlamat).First(&alamat).Error; err != nil {
+	if err := config.DB.Where("public_id = ? AND id_customer = ?", input.IdAlamat, result.IdCustomer).First(&alamat).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Alamat tidak ditemukan"})
 		return
 	}
@@ -82,37 +83,69 @@ func CekOngkir(c *gin.Context) {
 		return
 	}
 
+	// Build lookup map: kode_api → id_ekspedisi
+	var semuaEkspedisi []models.Ekspedisi
+	config.DB.Where("is_active = ?", true).Find(&semuaEkspedisi)
+	ekspedisiMap := make(map[string]uint)
+	for _, e := range semuaEkspedisi {
+		ekspedisiMap[e.KodeApi] = e.IdEkspedisi
+	}
+
+	// Build lookup map: (kode_ekspedisi + nama_layanan) → id_ekspedisi_layanan
+	type EkspedisiLayananRow struct {
+		IdEkspedisiLayanan uint
+		NamaLayanan        string
+		EkspedisiKodeApi   string
+	}
+	var layananRows []EkspedisiLayananRow
+	config.DB.Table("ekspedisi_layanan").
+		Select("ekspedisi_layanan.id_ekspedisi_layanan, ekspedisi_layanan.nama_layanan, ekspedisi.kode_api as ekspedisi_kode_api").
+		Joins("JOIN ekspedisi ON ekspedisi.id_ekspedisi = ekspedisi_layanan.id_ekspedisi").
+		Where("ekspedisi_layanan.is_active = ?", true).
+		Scan(&layananRows)
+
+	layananMap := make(map[string]uint)
+	for _, l := range layananRows {
+		key := l.EkspedisiKodeApi + "|" + l.NamaLayanan
+		layananMap[key] = l.IdEkspedisiLayanan
+	}
+
 	type LayananDTO struct {
-		KodeLayanan string `json:"kode_layanan"`
-		NamaLayanan string `json:"nama_layanan"`
-		Deskripsi   string `json:"deskripsi"`
-		Harga       int    `json:"harga"`
-		EstimasiMin int    `json:"estimasi_min"`
-		EstimasiMax int    `json:"estimasi_max"`
-		Durasi      string `json:"durasi"`
+		IdLayananEkspedisi uint   `json:"id_layanan_ekspedisi"`
+		KodeLayanan        string `json:"kode_layanan"`
+		NamaLayanan        string `json:"nama_layanan"`
+		Deskripsi          string `json:"deskripsi"`
+		Harga              int    `json:"harga"`
+		EstimasiMin        int    `json:"estimasi_min"`
+		EstimasiMax        int    `json:"estimasi_max"`
+		Durasi             string `json:"durasi"`
 	}
 
 	type EkspedisiDTO struct {
-		KodeEkspedisi string       `json:"kode_ekspedisi"`
-		NamaEkspedisi string       `json:"nama_ekspedisi"`
-		Layanan       []LayananDTO `json:"layanan"`
+		IdEkspedisi    uint         `json:"id_ekspedisi"`
+		KodeEkspedisi  string       `json:"kode_ekspedisi"`
+		NamaEkspedisi  string       `json:"nama_ekspedisi"`
+		Layanan        []LayananDTO `json:"layanan"`
 	}
 
 	var data []EkspedisiDTO
 	for _, r := range results {
 		var layananList []LayananDTO
 		for _, l := range r.Layanan {
+			layananKey := fmt.Sprintf("%s|%s", r.EkspedisiKode, l.NamaLayanan)
 			layananList = append(layananList, LayananDTO{
-				KodeLayanan: l.KodeLayanan,
-				NamaLayanan: l.NamaLayanan,
-				Deskripsi:   l.Deskripsi,
-				Harga:       l.Harga,
-				EstimasiMin: l.EstimasiMin,
-				EstimasiMax: l.EstimasiMax,
-				Durasi:      l.Durasi,
+				IdLayananEkspedisi: layananMap[layananKey],
+				KodeLayanan:        l.KodeLayanan,
+				NamaLayanan:        l.NamaLayanan,
+				Deskripsi:          l.Deskripsi,
+				Harga:              l.Harga,
+				EstimasiMin:        l.EstimasiMin,
+				EstimasiMax:        l.EstimasiMax,
+				Durasi:             l.Durasi,
 			})
 		}
 		data = append(data, EkspedisiDTO{
+			IdEkspedisi:   ekspedisiMap[r.EkspedisiKode],
 			KodeEkspedisi: r.EkspedisiKode,
 			NamaEkspedisi: r.NamaEkspedisi,
 			Layanan:       layananList,

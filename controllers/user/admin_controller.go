@@ -305,7 +305,7 @@ func GetDashboardAdmin(c *gin.Context) {
 	// 5. Transaksi Terbaru
 	var pesananTerbaru []models.Pesanan
 	config.DB.
-		Preload("Kasir.User").
+		Preload("Kasir.Karyawan.User").
 		Preload("Customer.User").
 		Order("tanggal_pesanan DESC").
 		Limit(50).

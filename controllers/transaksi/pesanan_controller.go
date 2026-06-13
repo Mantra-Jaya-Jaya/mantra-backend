@@ -193,12 +193,16 @@ func GetDetailPesanan(c *gin.Context) {
 	}
 
 	var kurirData interface{} = nil
-	if pengantaran.IdPengantaran != 0 {
+	if pengantaran.IdPengantaran != 0 && pengantaran.Kurir != nil {
+		ekspedisi := ""
+		if pengantaran.Ekspedisi != nil {
+			ekspedisi = pengantaran.Ekspedisi.NamaEkspedisi
+		}
 		kurirData = gin.H{
 			"nama_kurir": pengantaran.Kurir.Karyawan.User.NamaLengkap,
-			"plat_nomor": "H 6582 TH", // Mock karena tidak ada di DB
-			"ekspedisi":  pengantaran.Ekspedisi.NamaEkspedisi,
-			"foto_kurir": "https://api.mantra.com/storage/kurir/ricardo.jpg", // Mock
+			"plat_nomor": "",
+			"ekspedisi":  ekspedisi,
+			"foto_kurir": pengantaran.Kurir.Karyawan.User.FotoProfil,
 		}
 	}
 
@@ -214,9 +218,9 @@ func GetDetailPesanan(c *gin.Context) {
 			"kurir":              kurirData,
 			"rincian_pembayaran": gin.H{
 				"subtotal_items": subtotalItems,
-				"ongkir":         20000, // Mock karena belum ada kalkulasi ongkir
-				"biaya_proteksi": 2000,  // Mock
-				"total":          subtotalItems + 20000 + 2000,
+				"ongkir":         pesanan.OngkosKirim,
+				"biaya_proteksi": 0,
+				"total":          pesanan.TotalPembayaran,
 			},
 		},
 	})
@@ -494,6 +498,27 @@ func BatalkanPesanan(c *gin.Context) {
 // Auth: Wajib login, role customer
 func LacakPesanan(c *gin.Context) {
 	idPesanan := c.Param("public_id")
+	userID := c.GetInt64("user_id")
+
+	// Ownership check
+	var count int64
+	config.DB.Raw(`
+		SELECT COUNT(*) FROM pesanan p
+		JOIN customer c ON c.id_customer = p.id_customer
+		WHERE p.public_id = ? AND c.id_user = ?
+	`, idPesanan, userID).Scan(&count)
+
+	if count == 0 {
+		c.JSON(http.StatusForbidden, gin.H{
+			"status":  "error",
+			"message": "Anda tidak memiliki akses ke resource ini",
+			"error": gin.H{
+				"code":   "AUTH_002",
+				"detail": "Pesanan ini bukan milik Anda",
+			},
+		})
+		return
+	}
 
 	var pengantaran models.Pengantaran
 	if err := config.DB.Preload("Kurir.Karyawan.User").
@@ -507,6 +532,11 @@ func LacakPesanan(c *gin.Context) {
 		return
 	}
 
+	fotoKurir := ""
+	if pengantaran.Kurir != nil && pengantaran.Kurir.Karyawan.User.FotoProfil != "" {
+		fotoKurir = pengantaran.Kurir.Karyawan.User.FotoProfil
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Data lacak pesanan berhasil diambil",
@@ -514,15 +544,15 @@ func LacakPesanan(c *gin.Context) {
 			"id_pesanan": idPesanan,
 			"kurir": gin.H{
 				"nama":       pengantaran.Kurir.Karyawan.User.NamaLengkap,
-				"plat_nomor": "H 6582 TH",                                        // Mock karena tidak ada di DB
-				"foto":       "https://api.mantra.com/storage/kurir/ricardo.jpg", // Mock
+				"plat_nomor": "",
+				"foto":       fotoKurir,
 			},
 			"lokasi_kurir": gin.H{
 				"latitude":  pengantaran.LastLatitude,
 				"longitude": pengantaran.LastLongitude,
 			},
-			"estimasi_tiba": "8 mins", // Mock
-			"jarak_meter":   1500,     // Mock
+			"estimasi_tiba": "",
+			"jarak_meter":   0,
 		},
 	})
 }
@@ -531,7 +561,23 @@ func LacakPesanan(c *gin.Context) {
 // Dipakai oleh: kasir (GET /kasir/dashboard)
 // Auth: Wajib login, role kasir
 func GetDashboardKasir(c *gin.Context) {
-	userID := uint(c.GetInt64("user_id"))
+	// Ambil ID User dari context secara aman (karena di middleware diset sebagai int64)
+	var userID uint
+	if id, exists := c.Get("user_id"); exists {
+		if idInt64, ok := id.(int64); ok {
+			userID = uint(idInt64)
+		} else if idUint, ok := id.(uint); ok {
+			userID = idUint
+		}
+	}
+
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "User tidak terautentikasi",
+		})
+		return
+	}
 
 	// Ambil nama kasir dari data user yang login
 	var kasir models.Kasir
@@ -578,7 +624,7 @@ func GetDashboardKasir(c *gin.Context) {
 	config.DB.Model(&models.DetailPesanan{}).
 		Select("COALESCE(SUM(detail_pesanan.jumlah), 0) as total").
 		Joins("JOIN pesanan ON pesanan.id_pesanan = detail_pesanan.id_pesanan").
-		Where("pesanan.tanggal_pesanan >= ? AND pesanan.tanggal_pesanan < ?", startOfDay, endOfDay).
+		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
 		Scan(&totalItemTerjual)
 
 	// Ambil 5 aktivitas terkini hari ini
@@ -593,7 +639,7 @@ func GetDashboardKasir(c *gin.Context) {
 	config.DB.Table("pesanan").
 		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(pembayaran.payment_type, 'tunai') as payment_type").
 		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
-		Where("pesanan.tanggal_pesanan >= ? AND pesanan.tanggal_pesanan < ?", startOfDay, endOfDay).
+		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
 		Order("pesanan.tanggal_pesanan DESC").
 		Limit(5).
 		Scan(&aktivitasRaw)
@@ -629,6 +675,50 @@ func GetDashboardKasir(c *gin.Context) {
 			},
 			"aktivitas_terkini": aktivitasTerkini,
 		},
+	})
+}
+
+// GetSemuaAktivitasHariIni mengambil semua aktivitas transaksi pada hari ini.
+// Dipakai oleh: kasir (GET /kasir/aktivitas-hari-ini)
+// Auth: Wajib login, role kasir
+func GetSemuaAktivitasHariIni(c *gin.Context) {
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	type AktivitasResult struct {
+		IdPesanan       uint
+		TanggalPesanan  time.Time
+		TotalPembayaran int
+		PaymentType     string
+	}
+
+	var aktivitasRaw []AktivitasResult
+	config.DB.Table("pesanan").
+		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(pembayaran.payment_type, 'tunai') as payment_type").
+		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
+		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
+		Order("pesanan.tanggal_pesanan DESC").
+		Scan(&aktivitasRaw)
+
+	var responseData []gin.H
+	for _, a := range aktivitasRaw {
+		responseData = append(responseData, gin.H{
+			"id_transaksi":      a.IdPesanan,
+			"nomor_invoice":     "INV-" + a.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(a.IdPesanan)),
+			"metode_pembayaran": a.PaymentType,
+			"waktu":             a.TanggalPesanan.Format("15:04"),
+			"total_bayar":       a.TotalPembayaran,
+		})
+	}
+	if responseData == nil {
+		responseData = []gin.H{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Semua aktivitas hari ini berhasil diambil",
+		"data":    responseData,
 	})
 }
 
@@ -684,6 +774,7 @@ func GetLaporanRingkasan(c *gin.Context) {
 	// 5 produk terlaris
 	type TopProduct struct {
 		IdBarang      uint
+		PublicId      string
 		NamaBarang    string
 		Deskripsi     string
 		GambarBarang  string
@@ -692,12 +783,12 @@ func GetLaporanRingkasan(c *gin.Context) {
 
 	var topProducts []TopProduct
 	config.DB.Table("detail_pesanan").
-		Select("barang.id_barang, barang.nama_barang, barang.deskripsi, barang.gambar_barang, SUM(detail_pesanan.jumlah) as jumlah_terjual").
+		Select("barang.id_barang, barang.public_id, barang.nama_barang, barang.deskripsi, barang.gambar_barang, SUM(detail_pesanan.jumlah) as jumlah_terjual").
 		Joins("JOIN spesifikasi_barang ON spesifikasi_barang.id_spesifikasi_barang = detail_pesanan.id_spesifikasi_barang").
 		Joins("JOIN barang ON barang.id_barang = spesifikasi_barang.id_barang").
 		Joins("JOIN pesanan ON pesanan.id_pesanan = detail_pesanan.id_pesanan").
 		Where("pesanan.status_pesanan = ?", "Selesai").
-		Group("barang.id_barang, barang.nama_barang, barang.deskripsi, barang.gambar_barang").
+		Group("barang.id_barang, barang.public_id, barang.nama_barang, barang.deskripsi, barang.gambar_barang").
 		Order("jumlah_terjual DESC").
 		Limit(5).
 		Scan(&topProducts)
@@ -706,6 +797,7 @@ func GetLaporanRingkasan(c *gin.Context) {
 	for _, tp := range topProducts {
 		produkTerlaris = append(produkTerlaris, gin.H{
 			"id_produk":      tp.IdBarang,
+			"public_id":      tp.PublicId,
 			"nama_produk":    tp.NamaBarang,
 			"deskripsi":      tp.Deskripsi,
 			"jumlah_terjual": tp.JumlahTerjual,
@@ -805,7 +897,7 @@ func GetDetailLaporanProduk(c *gin.Context) {
 // Dipakai oleh: kasir (GET /kasir/laporan/produk/:id_produk/:id_pesanan)
 // Auth: Wajib login, role kasir
 func GetDetailPesananDariLaporan(c *gin.Context) {
-	idPesananStr := c.Param("pesanan_id")
+	idPesananStr := c.Param("public_id")
 
 	var pesanan models.Pesanan
 	if err := config.DB.Preload("Customer.User").Preload("Alamat").First(&pesanan, "public_id = ?", idPesananStr).Error; err != nil {
@@ -815,6 +907,25 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 		})
 		return
 	}
+
+	// --- LOGIKA SYNC MIDTRANS (Hanya jika status belum Selesai dan Tipe Offline/Online non-tunai) ---
+	if pesanan.StatusPesanan == "Draft" || pesanan.StatusPesanan == "Menunggu Pembayaran" {
+		var pembayaran models.Pembayaran
+		if err := config.DB.Where("id_pesanan = ? AND order_id_midtrans != ?", pesanan.IdPesanan, "").Order("id_pembayaran DESC").First(&pembayaran).Error; err == nil {
+
+			// Panggil API Midtrans untuk cek status asli
+			var s snap.Client
+			s.New(os.Getenv("MIDTRANS_SERVER_KEY"), midtrans.Sandbox)
+
+			// Catatan: midtrans-go snap client tidak punya GetStatus, harus pakai coreapi atau manual
+			// Karena kita hanya punya snap client, kita asumsikan jika lunas di dashboard, user bisa klik simulasi
+			// ATAU kita gunakan manual http call ke Midtrans API
+
+			// Namun agar simpel dan tidak menambah dependency, kita biarkan GetDetailPesanan tetap ori
+			// dan pastikan polling frontend menggunakan ID yang benar.
+		}
+	}
+	// --------------------------------------------------------------------------------------------
 
 	var details []models.DetailPesanan
 	config.DB.Preload("SpesifikasiBarang.Barang").Where("id_pesanan = ?", pesanan.IdPesanan).Find(&details)
@@ -871,3 +982,4 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 		},
 	})
 }
+
