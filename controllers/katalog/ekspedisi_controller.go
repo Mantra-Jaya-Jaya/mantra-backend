@@ -184,9 +184,9 @@ func TambahLayanan(c *gin.Context) {
 }
 
 func UpdateLayanan(c *gin.Context) {
-	id := c.Param("id")
+	publicID := c.Param("public_id")
 	var layanan models.EkspedisiLayanan
-	if err := config.DB.First(&layanan, "id_ekspedisi_layanan = ?", id).Error; err != nil {
+	if err := config.DB.First(&layanan, "public_id = ?", publicID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Layanan ekspedisi tidak ditemukan",
@@ -240,8 +240,8 @@ func UpdateLayanan(c *gin.Context) {
 }
 
 func HapusLayanan(c *gin.Context) {
-	id := c.Param("id")
-	result := config.DB.Where("id_ekspedisi_layanan = ?", id).Delete(&models.EkspedisiLayanan{})
+	publicID := c.Param("public_id")
+	result := config.DB.Where("public_id = ?", publicID).Delete(&models.EkspedisiLayanan{})
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
