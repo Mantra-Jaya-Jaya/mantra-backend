@@ -295,81 +295,255 @@ func GetAllPesananOnline(c *gin.Context) {
 }
 
 func GetDetailPesanan(c *gin.Context) {
-    publicID := c.Param("public_id") // Ambil public_id dari URL
+  // 🚀 1. ERROR HANDLING: CEK AUTH (Sama kayak referensi lu)
+  val, exists := c.Get("user_id")
+  if !exists {
+    c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: User belum login"})
+    return
+  }
 
-    // 1. Definisikan struct response yang bakal dikirim ke Flutter
-    type ItemBarangDTO struct {
-        NamaBarang     string `json:"nama_barang"`
-        Variasi        string `json:"variasi"`
-        JumlahBeli     int    `json:"jumlah_beli"`
-        HargaSatuan    int    `json:"harga_satuan"`
-        SubtotalItem   int    `json:"subtotal_item"`
+  var userID int64
+  switch v := val.(type) {
+  case float64:
+    userID = int64(v)
+  case int64:
+    userID = v
+  case int:
+    userID = int64(v)
+  case uint:
+    userID = int64(v)
+  default:
+    c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: Format token tidak valid"})
+    return
+  }
+
+  var count int64
+  config.DB.Table("kurir").Joins("JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan").Where("karyawan.id_user = ?", userID).Count(&count)
+  if count == 0 {
+    c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: Anda bukan kurir"})
+    return
+  }
+
+  // 🚀 2. TANGKAP PUBLIC ID DARI URL
+  publicID := c.Param("public_id")
+
+  // Variabel penampung ID asli (Primary Key)
+  var idPesananAsli uint
+
+  // 🕵️ INTEL 1: Cek apakah ini UUID milik tabel Pesanan?
+  var cekPesanan models.Pesanan
+  if err := config.DB.Select("id_pesanan").Where("public_id = ?", publicID).First(&cekPesanan).Error; err == nil {
+      idPesananAsli = cekPesanan.IdPesanan // Dapet! Ini dari halaman Home
+  } else {
+      // 🕵️ INTEL 2: Kalau bukan, cek apakah ini UUID milik tabel Pengantaran?
+      var cekPengantaran models.Pengantaran
+      
+      // ⚠️ PERHATIAN: Pastikan nama kolom UUID di tabel pengantaran lu bener (biasanya 'public_id' atau 'id_pengantaran')
+      if err := config.DB.Select("id_pesanan").Where("public_id = ?", publicID).First(&cekPengantaran).Error; err == nil {
+          idPesananAsli = cekPengantaran.PesananID // Dapet! Ini dari halaman Peta, kita ambil FK pesanannya
+      }
+  }
+
+  // 🚨 Kalau dua-duanya gagal total (Zonk)
+  if idPesananAsli == 0 {
+      c.JSON(http.StatusNotFound, gin.H{
+          "status":  "error",
+          "message": "Data tidak ditemukan (Bukan ID Pesanan maupun ID Pengantaran yang valid)",
+          "data":    nil,
+      })
+      return
+  }
+
+  // 🚀 3. TARIK DATA FULL (Karena ID Aslinya Udah Ketemu!)
+  var pesanan models.Pesanan
+  err := config.DB.
+    Preload("Customer.User").
+    Preload("Alamat").
+    Preload("Pembayaran.MetodePembayaran").
+    Preload("DetailPesanan.SpesifikasiBarang.Barang").
+    Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi").
+    Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
+    Where("id_pesanan = ?", idPesananAsli). // 👈 Tarik pakai ID asli (Primary Key) biar kenceng!
+    First(&pesanan).Error
+
+  if err != nil {
+    c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memuat detail pesanan"})
+    return
+  }
+
+  // 🚀 4. REFACTOR JSON (DTO KHUSUS DETAIL PESANAN)
+  type ItemBarang struct {
+    NamaBarang  string `json:"nama_barang"`
+		GambarBarang string `json:"gambar_barang"`
+    Varian      string `json:"varian"`
+    Jumlah      int    `json:"jumlah_beli"`
+    HargaSatuan int    `json:"harga_satuan"`
+    Subtotal    int    `json:"subtotal_item"`
+  }
+
+  type MetodeBayarDTO struct {
+    IDMetode   string `json:"id_metode_bayar"`
+    NamaMetode string `json:"nama_metode"`
+  }
+
+  type DetailPesananBungkus struct {
+    PublicID        string         `json:"public_id"`
+		NamaCustomer    string         `json:"nama_customer"`  
+    AlamatLengkap   string         `json:"alamat_lengkap"` 
+    TotalPembayaran int            `json:"total_pembayaran"`
+    TanggalPesanan  time.Time      `json:"tanggal_pesanan"`
+    StatusPesanan   string         `json:"status_pesanan"`
+    MetodeBayar     MetodeBayarDTO `json:"metode_bayar"`
+    DaftarBarang    []ItemBarang   `json:"daftar_barang"`
+  }
+
+  // 🚀 5. MAPPING BARANG (Looping keranjang)
+  var listBarang []ItemBarang
+  for _, detail := range pesanan.DetailPesanan {
+    varian := "Default"
+    if detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi != "" {
+      namaSpesifikasi := detail.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi
+      nilaiSpesifikasi := detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi
+      
+      if namaSpesifikasi != "" {
+        varian = namaSpesifikasi + ": " + nilaiSpesifikasi
+      } else {
+        varian = nilaiSpesifikasi
+      }
     }
+    
+    // Asumsi: field harga di tabel DetailPesanan lu namanya 'Harga' atau 'HargaSatuan'
+    hargaSatuan := detail.HargaSatuan // Ubah 'Harga' jadi nama field lu yang bener kalau beda
+    subtotalItem := hargaSatuan * detail.Jumlah // Kalau lu udah punya field Subtotal, tinggal panggil detail.Subtotal
 
-    type MetodeBayarDTO struct {
-        ID         string `json:"id_metode_bayar"`
-        NamaMetode string `json:"nama_metode"`
+    listBarang = append(listBarang, ItemBarang{
+      NamaBarang:  detail.SpesifikasiBarang.Barang.NamaBarang,
+			GambarBarang: detail.SpesifikasiBarang.Barang.GambarBarang,
+      Varian:      varian,
+      Jumlah:      detail.Jumlah,
+      HargaSatuan: hargaSatuan,
+      Subtotal:    subtotalItem,
+    })
+  }
+
+  // 🚀 6. MAPPING METODE BAYAR (Aman dari Nil Pointer)
+  metodeBayar := MetodeBayarDTO{
+    IDMetode:   "-",
+    NamaMetode: "Belum ada pembayaran",
+  }
+
+  // 🚀 PERBAIKAN DI SINI: Cek ganda! Pastikan Pembayaran ADA dan MetodePembayaran ADA!
+  if pesanan.Pembayaran != nil && pesanan.Pembayaran.MetodePembayaran != nil {
+    metodeBayar = MetodeBayarDTO{
+      IDMetode:   fmt.Sprintf("%d", pesanan.Pembayaran.MetodePembayaran.IdMetodePembayaran), 
+      NamaMetode: pesanan.Pembayaran.MetodePembayaran.NamaMetode, 
     }
+  }
 
-    type DetailPesananDTO struct {
-        PublicID        string           `json:"public_id"`
-        TotalPembayaran int              `json:"total_pembayaran"`
-        MetodeBayar     MetodeBayarDTO   `json:"metode_bayar"`
-        DaftarBarang    []ItemBarangDTO  `json:"daftar_barang"`
-    }
+	namaCust := "Customer Offline"
+  alamatLengkap := "Ambil di Toko"
 
-    // 2. Query Database dengan Preload Super Lengkap
-    var pesanan models.Pesanan
-    err := config.DB.
-        Preload("Pembayaran.MetodeBayar"). // 🚀 Pastikan relasi ini ada di model!
-        Preload("DetailPesanan.SpesifikasiBarang.Barang").
-        Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
-        Where("public_id = ?", publicID).
-        First(&pesanan).Error
+  if pesanan.Alamat != nil {
+    namaCust = pesanan.Alamat.NamaPenerima
+    alamatLengkap = pesanan.Alamat.AlamatLengkap
+  } else if pesanan.Customer.User.NamaLengkap != "" {
+    namaCust = pesanan.Customer.User.NamaLengkap
+  }
 
-    if err != nil {
-        c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pesanan tidak ditemukan"})
-        return
-    }
+  // 🚀 7. BUNGKUS KE DTO FINAL
+  hasilAkhir := DetailPesananBungkus{
+    PublicID:        pesanan.PublicId.String(),
+		NamaCustomer:    namaCust,      
+    AlamatLengkap:   alamatLengkap, 
+    TotalPembayaran: pesanan.TotalPembayaran,
+    TanggalPesanan:  pesanan.TanggalPesanan,
+    StatusPesanan:   pesanan.StatusPesanan,
+    MetodeBayar:     metodeBayar,
+    DaftarBarang:    listBarang,
+  }
 
-    // 3. Mapping Data Barang
-    var listBarang []ItemBarangDTO
-    for _, detail := range pesanan.DetailPesanan {
-        // Logika gabungin variasi (Warna: Hitam, Size: XL)
-        varian := "Default"
-        if detail.SpesifikasiBarang.DetailSpesifikasi.IdDetailSpesifikasi != 0 {
-            varian = detail.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi + ": " + 
-                     detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi
-        }
+  // 🚀 8. SUKSES (200 OK)
+  c.JSON(http.StatusOK, gin.H{
+    "status":  "success",
+    "message": "Detail pesanan berhasil diambil",
+    "data":    hasilAkhir,
+  })
+}
 
-        listBarang = append(listBarang, ItemBarangDTO{
-            NamaBarang:   detail.SpesifikasiBarang.Barang.NamaBarang,
-            Variasi:      varian,
-            JumlahBeli:   detail.Jumlah,
-            HargaSatuan:  detail.HargaSatuan, // Pastikan field ini ada di tabel DetailPesanan
-            SubtotalItem: detail.Subtotal,    // Pastikan field ini ada di tabel DetailPesanan
-        })
-    }
+func TerimaPesanan(c *gin.Context) {
+	// 🚀 1. CEK AUTH (Identifikasi Kurir)
+	val, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: User belum login"})
+		return
+	}
 
-    // 4. Mapping Data Metode Bayar
-    metodeBayar := MetodeBayarDTO{
-        ID:         "", 
-        NamaMetode: "Belum Ada Metode",
-    }
-    if pesanan.Pembayaran.MetodePembayaran.IdMetodePembayaran != 0 {
-        metodeBayar = MetodeBayarDTO{
-            ID:         fmt.Sprintf("%d", pesanan.Pembayaran.MetodePembayaran.IdMetodePembayaran),
-            NamaMetode: pesanan.Pembayaran.MetodePembayaran.NamaMetode, 
-        }
-    }
+	var userID int64
+	switch v := val.(type) {
+	case float64: userID = int64(v)
+	case int64: userID = v
+	case int: userID = int64(v)
+	case uint: userID = int64(v)
+	}
 
-    // 5. Bungkus Final
-    response := DetailPesananDTO{
-        PublicID:        pesanan.PublicId.String(),
-        TotalPembayaran: pesanan.TotalPembayaran,
-        MetodeBayar:     metodeBayar,
-        DaftarBarang:    listBarang,
-    }
+	// Cari ID Kurir aslinya berdasarkan user_id
+	var kurir struct {
+		IdKurir uint `gorm:"column:id_kurir"`
+	}
+	errKurir := config.DB.Table("kurir").
+		Joins("JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan").
+		Where("karyawan.id_user = ?", userID).
+		Select("kurir.id_kurir").
+		First(&kurir).Error
 
-    c.JSON(http.StatusOK, gin.H{"status": "success", "data": response})
+	if errKurir != nil || kurir.IdKurir == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Anda tidak terdaftar sebagai kurir"})
+		return
+	}
+
+	// 🚀 2. TANGKAP PUBLIC ID PESANAN DARI URL
+	publicIDPesanan := c.Param("public_id")
+
+	// Cari ID Pesanan aslinya
+	var pesanan models.Pesanan
+	if err := config.DB.Where("public_id = ?", publicIDPesanan).First(&pesanan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pesanan tidak ditemukan"})
+		return
+	}
+
+	// 🚀 3. CEK APAKAH PESANAN INI UDAH DIAMBIL KURIR LAIN?
+	var count int64
+	config.DB.Model(&models.Pengantaran{}).Where("id_pesanan = ?", pesanan.IdPesanan).Count(&count)
+	if count > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Waduh, pesanan ini sudah diambil kurir lain!"})
+		return
+	}
+
+	// 🚀 4. BIKIN DATA PENGANTARAN BARU (Sesuai Struct Lu)
+	pengantaranBaru := models.Pengantaran{
+		PesananID:           pesanan.IdPesanan,
+		KurirID:             &kurir.IdKurir,
+		StatusPengantaranID: 1, // 🚀 Referensi image_1b2103.png (1 = Menunggu Pickup)
+		EkspedisiID:         pesanan.EkspedisiID, // Oper data ekspedisi dari pesanan
+	}
+
+	// Insert ke database!
+	if err := config.DB.Create(&pengantaranBaru).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat jadwal pengantaran"})
+		return
+	}
+
+	// 🚀 5. UPDATE STATUS PESANAN
+	// Kita ubah status pesanan biar nggak nongol lagi di daftar "Cari Order" kurir lain
+	config.DB.Model(&pesanan).Update("status_pesanan", "Dikirim")
+
+	// 🚀 6. KEMBALIKAN PUBLIC ID PENGANTARAN KE FLUTTER
+	// Tarik ulang datanya buat mastiin Public ID-nya ke-generate dari database
+	config.DB.Where("id_pengantaran = ?", pengantaranBaru.IdPengantaran).First(&pengantaranBaru)
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Mantap! Pesanan berhasil diterima",
+		"data":    pengantaranBaru.PublicId.String(), // 👈 Public ID ini yang dilempar ke UI Flutter
+	})
 }
