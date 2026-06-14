@@ -5,20 +5,11 @@ meta {
 }
 
 put {
-  url: {{baseUrl}}/kurir/pengantaran/5a4215e7-3d06-45eb-8e37-58fac650d808/selesai
-  body: multipartForm
-  auth: bearer
-}
-
-auth:bearer {
-  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODEyNzYyMjksImlhdCI6MTc4MTI3NDQyOSwicHVibGljX2lkIjoiZWE4YzMxNzctMDUxZS00ODNjLWE1ZjMtMjY4YzVmNTU3ODZhIiwicm9sZSI6Ikt1cmlyIiwidXNlcl9pZCI6M30.2W71QyZ6ARFugHIccni3gGpETDE1KmwMnmLN_GSPqpc
-}
-
-body:multipart-form {
-  foto_bukti: @file(/home/rajaba/Downloads/Ram.jpeg)
+  url: 
+  body: none
+  auth: inherit
 }
 
 settings {
   encodeUrl: true
-  timeout: 0
 }

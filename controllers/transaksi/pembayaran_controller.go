@@ -515,3 +515,7 @@ func CekStatusPembayaran(c *gin.Context) {
 		},
 	})
 }
+
+func hitungPajak(subtotal int) int {
+	return int(float64(subtotal)*0.11 + 0.5)
+}
