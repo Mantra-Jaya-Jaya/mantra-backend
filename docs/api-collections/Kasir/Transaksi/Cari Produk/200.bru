@@ -4,22 +4,20 @@ meta {
   seq: 1
 }
 
-post {
-  url: {{baseUrl}}/kasir/transaksi/produk
+get {
+  url: {{baseUrl}}/kasir/transaksi/produk?q=
   body: json
   auth: bearer
 }
 
-auth:bearer {
-  token: {{accessToken}}
+params:query {
+  q: 
 }
 
 headers {
   Content-Type: application/json
 }
 
-body:json {
-  {
-    "keyword": "nama_barang_atau_barcode"
-  }
+auth:bearer {
+  token: {{accessToken}}
 }

@@ -10,17 +10,16 @@ post {
   auth: bearer
 }
 
-auth:bearer {
-  token: {{accessToken}}
-}
-
 headers {
   Content-Type: application/json
 }
 
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODEzNzQ2OTAsImlhdCI6MTc4MTM3Mjg5MCwicHVibGljX2lkIjoiNGRmYjM3ZjktZTkxNC00NjRkLWFiNDAtMjdlYjZkYjM0Mzg3Iiwicm9sZSI6Ikthc2lyIiwidXNlcl9pZCI6Mn0.CwS-02QjKHT_vHWaW8ZWmMdBJXWIu37HeM1yTf81eDE
+}
+
 body:json {
   {
-    "payment_type": "qris",
-    "id_pesanan": 1
+    "id_pesanan": 4
   }
 }

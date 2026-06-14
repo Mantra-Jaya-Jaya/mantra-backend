@@ -16,26 +16,47 @@ import (
 // Dipakai oleh: customer (GET /customer/notifikasi), kasir (GET /kasir/notifikasi), admin (GET /admin/notifikasi)
 // Auth: Wajib login, semua role boleh akses (dikontrol di route)
 func GetNotifikasi(c *gin.Context) {
-	userID := c.GetInt64("user_id")
+    // 1. Ambil dari context sebagai interface
+    val, exists := c.Get("user_id")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "User ID tidak ditemukan"})
+        return
+    }
 
-	var notifikasis []models.Notifikasi
-	if err := config.DB.Where("id_user = ?", userID).Find(&notifikasis).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal mengambil notifikasi",
-		})
-		return
-	}
+    // 2. Konversi ke int64 secara eksplisit
+    var userID int64
+    switch v := val.(type) {
+    case int:
+        userID = int64(v)
+    case int64:
+        userID = v
+    case uint:
+        userID = int64(v)
+    default:
+        // Jika tipe data tidak dikenali, set ke 0
+        userID = 0
+    }
 
-	if notifikasis == nil {
-		notifikasis = []models.Notifikasi{}
-	}
+    // 3. Gunakan userID yang sudah pasti int64
+    var notifikasis []models.Notifikasi
+    // Sekarang query ini sinkron dengan model dan database bigint
+    if err := config.DB.Where("id_user = ?", userID).Find(&notifikasis).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "status":  "error",
+            "message": "Gagal mengambil notifikasi",
+        })
+        return
+    }
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Notifikasi berhasil diambil",
-		"data":    notifikasis,
-	})
+    if notifikasis == nil {
+        notifikasis = []models.Notifikasi{}
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "status":  "success",
+        "message": "Notifikasi berhasil diambil",
+        "data":    notifikasis,
+    })
 }
 
 // GetNotifikasiAdmin mengambil notifikasi khusus admin (stok menipis, dll).

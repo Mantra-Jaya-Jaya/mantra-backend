@@ -69,17 +69,19 @@ func SetupRoutes(r *gin.Engine) {
 		kasirGroup.Use(middleware.AuthMiddleware())
 		{
 			kasirGroup.GET("/dashboard", transaksi.GetDashboardKasir)
+			kasirGroup.GET("/aktivitas-hari-ini", transaksi.GetSemuaAktivitasHariIni)
 			kasirGroup.GET("/laporan", transaksi.GetLaporanRingkasan)
 			kasirGroup.GET("/laporan/produk/:public_id", transaksi.GetDetailLaporanProduk)
 			kasirGroup.GET("/laporan/produk/:public_id/:pesanan_id", transaksi.GetDetailPesananDariLaporan)
 			kasirGroup.GET("/pesanan", transaksi.GetDaftarPesanan)
 			kasirGroup.GET("/pesanan/:public_id", transaksi.GetDetailPesanan)
 			kasirGroup.GET("/kategori", katalog.GetKategori)
-			kasirGroup.POST("/transaksi/produk", katalog.CariProdukTransaksi)
+			kasirGroup.GET("/transaksi/produk", katalog.CariProdukTransaksi)
 			kasirGroup.PATCH("/transaksi/item/update", transaksi.UpdateQuantityItem)
 			kasirGroup.GET("/transaksi/checkout", transaksi.GetRingkasanCheckout)
 			kasirGroup.POST("/transaksi/bayar/tunai", transaksi.BayarTunai)
 			kasirGroup.POST("/transaksi/bayar/non-tunai", transaksi.BayarNonTunai)
+			kasirGroup.GET("/transaksi/cek-status/:order_id", transaksi.CekStatusPembayaran)
 			kasirGroup.GET("/profil", user.GetProfilKasir)
 			kasirGroup.GET("/notifikasi", notifikasi.GetNotifikasi)
 		}
@@ -94,7 +96,10 @@ func SetupRoutes(r *gin.Engine) {
 			kurirGroup.GET("/pesanan/new", pemesanan.GetPesananTerbaru)
 			kurirGroup.GET("/pesanan", pemesanan.GetAllPesananOnline)
 			kurirGroup.GET("/pesanan/:public_id", pemesanan.GetDetailPesanan)
-			kurirGroup.GET("/pengantaran/:id_pengantaran/detail", pengantaran.GetDetailPengantaran)
+			kurirGroup.POST("/pesanan/:public_id/terima", pemesanan.TerimaPesanan)
+			kurirGroup.GET("/pengantaran/:public_id/detail", pengantaran.GetDetailPengantaran)
+			kurirGroup.PUT("/pengantaran/:public_id/lokasi", pengantaran.UpdateLokasiKurir)
+			kurirGroup.PUT("/pengantaran/:public_id/selesai", pengantaran.UploadBuktiPengiriman)
 		}
 
 		// Admin Routes
@@ -134,8 +139,8 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.PUT("/ekspedisi/:public_id", katalog.UpdateEkspedisi)
 			adminGroup.DELETE("/ekspedisi/:public_id", katalog.HapusEkspedisi)
 			adminGroup.POST("/ekspedisi/layanan", katalog.TambahLayanan)
-			adminGroup.PUT("/ekspedisi/layanan/:id", katalog.UpdateLayanan)
-			adminGroup.DELETE("/ekspedisi/layanan/:id", katalog.HapusLayanan)
+			adminGroup.PUT("/ekspedisi/layanan/:public_id", katalog.UpdateLayanan)
+			adminGroup.DELETE("/ekspedisi/layanan/:public_id", katalog.HapusLayanan)
 			adminGroup.GET("/metode-pembayaran", transaksi.GetMetodePembayaran)
 			adminGroup.POST("/metode-pembayaran", transaksi.TambahMetodePembayaran)
 			adminGroup.PUT("/metode-pembayaran/:public_id", transaksi.UpdateMetodePembayaran)
