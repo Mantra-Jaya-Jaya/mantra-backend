@@ -87,6 +87,7 @@ func SeedPesanan() {
 		pesanan := models.Pesanan{
 			TotalPembayaran:  totalPembayaran,
 			TanggalPesanan:   tglPesanan,
+			TipePesanan:      tipePesanan,
 			TipePesananID:    utils.GetTipePesananID(tipePesanan),
 			StatusPesananID:  utils.GetStatusPesananID(statusName),
 			CustomerID:       cId,
