@@ -262,16 +262,17 @@ func GetLaporanHariIni(c *gin.Context) {
 	var pesananBaruCount int64 
 
 	// 3. QUERY 1: Hitung Pesanan yang "SELESAI" hari ini
+	selesaiPengantaranID := utils.GetStatusPengantaranID("Selesai") // lookup by name, bukan hardcode
 	config.DB.Model(&models.Pengantaran{}).
 		Where("id_kurir = ?", idKurir).
-		Where("id_status_pengantaran = ?", 4).
+		Where("id_status_pengantaran = ?", selesaiPengantaranID).
 		Where("waktu_sampai >= ? AND waktu_sampai < ?", startOfDay, endOfDay).
 		Count(&selesaiCount)
 
 	// 4. QUERY 2: Hitung Pesanan yang "BELUM SELESAI" (Masih dipegang kurir ini)
 	config.DB.Model(&models.Pengantaran{}).
 		Where("id_kurir = ?", idKurir).
-		Where("id_status_pengantaran != ?", 4).
+		Where("id_status_pengantaran != ?", selesaiPengantaranID).
 		Count(&belumSelesaiCount)
 
 	// 🚀 5. QUERY 3 (BARU!): Hitung Pesanan Online yang NGANGGUR / Siap Direbut
