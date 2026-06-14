@@ -95,9 +95,16 @@ func GetDaftarPesanan(c *gin.Context) {
 		if items == nil {
 			items = []gin.H{}
 		}
+
+		namaStatus := ""
+		if p.StatusPesanan != nil {
+			namaStatus = p.StatusPesanan.NamaStatus
+		}
+
 		responseData = append(responseData, gin.H{
 			"id_pesanan":          p.PublicId,
 			"id_status_pesanan":   p.StatusPesananID,
+			"nama_status_pesanan": namaStatus, // nama string dari relasi, bukan hardcode
 			"tanggal_pesan":       p.TanggalPesanan,
 			"total_bayar":         p.TotalPembayaran,
 			"items":               items,
