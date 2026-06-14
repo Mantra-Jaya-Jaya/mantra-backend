@@ -337,7 +337,7 @@ func RegisterCustomer(c *gin.Context) {
 
 	newCustomer := models.Customer{
 		NoTelp: req.NoTelp,
-		UserId: newUser.IdUser,
+		UserID: newUser.IdUser,
 	}
 
 	if err := tx.Create(&newCustomer).Error; err != nil {

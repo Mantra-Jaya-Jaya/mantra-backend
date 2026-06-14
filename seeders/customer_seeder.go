@@ -24,7 +24,7 @@ func SeedCustomer() {
 	// 2. Siapin data profil customer-nya
 	customerProfil := models.Customer{
 		NoTelp: "085" + gofakeit.DigitN(9),
-		UserId: user.IdUser,
+		UserID: user.IdUser,
 	}
 
 	// 3. Simpan ke database (Pakai FirstOrCreate biar gak dobel pas di-run ulang)

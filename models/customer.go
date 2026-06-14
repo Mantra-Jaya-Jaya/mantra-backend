@@ -16,8 +16,8 @@ type Customer struct {
 	NoTelp     string    `gorm:"column:no_telp" json:"no_telp"`
 
 	//Relasi ke User
-	UserId uint `gorm:"column:id_user;unique" json:"id_user"`
+	UserID uint `gorm:"column:id_user;unique" json:"id_user"`
 
 	//Relasi  ke tabel user
-	User User `gorm:"foreignKey:UserId;references:IdUser" json:"user"`
+	User User `gorm:"foreignKey:UserID;references:IdUser" json:"user"`
 }

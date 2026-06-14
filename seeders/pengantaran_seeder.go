@@ -3,6 +3,7 @@ package seeders
 import (
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 	"fmt"
 	"time"
 )
@@ -19,7 +20,7 @@ func SeedPengantaran() {
 	}
 
 	var daftarPesanan []models.Pesanan
-	if err := config.DB.Where("tipe_pesanan = ?", "Online").Find(&daftarPesanan).Error; err != nil || len(daftarPesanan) == 0 {
+	if err := config.DB.Where("id_tipe_pesanan = ?", utils.GetTipePesananID("Online")).Find(&daftarPesanan).Error; err != nil || len(daftarPesanan) == 0 {
 		fmt.Println("Gagal: Data Pesanan Online masih kosong!")
 		return
 	}

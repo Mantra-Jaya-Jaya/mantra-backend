@@ -23,23 +23,22 @@ func GetNotifikasi(c *gin.Context) {
         return
     }
 
-    // 2. Konversi ke int64 secara eksplisit
-    var userID int64
+    // 2. Konversi ke uint secara eksplisit
+    var userID uint
     switch v := val.(type) {
     case int:
-        userID = int64(v)
+        userID = uint(v)
     case int64:
-        userID = v
+        userID = uint(v)
     case uint:
-        userID = int64(v)
+        userID = v
     default:
         // Jika tipe data tidak dikenali, set ke 0
         userID = 0
     }
 
-    // 3. Gunakan userID yang sudah pasti int64
+    // 3. Gunakan userID yang sudah pasti uint
     var notifikasis []models.Notifikasi
-    // Sekarang query ini sinkron dengan model dan database bigint
     if err := config.DB.Where("id_user = ?", userID).Find(&notifikasis).Error; err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{
             "status":  "error",

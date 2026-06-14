@@ -174,8 +174,8 @@ func TambahKaryawan(c *gin.Context) {
 		Alamat:             input.Alamat,
 		PendidikanTerakhir: input.PendidikanTerakhir,
 		Nik:                input.Nik,
-		UserId:             newUser.IdUser,
-		Status:             "Aktif",
+		UserID:             newUser.IdUser,
+		StatusKaryawanID:   utils.GetStatusKaryawanID("Aktif"),
 	}
 
 	if err := tx.Create(&newKaryawan).Error; err != nil {
@@ -185,10 +185,10 @@ func TambahKaryawan(c *gin.Context) {
 	}
 
 	if input.Role == "Kasir" {
-		kasir := models.Kasir{KaryawanId: newKaryawan.IdKaryawan, Shift: input.Shift}
+		kasir := models.Kasir{KaryawanID: newKaryawan.IdKaryawan, ShiftKasirID: utils.GetShiftKasirID(input.Shift)}
 		tx.Create(&kasir)
 	} else if input.Role == "Kurir" {
-		kurir := models.Kurir{KaryawanId: newKaryawan.IdKaryawan}
+		kurir := models.Kurir{KaryawanID: newKaryawan.IdKaryawan}
 		tx.Create(&kurir)
 	}
 
@@ -213,10 +213,10 @@ func HapusKaryawan(c *gin.Context) {
 	}
 
 	tx.Where("id_karyawan = ?", karyawan.IdKaryawan).Delete(&models.Karyawan{})
-	tx.Where("id_user = ?", karyawan.UserId).Delete(&models.User{})
+	tx.Where("id_user = ?", karyawan.UserID).Delete(&models.User{})
 
 	now := time.Now()
-	tx.Model(&models.RefreshToken{}).Where("id_user = ? AND revoked_at IS NULL", karyawan.UserId).Update("revoked_at", &now)
+	tx.Model(&models.RefreshToken{}).Where("id_user = ? AND revoked_at IS NULL", karyawan.UserID).Update("revoked_at", &now)
 
 	tx.Commit()
 	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Karyawan berhasil dihapus"})
@@ -246,6 +246,9 @@ func GetDetailKaryawan(c *gin.Context) {
 		var kasir models.Kasir
 		config.DB.Where("id_karyawan = ?", karyawan.IdKaryawan).First(&kasir)
 		shift = kasir.Shift
+		if kasir.ShiftKasirRel != nil {
+			shift = kasir.ShiftKasirRel.NamaShift
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -330,7 +333,7 @@ func UpdateKaryawan(c *gin.Context) {
 	if input.Alamat != "" { karyawan.Alamat = input.Alamat }
 	if input.PendidikanTerakhir != "" { karyawan.PendidikanTerakhir = input.PendidikanTerakhir }
 	if input.Nik != "" { karyawan.Nik = input.Nik }
-	if input.Status != "" { karyawan.Status = input.Status }
+	if input.Status != "" { karyawan.StatusKaryawanID = utils.GetStatusKaryawanID(input.Status) }
 
 	if err := tx.Save(&karyawan).Error; err != nil {
 		tx.Rollback()
@@ -340,7 +343,7 @@ func UpdateKaryawan(c *gin.Context) {
 
 	// Update Shift if Kasir
 	if karyawan.User.Role.NamaRole == "Kasir" && input.Shift != "" {
-		tx.Model(&models.Kasir{}).Where("id_karyawan = ?", karyawan.IdKaryawan).Update("shift", input.Shift)
+		tx.Model(&models.Kasir{}).Where("id_karyawan = ?", karyawan.IdKaryawan).Update("id_shift_kasir", utils.GetShiftKasirID(input.Shift))
 	}
 
 	tx.Commit()

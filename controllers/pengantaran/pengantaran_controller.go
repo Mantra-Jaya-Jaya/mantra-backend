@@ -277,8 +277,8 @@ func GetLaporanHariIni(c *gin.Context) {
 	// 🚀 5. QUERY 3 (BARU!): Hitung Pesanan Online yang NGANGGUR / Siap Direbut
 	// Kita hitung dari tabel Pesanan langsung yang statusnya siap antar
 	config.DB.Model(&models.Pesanan{}).
-		Where("tipe_pesanan = ?", "Online").
-		Where("status_pesanan = ?", "Dikemas"). // NOTE: Sesuaikan nama status lu kalau beda!
+		Where("id_tipe_pesanan = ?", utils.GetTipePesananID("Online")).
+		Where("id_status_pesanan = ?", utils.GetStatusPesananID("Dikemas")).
 		Count(&pesananBaruCount)
 
 	// 6. Kembalikan 3 data tersebut ke Flutter
@@ -525,7 +525,7 @@ func UploadBuktiPengiriman(c *gin.Context) {
 	if pengantaran.Pesanan != nil {
 		config.DB.Model(&models.Pesanan{}).
 			Where("id_pesanan = ?", pengantaran.PesananID).
-			Update("status_pesanan", "Selesai")
+			Update("id_status_pesanan", utils.GetStatusPesananID("Selesai"))
 	}
 
 	var listBarang []gin.H
@@ -580,7 +580,7 @@ func AmbilPesanan(c *gin.Context) {
 
 	// 2. Cari Pesanan berdasarkan public_id
 	var pesanan models.Pesanan
-	if err := config.DB.Where("public_id = ?", pesananPublicID).First(&pesanan).Error; err != nil {
+	if err := config.DB.Preload("StatusPesanan").Where("public_id = ?", pesananPublicID).First(&pesanan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak ditemukan",
@@ -588,7 +588,7 @@ func AmbilPesanan(c *gin.Context) {
 		return
 	}
 
-	if pesanan.StatusPesanan != "Dikemas" {
+	if pesanan.StatusPesanan.NamaStatus != "Dikemas" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak dapat diambil karena status bukan Dikemas",
@@ -605,7 +605,7 @@ func AmbilPesanan(c *gin.Context) {
 	tx := config.DB.Begin()
 
 	// Update status pesanan ke "Dikirim"
-	pesanan.StatusPesanan = "Dikirim"
+	pesanan.StatusPesananID = utils.GetStatusPesananID("Dikirim")
 	if err := tx.Save(&pesanan).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memperbarui status pesanan"})
@@ -716,7 +716,7 @@ func UpdateStatusPengantaran(c *gin.Context) {
 		}
 
 		// Update status pesanan ke "Selesai"
-		if err := tx.Model(&models.Pesanan{}).Where("id_pesanan = ?", pengantaran.PesananID).Update("status_pesanan", "Selesai").Error; err != nil {
+		if err := tx.Model(&models.Pesanan{}).Where("id_pesanan = ?", pengantaran.PesananID).Update("id_status_pesanan", utils.GetStatusPesananID("Selesai")).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengupdate status pesanan"})
 			return
@@ -728,7 +728,7 @@ func UpdateStatusPengantaran(c *gin.Context) {
 			var metode models.MetodePembayaran
 			if err := tx.First(&metode, pembayaran.MetodePembayaranID).Error; err == nil {
 				if metode.KodeMetode == "cod" || metode.KodeMetode == "cash" {
-					pembayaran.StatusTransaksi = "settlement"
+					pembayaran.StatusTransaksiID = utils.GetStatusTransaksiID("settlement")
 					pembayaran.TotalDibayar = pengantaran.Pesanan.TotalPembayaran
 					pembayaran.WaktuPembayaran = &now
 					tx.Save(&pembayaran)

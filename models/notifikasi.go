@@ -7,13 +7,17 @@ func (Notifikasi) TableName() string {
 }
 
 type Notifikasi struct {
-	IdNotifikasi int64 `gorm:"primaryKey;column:id_notifikasi" json:"id_notifikasi"`
+	IdNotifikasi uint `gorm:"primaryKey;column:id_notifikasi" json:"id_notifikasi"`
 
-	UserID int64 `gorm:"column:id_user" json:"id_user"`
+	UserID uint `gorm:"column:id_user" json:"id_user"`
 	User   User `gorm:"foreignKey:UserID;references:IdUser" json:"user"`
 
-	Judul  string `gorm:"column:judul" json:"judul"`
-	Pesan  string `gorm:"column:pesan" json:"pesan"`
-	Status string `gorm:"column:status" json:"status"`
-	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
+	Judul               string `gorm:"column:judul" json:"judul"`
+	Pesan               string `gorm:"column:pesan" json:"pesan"`
+	Status              string `gorm:"column:status" json:"-"` // TODO: hapus setelah migration
+	StatusNotifikasiID  uint   `gorm:"column:id_status_notifikasi" json:"id_status_notifikasi"`
+
+	StatusNotifikasiRel *StatusNotifikasi `gorm:"foreignKey:StatusNotifikasiID;references:IdStatusNotifikasi" json:"status_notifikasi,omitempty"`
+
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 }

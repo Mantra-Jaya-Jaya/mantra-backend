@@ -3,6 +3,7 @@ package seeders
 import (
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 	"fmt"
 	"time"
 
@@ -39,11 +40,16 @@ func SeedPembayaran() {
 		status := "settlement"
 		orderIdMidtrans := ""
 
-		if pesanan.TipePesanan == "Online" {
+		statusName := ""
+		if pesanan.StatusPesanan != nil {
+			statusName = pesanan.StatusPesanan.NamaStatus
+		}
+
+		if pesanan.TipePesananID == utils.GetTipePesananID("Online") {
 			ptype = fake.RandomString(onlinePaymentTypes)
-			if pesanan.StatusPesanan == "Selesai" || pesanan.StatusPesanan == "Dikirim" {
+			if statusName == "Selesai" || statusName == "Dikirim" {
 				status = "settlement"
-			} else if pesanan.StatusPesanan == "Dibatalkan" {
+			} else if statusName == "Dibatalkan" {
 				status = "cancel"
 			} else {
 				status = "pending"
@@ -51,7 +57,7 @@ func SeedPembayaran() {
 			orderIdMidtrans = fmt.Sprintf("MANTRA-%d-%d", pesanan.IdPesanan, time.Now().UnixNano())
 		} else {
 			ptype = "cash"
-			if pesanan.StatusPesanan == "Dibatalkan" {
+			if statusName == "Dibatalkan" {
 				status = "cancel"
 			} else {
 				status = "settlement"
@@ -59,11 +65,11 @@ func SeedPembayaran() {
 		}
 
 		pembayaran := models.Pembayaran{
-			OrderIdMidtrans: orderIdMidtrans,
-			PaymentType:     ptype,
-			StatusTransaksi: status,
-			FraudStatus:     "accept",
-			PesananID:       pesanan.IdPesanan,
+			OrderIdMidtrans:  orderIdMidtrans,
+			TipePembayaranID: utils.GetTipePembayaranID(ptype),
+			StatusTransaksiID: utils.GetStatusTransaksiID(status),
+			FraudStatusID:    utils.GetFraudStatusID("accept"),
+			PesananID:        pesanan.IdPesanan,
 		}
 
 		if err := config.DB.Create(&pembayaran).Error; err == nil {

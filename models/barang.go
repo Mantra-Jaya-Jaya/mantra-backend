@@ -19,12 +19,12 @@ type Barang struct {
 	TinggiBarang  int  `gorm:"column:tinggi_barang;default:0" json:"tinggi_barang"`
 
 	//Relasi
-	DiskonId   *uint `gorm:"column:id_diskon" json:"id_diskon"`
-	SatuanId   uint `gorm:"column:id_satuan" json:"id_satuan"`
-	KategoriId uint `gorm:"column:id_kategori" json:"id_kategori"`
+	DiskonID   *uint `gorm:"column:id_diskon" json:"id_diskon"`
+	SatuanID   uint `gorm:"column:id_satuan" json:"id_satuan"`
+	KategoriID uint `gorm:"column:id_kategori" json:"id_kategori"`
 
 	// Relasi
-	Diskon   Diskon   `gorm:"foreignKey:DiskonId;references:IdDiskon" json:"diskon"`
-	Satuan   Satuan   `gorm:"foreignKey:SatuanId;references:IdSatuan" json:"satuan"`
-	Kategori Kategori `gorm:"foreignKey:KategoriId;references:IdKategori" json:"kategori"`
+	Diskon   Diskon   `gorm:"foreignKey:DiskonID;references:IdDiskon" json:"diskon"`
+	Satuan   Satuan   `gorm:"foreignKey:SatuanID;references:IdSatuan" json:"satuan"`
+	Kategori Kategori `gorm:"foreignKey:KategoriID;references:IdKategori" json:"kategori"`
 }

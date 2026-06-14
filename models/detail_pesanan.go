@@ -11,10 +11,22 @@ type DetailPesanan struct {
 	Subtotal        int  `gorm:"column:subtotal" json:"subtotal"`
 
 	// Foreign Key ke Pesanan
-	PesananId uint    `gorm:"column:id_pesanan" json:"id_pesanan"`
-	Pesanan   Pesanan `gorm:"foreignKey:PesananId;references:IdPesanan" json:"pesanan"`
+	PesananID uint    `gorm:"column:id_pesanan" json:"id_pesanan"`
+	Pesanan   Pesanan `gorm:"foreignKey:PesananID;references:IdPesanan" json:"pesanan"`
 
 	// Foreign Key ke SpesifikasiBarang (bukan ke Barang langsung — menyimpan varian yang dipilih)
-	SpesifikasiBarangId uint              `gorm:"column:id_spesifikasi_barang" json:"id_spesifikasi_barang"`
-	SpesifikasiBarang   SpesifikasiBarang `gorm:"foreignKey:SpesifikasiBarangId;references:IdSpesifikasiBarang" json:"spesifikasi_barang"`
+	SpesifikasiBarangID uint              `gorm:"column:id_spesifikasi_barang" json:"id_spesifikasi_barang"`
+	SpesifikasiBarang   SpesifikasiBarang `gorm:"foreignKey:SpesifikasiBarangID;references:IdSpesifikasiBarang" json:"spesifikasi_barang"`
+}
+
+// BeforeCreate hook untuk auto-compute Subtotal saat INSERT
+func (d *DetailPesanan) BeforeCreate() error {
+	d.Subtotal = d.Jumlah * d.HargaSatuan
+	return nil
+}
+
+// BeforeUpdate hook untuk auto-compute Subtotal saat UPDATE
+func (d *DetailPesanan) BeforeUpdate() error {
+	d.Subtotal = d.Jumlah * d.HargaSatuan
+	return nil
 }

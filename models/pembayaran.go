@@ -9,12 +9,20 @@ func (Pembayaran) TableName() string {
 type Pembayaran struct {
 	IdPembayaran    uint   `gorm:"primaryKey;column:id_pembayaran" json:"id_pembayaran"`
 	OrderIdMidtrans string `gorm:"column:order_id_midtrans" json:"order_id_midtrans"`
-	PaymentType     string `gorm:"column:payment_type" json:"payment_type"`
-	StatusTransaksi string `gorm:"column:status_transaksi" json:"status_transaksi"`
-	FraudStatus     string `gorm:"column:fraud_status" json:"fraud_status"`
+	RawPaymentType    string         `gorm:"-" json:"-"` // TODO: hapus setelah migration — DB column is payment_type
+	TipePembayaranID  uint           `gorm:"column:id_tipe_pembayaran" json:"id_tipe_pembayaran"`
+	TipePembayaranRel *TipePembayaran `gorm:"foreignKey:TipePembayaranID;references:IdTipePembayaran" json:"tipe_pembayaran,omitempty"`
+	StatusTransaksi string `gorm:"column:status_transaksi" json:"-"`               // TODO: hapus setelah migration
+	StatusTransaksiID uint `gorm:"column:id_status_transaksi" json:"id_status_transaksi"`
+
+	FraudStatus    string       `gorm:"column:fraud_status" json:"-"` // TODO: hapus setelah migration
+	FraudStatusID  uint         `gorm:"column:id_fraud_status" json:"id_fraud_status"`
+	FraudStatusRel *FraudStatus `gorm:"foreignKey:FraudStatusID;references:IdFraudStatus" json:"fraud_status,omitempty"`
 
 	PesananID uint    `gorm:"column:id_pesanan" json:"id_pesanan"`
 	Pesanan   Pesanan `gorm:"foreignKey:PesananID;references:IdPesanan" json:"pesanan"`
+
+	StatusTransaksiRel *StatusTransaksi `gorm:"foreignKey:StatusTransaksiID;references:IdStatusTransaksi" json:"status_transaksi,omitempty"`
 
 	MetodePembayaranID  *uint             `gorm:"column:id_metode_pembayaran" json:"id_metode_pembayaran,omitempty"`
 	MetodePembayaran    *MetodePembayaran `gorm:"foreignKey:MetodePembayaranID;references:IdMetodePembayaran" json:"metode_pembayaran,omitempty"`

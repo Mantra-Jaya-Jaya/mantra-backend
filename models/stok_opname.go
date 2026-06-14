@@ -10,7 +10,7 @@ func (StokOpname) TableName() string {
 type StokOpname struct {
 	IdStokOpname uint      `gorm:"primaryKey;column:id_stok_opname" json:"id_stok_opname"`
 	HargaBeli    int       `gorm:"column:harga_beli" json:"harga_beli"`   // Harga beli/modal dalam Rupiah
-	Status       bool      `gorm:"column:status" json:"status"`           // true = stok masuk, false = stok keluar
+	TipePergerakan string  `gorm:"column:tipe_pergerakan" json:"tipe_pergerakan"` // masuk, keluar, penyesuaian, retur
 	JumlahStok   int       `gorm:"column:jumlah_stok" json:"jumlah_stok"` // yang sedang di masukkan atau keluar (bukan total stok)
 	Keterangan   string    `gorm:"type:text;column:keterangan" json:"keterangan"`
 	Tanggal      time.Time `gorm:"column:tanggal" json:"tanggal"`

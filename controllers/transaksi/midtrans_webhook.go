@@ -15,6 +15,7 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -72,30 +73,36 @@ func MidtransNotificationHandler(c *gin.Context) {
 		return
 	}
 
+	// Normalize Midtrans status: "capture" dianggap "settlement"
+	normalizedStatus := notif.TransactionStatus
+	if normalizedStatus == "capture" {
+		normalizedStatus = "settlement"
+	}
+
 	pembayaran.TransaksiMidtransID = notif.TransactionID
-	pembayaran.PaymentType = notif.PaymentType
-	pembayaran.StatusTransaksi = notif.TransactionStatus
-	pembayaran.FraudStatus = notif.FraudStatus
+	pembayaran.TipePembayaranID = utils.GetTipePembayaranID(notif.PaymentType)
+	pembayaran.StatusTransaksiID = utils.GetStatusTransaksiID(normalizedStatus)
+	pembayaran.FraudStatusID = utils.GetFraudStatusID(notif.FraudStatus)
 
 	grossAmount := 0
 	if err := parseGrossAmount(notif.GrossAmount, &grossAmount); err == nil {
 		pembayaran.TotalDibayar = grossAmount
 	}
 
-	if notif.TransactionStatus == "settlement" || notif.TransactionStatus == "capture" {
+	if pembayaran.StatusTransaksiID == utils.GetStatusTransaksiID("settlement") {
 		now := time.Now()
 		pembayaran.WaktuPembayaran = &now
 	}
 
 	config.DB.Save(&pembayaran)
 
-	if notif.TransactionStatus == "settlement" || notif.TransactionStatus == "capture" {
+	if normalizedStatus == "settlement" {
 		var pesanan models.Pesanan
 		if err := config.DB.First(&pesanan, pembayaran.PesananID).Error; err == nil {
-			if pesanan.TipePesanan == "Online" {
-				pesanan.StatusPesanan = "Dikemas" // Masuk ke antrean packing/kurir toko
+			if pesanan.TipePesananID == utils.GetTipePesananID("Online") {
+				pesanan.StatusPesananID = utils.GetStatusPesananID("Dikemas")
 			} else {
-				pesanan.StatusPesanan = "Selesai" // Pembayaran kasir langsung selesai
+				pesanan.StatusPesananID = utils.GetStatusPesananID("Selesai")
 			}
 			config.DB.Save(&pesanan)
 		}

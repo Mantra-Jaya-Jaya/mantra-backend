@@ -11,8 +11,10 @@ func (Kasir) TableName() string {
 type Kasir struct {
 	IdKasir    uint      `gorm:"primaryKey;column:id_kasir" json:"id_kasir"`
 	PublicId   uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
-	Shift      string    `gorm:"column:shift" json:"shift"`
+	Shift           string      `gorm:"column:shift" json:"-"` // TODO: hapus setelah migration
+	ShiftKasirID    uint        `gorm:"column:id_shift_kasir" json:"id_shift_kasir"`
+	ShiftKasirRel   *ShiftKasir `gorm:"foreignKey:ShiftKasirID;references:IdShiftKasir" json:"shift,omitempty"`
 
-	KaryawanId uint     `gorm:"column:id_karyawan;unique" json:"id_karyawan"`
-	Karyawan   Karyawan `gorm:"foreignKey:KaryawanId;references:IdKaryawan" json:"karyawan"`
+	KaryawanID uint     `gorm:"column:id_karyawan;unique" json:"id_karyawan"`
+	Karyawan   Karyawan `gorm:"foreignKey:KaryawanID;references:IdKaryawan" json:"karyawan"`
 }

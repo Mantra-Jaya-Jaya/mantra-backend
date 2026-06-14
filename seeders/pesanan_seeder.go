@@ -3,6 +3,7 @@ package seeders
 import (
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 	"fmt"
 	"time"
 
@@ -54,17 +55,17 @@ func SeedPesanan() {
 
 	for idx, tglPesanan := range datesToGenerate {
 		randStatus := fake.IntRange(1, 100)
-		var status string
+		var statusName string
 		if randStatus <= 70 {
-			status = "Selesai"
+			statusName = "Selesai"
 		} else if randStatus <= 80 {
-			status = "Dikirim"
+			statusName = "Dikirim"
 		} else if randStatus <= 90 {
-			status = "Dikemas"
+			statusName = "Dikemas"
 		} else if randStatus <= 95 {
-			status = "Diproses"
+			statusName = "Diproses"
 		} else {
-			status = "Dibatalkan"
+			statusName = "Dibatalkan"
 		}
 
 		randType := fake.IntRange(1, 100)
@@ -84,13 +85,13 @@ func SeedPesanan() {
 		totalPembayaran := fake.IntRange(50000, 5000000)
 
 		pesanan := models.Pesanan{
-			TotalPembayaran: totalPembayaran,
-			TanggalPesanan:  tglPesanan,
-			TipePesanan:     tipePesanan,
-			StatusPesanan:   status,
-			CustomerId:      cId,
-			KasirId:         &kId,
-			AlamatId:        alamatId,
+			TotalPembayaran:  totalPembayaran,
+			TanggalPesanan:   tglPesanan,
+			TipePesananID:    utils.GetTipePesananID(tipePesanan),
+			StatusPesananID:  utils.GetStatusPesananID(statusName),
+			CustomerID:       cId,
+			KasirID:          &kId,
+			AlamatID:         alamatId,
 		}
 
 		if err := config.DB.Create(&pesanan).Error; err == nil {

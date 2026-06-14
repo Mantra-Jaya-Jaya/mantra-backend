@@ -10,6 +10,7 @@ import (
 	"backend-mantra/config"
 	"backend-mantra/models"
 	"backend-mantra/services"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/midtrans/midtrans-go"
@@ -34,7 +35,7 @@ func GetDaftarPesanan(c *gin.Context) {
 
 	var pesanan []models.Pesanan
 	var total int64
-	query := config.DB.Model(&models.Pesanan{})
+	query := config.DB.Model(&models.Pesanan{}).Preload("StatusPesanan")
 
 	switch role {
 	case "customer":
@@ -79,7 +80,7 @@ func GetDaftarPesanan(c *gin.Context) {
 
 	itemsMap := make(map[uint][]gin.H)
 	for _, d := range details {
-		itemsMap[d.PesananId] = append(itemsMap[d.PesananId], gin.H{
+		itemsMap[d.PesananID] = append(itemsMap[d.PesananID], gin.H{
 			"id_barang":       d.SpesifikasiBarang.BarangID,
 			"nama_barang":     d.SpesifikasiBarang.Barang.NamaBarang,
 			"jumlah":          d.Jumlah,
@@ -95,11 +96,11 @@ func GetDaftarPesanan(c *gin.Context) {
 			items = []gin.H{}
 		}
 		responseData = append(responseData, gin.H{
-			"id_pesanan":    p.PublicId,
-			"status":        p.StatusPesanan,
-			"tanggal_pesan": p.TanggalPesanan,
-			"total_bayar":   p.TotalPembayaran,
-			"items":         items,
+			"id_pesanan":          p.PublicId,
+			"id_status_pesanan":   p.StatusPesananID,
+			"tanggal_pesan":       p.TanggalPesanan,
+			"total_bayar":         p.TotalPembayaran,
+			"items":               items,
 		})
 	}
 
@@ -132,7 +133,7 @@ func GetDetailPesanan(c *gin.Context) {
 	userID := c.GetInt64("user_id")
 
 	var pesanan models.Pesanan
-	query := config.DB.Preload("Alamat").Where("public_id = ?", idPesanan)
+	query := config.DB.Preload("StatusPesanan").Preload("Alamat").Where("public_id = ?", idPesanan)
 
 	if role == "customer" {
 		// Ownership check: pesanan harus milik customer yang login
@@ -211,12 +212,12 @@ func GetDetailPesanan(c *gin.Context) {
 		"status":  "success",
 		"message": "Detail pesanan berhasil diambil",
 		"data": gin.H{
-			"no_pesanan":         pesanan.PublicId,
-			"status":             pesanan.StatusPesanan,
-			"tanggal_pesan":      pesanan.TanggalPesanan,
-			"items":              items,
-			"tujuan_pengantaran": tujuanPengantaran,
-			"kurir":              kurirData,
+			"no_pesanan":          pesanan.PublicId,
+			"id_status_pesanan":   pesanan.StatusPesananID,
+			"tanggal_pesan":       pesanan.TanggalPesanan,
+			"items":               items,
+			"tujuan_pengantaran":  tujuanPengantaran,
+			"kurir":               kurirData,
 			"rincian_pembayaran": gin.H{
 				"subtotal_items": subtotalItems,
 				"ongkir":         pesanan.OngkosKirim,
@@ -281,9 +282,16 @@ func CheckoutPesanan(c *gin.Context) {
 		hargaSatuan := item.SpesifikasiBarang.HargaBarang
 		b := item.SpesifikasiBarang.Barang
 
-		if b.DiskonId != nil && b.Diskon.IdDiskon != 0 {
+		if b.DiskonID != nil && b.Diskon.IdDiskon != 0 {
 			if b.Diskon.TglMulai.Before(now) && b.Diskon.TglSelesai.After(now) {
-				hargaSatuan = item.SpesifikasiBarang.HargaBarang - (item.SpesifikasiBarang.HargaBarang * b.Diskon.BesarDiskon / 100)
+				if b.Diskon.TipeDiskon == "persen" {
+					hargaSatuan = item.SpesifikasiBarang.HargaBarang - (item.SpesifikasiBarang.HargaBarang * b.Diskon.BesarDiskon / 100)
+				} else if b.Diskon.TipeDiskon == "nominal" {
+					hargaSatuan = item.SpesifikasiBarang.HargaBarang - b.Diskon.BesarDiskon
+					if hargaSatuan < 0 {
+						hargaSatuan = 0
+					}
+				}
 			}
 		}
 
@@ -312,18 +320,18 @@ func CheckoutPesanan(c *gin.Context) {
 	tx := config.DB.Begin()
 
 	pesanan := models.Pesanan{
-		CustomerId:      customerID,
-		TotalPembayaran: grandTotal,
-		TanggalPesanan:  now,
-		TipePesanan:     "Online",
-		StatusPesanan:   "Diproses",
-		OngkosKirim:     ongkir,
-		Catatan:         input.Catatan,
-		EkspedisiID:     input.IdEkspedisi,
+		CustomerID:         customerID,
+		TotalPembayaran:    grandTotal,
+		TanggalPesanan:     now,
+		TipePesananID:      utils.GetTipePesananID("Online"),
+		StatusPesananID:    utils.GetStatusPesananID("Diproses"),
+		OngkosKirim:        ongkir,
+		Catatan:            input.Catatan,
+		EkspedisiID:        input.IdEkspedisi,
 		LayananEkspedisiID: input.IdLayananEkspedisi,
 	}
 	if alamat.IdAlamat != 0 {
-		pesanan.AlamatId = &alamat.IdAlamat
+		pesanan.AlamatID = &alamat.IdAlamat
 	}
 
 	if err := tx.Create(&pesanan).Error; err != nil {
@@ -334,8 +342,8 @@ func CheckoutPesanan(c *gin.Context) {
 
 	for _, item := range itemsToInsert {
 		detail := models.DetailPesanan{
-			PesananId:           pesanan.IdPesanan,
-			SpesifikasiBarangId: item.SpesifikasiBarangID,
+			PesananID:           pesanan.IdPesanan,
+			SpesifikasiBarangID: item.SpesifikasiBarangID,
 			Jumlah:              item.Jumlah,
 			HargaSatuan:         item.HargaSatuan,
 			Subtotal:            item.Subtotal,
@@ -367,9 +375,9 @@ func CheckoutPesanan(c *gin.Context) {
 
 	pembayaran := models.Pembayaran{
 		PesananID:          pesanan.IdPesanan,
-		PaymentType:        "pending",
-		StatusTransaksi:    statusTransaksi,
-		FraudStatus:        fraudStatus,
+		TipePembayaranID:   utils.GetTipePembayaranID("non-cash"),
+		StatusTransaksiID:  utils.GetStatusTransaksiID(statusTransaksi),
+		FraudStatusID:      utils.GetFraudStatusID(fraudStatus),
 		MetodePembayaranID: input.IdMetodePembayaran,
 	}
 
@@ -377,7 +385,7 @@ func CheckoutPesanan(c *gin.Context) {
 		pembayaran.TotalDibayar = grandTotal
 		nowTime := time.Now()
 		pembayaran.WaktuPembayaran = &nowTime
-		pesanan.StatusPesanan = "Selesai"
+		pesanan.StatusPesananID = utils.GetStatusPesananID("Selesai")
 		tx.Save(&pesanan)
 	}
 
@@ -463,7 +471,7 @@ func BatalkanPesanan(c *gin.Context) {
 	}
 
 	var pesanan models.Pesanan
-	if err := config.DB.Where("public_id = ?", idPesanan).First(&pesanan).Error; err != nil {
+	if err := config.DB.Preload("StatusPesanan").Where("public_id = ?", idPesanan).First(&pesanan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak ditemukan",
@@ -471,15 +479,19 @@ func BatalkanPesanan(c *gin.Context) {
 		return
 	}
 
-	if pesanan.StatusPesanan != "Diproses" {
+	statusName := ""
+	if pesanan.StatusPesanan != nil {
+		statusName = pesanan.StatusPesanan.NamaStatus
+	}
+	if statusName != "Diproses" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
-			"message": "Pesanan tidak bisa dibatalkan karena status saat ini: " + pesanan.StatusPesanan,
+			"message": "Pesanan tidak bisa dibatalkan karena status saat ini: " + statusName,
 		})
 		return
 	}
 
-	pesanan.StatusPesanan = "Dibatalkan"
+	pesanan.StatusPesananID = utils.GetStatusPesananID("Dibatalkan")
 	if err := config.DB.Save(&pesanan).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -522,7 +534,7 @@ func LacakPesanan(c *gin.Context) {
 	}
 
 	var pesanan models.Pesanan
-	if err := config.DB.Preload("Ekspedisi").Where("public_id = ?", idPesanan).First(&pesanan).Error; err != nil {
+	if err := config.DB.Preload("StatusPesanan").Preload("Ekspedisi").Where("public_id = ?", idPesanan).First(&pesanan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak ditemukan",
@@ -574,10 +586,10 @@ func LacakPesanan(c *gin.Context) {
 			"status":  "success",
 			"message": "Pesanan sedang dipersiapkan di toko",
 			"data": gin.H{
-				"id_pesanan":      idPesanan,
-				"tipe_ekspedisi": "internal",
-				"status":         pesanan.StatusPesanan,
-				"kurir":          nil,
+				"id_pesanan":        idPesanan,
+				"tipe_ekspedisi":    "internal",
+				"id_status_pesanan": pesanan.StatusPesananID,
+				"kurir":             nil,
 			},
 		})
 		return
@@ -658,9 +670,10 @@ func GetDashboardKasir(c *gin.Context) {
 
 	// Hitung total pendapatan bersih hari ini (Net - Hanya Selesai)
 	var totalPendapatanBersih struct{ Total int }
+	statusSelesaiID := utils.GetStatusPesananID("Selesai")
 	config.DB.Model(&models.Pesanan{}).
 		Select("COALESCE(SUM(total_pembayaran), 0) as total").
-		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ? AND status_pesanan = ?", startOfDay, endOfDay, "Selesai").
+		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ? AND id_status_pesanan = ?", startOfDay, endOfDay, statusSelesaiID).
 		Scan(&totalPendapatanBersih)
 
 	// Hitung jumlah transaksi hari ini (Gross)
@@ -672,7 +685,7 @@ func GetDashboardKasir(c *gin.Context) {
 	// Hitung jumlah transaksi selesai hari ini (Net)
 	var jumlahTransaksiSelesai int64
 	config.DB.Model(&models.Pesanan{}).
-		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ? AND status_pesanan = ?", startOfDay, endOfDay, "Selesai").
+		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ? AND id_status_pesanan = ?", startOfDay, endOfDay, statusSelesaiID).
 		Count(&jumlahTransaksiSelesai)
 
 	// Hitung total item terjual hari ini
@@ -688,12 +701,12 @@ func GetDashboardKasir(c *gin.Context) {
 		IdPesanan       uint
 		TanggalPesanan  time.Time
 		TotalPembayaran int
-		PaymentType     string
+		RawPaymentType  string
 	}
 
 	var aktivitasRaw []AktivitasResult
 	config.DB.Table("pesanan").
-		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(pembayaran.payment_type, 'tunai') as payment_type").
+		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(pembayaran.payment_type, 'tunai') as raw_payment_type").
 		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
 		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
 		Order("pesanan.tanggal_pesanan DESC").
@@ -705,7 +718,7 @@ func GetDashboardKasir(c *gin.Context) {
 		aktivitasTerkini = append(aktivitasTerkini, gin.H{
 			"id_transaksi":      a.IdPesanan,
 			"nomor_invoice":     "INV-" + a.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(a.IdPesanan)),
-			"metode_pembayaran": a.PaymentType,
+			"metode_pembayaran": a.RawPaymentType,
 			"waktu":             a.TanggalPesanan.Format("15:04"),
 			"total_bayar":       a.TotalPembayaran,
 		})
@@ -746,12 +759,12 @@ func GetSemuaAktivitasHariIni(c *gin.Context) {
 		IdPesanan       uint
 		TanggalPesanan  time.Time
 		TotalPembayaran int
-		PaymentType     string
+		RawPaymentType  string
 	}
 
 	var aktivitasRaw []AktivitasResult
 	config.DB.Table("pesanan").
-		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(pembayaran.payment_type, 'tunai') as payment_type").
+		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(pembayaran.payment_type, 'tunai') as raw_payment_type").
 		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
 		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
 		Order("pesanan.tanggal_pesanan DESC").
@@ -762,7 +775,7 @@ func GetSemuaAktivitasHariIni(c *gin.Context) {
 		responseData = append(responseData, gin.H{
 			"id_transaksi":      a.IdPesanan,
 			"nomor_invoice":     "INV-" + a.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(a.IdPesanan)),
-			"metode_pembayaran": a.PaymentType,
+			"metode_pembayaran": a.RawPaymentType,
 			"waktu":             a.TanggalPesanan.Format("15:04"),
 			"total_bayar":       a.TotalPembayaran,
 		})
@@ -783,10 +796,11 @@ func GetSemuaAktivitasHariIni(c *gin.Context) {
 // Auth: Wajib login, role kasir
 func GetLaporanRingkasan(c *gin.Context) {
 	var totalPendapatan int64
-	config.DB.Model(&models.Pesanan{}).Where("status_pesanan = ?", "Selesai").Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&totalPendapatan)
+	statusSelesaiID := utils.GetStatusPesananID("Selesai")
+	config.DB.Model(&models.Pesanan{}).Where("id_status_pesanan = ?", statusSelesaiID).Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&totalPendapatan)
 
 	var totalTransaksi int64
-	config.DB.Model(&models.Pesanan{}).Where("status_pesanan = ?", "Selesai").Count(&totalTransaksi)
+	config.DB.Model(&models.Pesanan{}).Where("id_status_pesanan = ?", statusSelesaiID).Count(&totalTransaksi)
 
 	var rataRataPesanan int64
 	if totalTransaksi > 0 {
@@ -805,7 +819,7 @@ func GetLaporanRingkasan(c *gin.Context) {
 	var hourlySales []HourlySale
 	config.DB.Model(&models.Pesanan{}).
 		Select("EXTRACT(HOUR FROM tanggal_pesanan) as hour, SUM(total_pembayaran) as total").
-		Where("status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", "Selesai", startOfDay, endOfDay).
+		Where("id_status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", statusSelesaiID, startOfDay, endOfDay).
 		Group("hour").
 		Order("hour ASC").
 		Scan(&hourlySales)
@@ -843,7 +857,7 @@ func GetLaporanRingkasan(c *gin.Context) {
 		Joins("JOIN spesifikasi_barang ON spesifikasi_barang.id_spesifikasi_barang = detail_pesanan.id_spesifikasi_barang").
 		Joins("JOIN barang ON barang.id_barang = spesifikasi_barang.id_barang").
 		Joins("JOIN pesanan ON pesanan.id_pesanan = detail_pesanan.id_pesanan").
-		Where("pesanan.status_pesanan = ?", "Selesai").
+		Where("pesanan.id_status_pesanan = ?", statusSelesaiID).
 		Group("barang.id_barang, barang.public_id, barang.nama_barang, barang.deskripsi, barang.gambar_barang").
 		Order("jumlah_terjual DESC").
 		Limit(5).
@@ -894,10 +908,11 @@ func GetDetailLaporanProduk(c *gin.Context) {
 	}
 
 	var totalTerjual int64
+	statusSelesaiID := utils.GetStatusPesananID("Selesai")
 	config.DB.Model(&models.DetailPesanan{}).
 		Joins("JOIN spesifikasi_barang ON spesifikasi_barang.id_spesifikasi_barang = detail_pesanan.id_spesifikasi_barang").
 		Joins("JOIN pesanan ON pesanan.id_pesanan = detail_pesanan.id_pesanan").
-		Where("pesanan.status_pesanan = ? AND spesifikasi_barang.id_barang = ?", "Selesai", barang.IdBarang).
+		Where("pesanan.id_status_pesanan = ? AND spesifikasi_barang.id_barang = ?", statusSelesaiID, barang.IdBarang).
 		Select("COALESCE(SUM(detail_pesanan.jumlah), 0)").
 		Scan(&totalTerjual)
 
@@ -914,7 +929,7 @@ func GetDetailLaporanProduk(c *gin.Context) {
 		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, detail_pesanan.harga_satuan, detail_pesanan.jumlah, detail_pesanan.subtotal").
 		Joins("JOIN pesanan ON pesanan.id_pesanan = detail_pesanan.id_pesanan").
 		Joins("JOIN spesifikasi_barang ON spesifikasi_barang.id_spesifikasi_barang = detail_pesanan.id_spesifikasi_barang").
-		Where("pesanan.status_pesanan = ? AND spesifikasi_barang.id_barang = ?", "Selesai", barang.IdBarang).
+		Where("pesanan.id_status_pesanan = ? AND spesifikasi_barang.id_barang = ?", statusSelesaiID, barang.IdBarang).
 		Order("pesanan.tanggal_pesanan DESC").
 		Scan(&txHistory)
 
@@ -956,7 +971,7 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 	idPesananStr := c.Param("public_id")
 
 	var pesanan models.Pesanan
-	if err := config.DB.Preload("Customer.User").Preload("Alamat").First(&pesanan, "public_id = ?", idPesananStr).Error; err != nil {
+	if err := config.DB.Preload("StatusPesanan").Preload("Customer.User").Preload("Alamat").First(&pesanan, "public_id = ?", idPesananStr).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak ditemukan",
@@ -965,7 +980,11 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 	}
 
 	// --- LOGIKA SYNC MIDTRANS (Hanya jika status belum Selesai dan Tipe Offline/Online non-tunai) ---
-	if pesanan.StatusPesanan == "Draft" || pesanan.StatusPesanan == "Menunggu Pembayaran" {
+	statusName := ""
+	if pesanan.StatusPesanan != nil {
+		statusName = pesanan.StatusPesanan.NamaStatus
+	}
+	if statusName == "Draft" || statusName == "Menunggu Pembayaran" {
 		var pembayaran models.Pembayaran
 		if err := config.DB.Where("id_pesanan = ? AND order_id_midtrans != ?", pesanan.IdPesanan, "").Order("id_pembayaran DESC").First(&pembayaran).Error; err == nil {
 
@@ -997,15 +1016,15 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 	}
 
 	var pembayaran models.Pembayaran
-	config.DB.Where("id_pesanan = ?", pesanan.IdPesanan).First(&pembayaran)
-	metodePembayaran := pembayaran.PaymentType
-	if metodePembayaran == "" {
-		metodePembayaran = "tunai"
+	config.DB.Where("id_pesanan = ?", pesanan.IdPesanan).Preload("TipePembayaranRel").First(&pembayaran)
+	metodePembayaran := "tunai"
+	if pembayaran.TipePembayaranRel != nil {
+		metodePembayaran = pembayaran.TipePembayaranRel.NamaTipe
 	}
 
 	customerNama := "Walk-in Customer"
 	customerAlamat := "-"
-	if pesanan.CustomerId != 0 && pesanan.Customer.IdCustomer != 0 {
+	if pesanan.CustomerID != 0 && pesanan.Customer.IdCustomer != 0 {
 		customerNama = pesanan.Customer.User.NamaLengkap
 	}
 	if pesanan.Alamat != nil {
@@ -1017,12 +1036,9 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 		"message": "Detail pesanan berhasil diambil",
 		"data": gin.H{
 			"order_info": gin.H{
-				"nomor_order":   "ORD-" + pesanan.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(pesanan.IdPesanan)),
-				"tanggal_waktu": pesanan.TanggalPesanan,
-				"status_order": gin.H{
-					"kode":  pesanan.StatusPesanan,
-					"label": pesanan.StatusPesanan,
-				},
+				"nomor_order":         "ORD-" + pesanan.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(pesanan.IdPesanan)),
+				"tanggal_waktu":       pesanan.TanggalPesanan,
+				"id_status_pesanan":   pesanan.StatusPesananID,
 			},
 			"pelanggan": gin.H{
 				"nama":   customerNama,

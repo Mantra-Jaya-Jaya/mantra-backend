@@ -3,6 +3,7 @@ package seeders
 import (
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 	"fmt"
 	"time"
 
@@ -32,8 +33,8 @@ func SeedKasir() {
 		Alamat:             "Jl. Prof. Sudarto, Tembalang, Kota Semarang",
 		PendidikanTerakhir: "D3 Teknik Komputer",
 		Nik:                "3374" + gofakeit.DigitN(12),
-		Status:             "Aktif",
-		UserId:             user.IdUser,
+		StatusKaryawanID:   utils.GetStatusKaryawanID("Aktif"),
+		UserID:             user.IdUser,
 	}
 
 	// 4. Simpan ke database
@@ -43,8 +44,8 @@ func SeedKasir() {
 	}
 
 	kasirProfil := models.Kasir{
-		Shift:      "Pagi",
-		KaryawanId: karyawanProfil.IdKaryawan,
+		ShiftKasirID: utils.GetShiftKasirID("Pagi"),
+		KaryawanID: karyawanProfil.IdKaryawan,
 	}
 	if err := config.DB.Where("id_karyawan = ?", karyawanProfil.IdKaryawan).FirstOrCreate(&kasirProfil).Error; err != nil {
 		fmt.Println("Error:", err)

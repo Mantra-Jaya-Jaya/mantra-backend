@@ -20,8 +20,10 @@ type Karyawan struct {
 	Alamat             string    `gorm:"column:alamat" json:"alamat"`
 	PendidikanTerakhir string    `gorm:"column:pendidikan_terakhir" json:"pendidikan_terakhir"`
 	Nik                string    `gorm:"type:varchar(16);column:nik;unique;not null" json:"nik"`
-	Status             string    `gorm:"column:status" json:"status"`
+	Status             string         `gorm:"column:status" json:"-"` // TODO: hapus setelah migration
+	StatusKaryawanID   uint           `gorm:"column:id_status_karyawan" json:"id_status_karyawan"`
+	StatusKaryawanRel  *StatusKaryawan `gorm:"foreignKey:StatusKaryawanID;references:IdStatusKaryawan" json:"status,omitempty"`
 
-	UserId uint `gorm:"column:id_user;unique" json:"id_user"`
-	User   User `gorm:"foreignKey:UserId;references:IdUser" json:"user"`
+	UserID uint `gorm:"column:id_user;unique" json:"id_user"`
+	User   User `gorm:"foreignKey:UserID;references:IdUser" json:"user"`
 }

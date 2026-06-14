@@ -7,6 +7,7 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -44,14 +45,16 @@ func GetPesananTerbaru(c *gin.Context) {
 
 	// 🚀 2. QUERY DATABASE
 	var pesanan models.Pesanan
+	dikemasID := utils.GetStatusPesananID("Dikemas")
 	err := config.DB.
+		Preload("StatusPesanan").
 		Preload("Customer.User").
 		Preload("Alamat").
 		Preload("DetailPesanan.SpesifikasiBarang.Barang").
 		Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi").
 		Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
-		Where("tipe_pesanan = ?", "Online").
-		Where("status_pesanan = ?", "Dikemas"). // Sesuaikan status
+		Where("id_tipe_pesanan = ?", utils.GetTipePesananID("Online")).
+		Where("id_status_pesanan = ?", dikemasID).
 		Order("tanggal_pesanan DESC").
 		First(&pesanan).Error
 
@@ -73,15 +76,15 @@ func GetPesananTerbaru(c *gin.Context) {
 	}
 
 	type PesananRingkas struct {
-		PublicID        string       `json:"public_id"`
-		TotalPembayaran int          `json:"total_pembayaran"`
-		TanggalPesanan  time.Time    `json:"tanggal_pesanan"`
-		StatusPesanan   string       `json:"status_pesanan"`
-		NamaCustomer    string       `json:"nama_customer"`
-		NoTelp          string       `json:"no_telp"`
-		AlamatLengkap   string       `json:"alamat_lengkap"`
-		CatatanLokasi   string       `json:"catatan_lokasi"`
-		DaftarBarang    []ItemBarang `json:"daftar_barang"`
+		PublicID          string       `json:"public_id"`
+		TotalPembayaran   int          `json:"total_pembayaran"`
+		TanggalPesanan    time.Time    `json:"tanggal_pesanan"`
+		IDStatusPesanan   uint         `json:"id_status_pesanan"`
+		NamaCustomer      string       `json:"nama_customer"`
+		NoTelp            string       `json:"no_telp"`
+		AlamatLengkap     string       `json:"alamat_lengkap"`
+		CatatanLokasi     string       `json:"catatan_lokasi"`
+		DaftarBarang      []ItemBarang `json:"daftar_barang"`
 	}
 
 	// Siapin variabel buat alamat (jaga-jaga kalau null)
@@ -125,11 +128,15 @@ func GetPesananTerbaru(c *gin.Context) {
 	}
 
 	// Bungkus ke DTO
+	var statusID uint
+	if pesanan.StatusPesanan != nil {
+		statusID = pesanan.StatusPesanan.IdStatusPesanan
+	}
 	dataBungkus := PesananRingkas{
 		PublicID:        pesanan.PublicId.String(),
 		TotalPembayaran: pesanan.TotalPembayaran,
 		TanggalPesanan:  pesanan.TanggalPesanan,
-		StatusPesanan:   pesanan.StatusPesanan,
+		IDStatusPesanan: statusID,
 		NamaCustomer:    namaCust,
 		NoTelp:          noTelp,
 		AlamatLengkap:   alamatLengkap,
@@ -178,14 +185,16 @@ func GetAllPesananOnline(c *gin.Context) {
 
 	// 🚀 2. QUERY DATABASE (Tarik Semua Pesanan)
 	var daftarPesanan []models.Pesanan
+	dikemasID := utils.GetStatusPesananID("Dikemas")
 	err := config.DB.
+		Preload("StatusPesanan").
 		Preload("Customer.User").
 		Preload("Alamat").
 		Preload("DetailPesanan.SpesifikasiBarang.Barang").
 		Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi").
 		Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
-		Where("tipe_pesanan = ?", "Online").
-		Where("status_pesanan = ?", "Dikemas"). // Filter biar kurir cuma liat yang nganggur/siap antar
+		Where("id_tipe_pesanan = ?", utils.GetTipePesananID("Online")).
+		Where("id_status_pesanan = ?", dikemasID). // Filter biar kurir cuma liat yang nganggur/siap antar
 		Order("tanggal_pesanan DESC").
 		Find(&daftarPesanan).Error
 
@@ -216,15 +225,15 @@ func GetAllPesananOnline(c *gin.Context) {
 	}
 
 	type PesananRingkas struct {
-		PublicID        string       `json:"public_id"`
-		TotalPembayaran int          `json:"total_pembayaran"`
-		TanggalPesanan  time.Time    `json:"tanggal_pesanan"`
-		StatusPesanan   string       `json:"status_pesanan"`
-		NamaCustomer    string       `json:"nama_customer"`
-		NoTelp          string       `json:"no_telp"`
-		AlamatLengkap   string       `json:"alamat_lengkap"`
-		CatatanLokasi   string       `json:"catatan_lokasi"`
-		DaftarBarang    []ItemBarang `json:"daftar_barang"`
+		PublicID          string       `json:"public_id"`
+		TotalPembayaran   int          `json:"total_pembayaran"`
+		TanggalPesanan    time.Time    `json:"tanggal_pesanan"`
+		IDStatusPesanan   uint         `json:"id_status_pesanan"`
+		NamaCustomer      string       `json:"nama_customer"`
+		NoTelp            string       `json:"no_telp"`
+		AlamatLengkap     string       `json:"alamat_lengkap"`
+		CatatanLokasi     string       `json:"catatan_lokasi"`
+		DaftarBarang      []ItemBarang `json:"daftar_barang"`
 	}
 
 	// Siapin "keranjang" buat nampung semua DTO
@@ -273,11 +282,15 @@ func GetAllPesananOnline(c *gin.Context) {
 		}
 
 		// Masukin pesanan yang udah langsing ini ke "keranjang" hasil akhir
+		var statusID uint
+		if pesanan.StatusPesanan != nil {
+			statusID = pesanan.StatusPesanan.IdStatusPesanan
+		}
 		hasilAkhir = append(hasilAkhir, PesananRingkas{
 			PublicID:        pesanan.PublicId.String(),
 			TotalPembayaran: pesanan.TotalPembayaran,
 			TanggalPesanan:  pesanan.TanggalPesanan,
-			StatusPesanan:   pesanan.StatusPesanan,
+			IDStatusPesanan: statusID,
 			NamaCustomer:    namaCust,
 			NoTelp:          noTelp,
 			AlamatLengkap:   alamatLengkap,
@@ -387,15 +400,15 @@ func GetDetailPesanan(c *gin.Context) {
   }
 
   type DetailPesananBungkus struct {
-    PublicID        string         `json:"public_id"`
-		NamaCustomer    string         `json:"nama_customer"`
-    NoTelp          string         `json:"no_telp"`
-    AlamatLengkap   string         `json:"alamat_lengkap"`
-    TotalPembayaran int            `json:"total_pembayaran"`
-    TanggalPesanan  time.Time      `json:"tanggal_pesanan"`
-    StatusPesanan   string         `json:"status_pesanan"`
-    MetodeBayar     MetodeBayarDTO `json:"metode_bayar"`
-    DaftarBarang    []ItemBarang   `json:"daftar_barang"`
+    PublicID          string         `json:"public_id"`
+		NamaCustomer      string         `json:"nama_customer"`
+    NoTelp            string         `json:"no_telp"`
+    AlamatLengkap     string         `json:"alamat_lengkap"`
+    TotalPembayaran   int            `json:"total_pembayaran"`
+    TanggalPesanan    time.Time      `json:"tanggal_pesanan"`
+    IDStatusPesanan   uint           `json:"id_status_pesanan"`
+    MetodeBayar       MetodeBayarDTO `json:"metode_bayar"`
+    DaftarBarang      []ItemBarang   `json:"daftar_barang"`
   }
 
   // 🚀 5. MAPPING BARANG (Looping keranjang)
@@ -453,17 +466,22 @@ func GetDetailPesanan(c *gin.Context) {
     namaCust = pesanan.Customer.User.NamaLengkap
   }
 
+  var statusID uint
+  if pesanan.StatusPesanan != nil {
+    statusID = pesanan.StatusPesanan.IdStatusPesanan
+  }
+
   // 🚀 7. BUNGKUS KE DTO FINAL
   hasilAkhir := DetailPesananBungkus{
-    PublicID:        pesanan.PublicId.String(),
-		NamaCustomer:    namaCust,
-    NoTelp:          noTelp,
-    AlamatLengkap:   alamatLengkap,
-    TotalPembayaran: pesanan.TotalPembayaran,
-    TanggalPesanan:  pesanan.TanggalPesanan,
-    StatusPesanan:   pesanan.StatusPesanan,
-    MetodeBayar:     metodeBayar,
-    DaftarBarang:    listBarang,
+    PublicID:          pesanan.PublicId.String(),
+		NamaCustomer:      namaCust,
+    NoTelp:            noTelp,
+    AlamatLengkap:     alamatLengkap,
+    TotalPembayaran:   pesanan.TotalPembayaran,
+    TanggalPesanan:    pesanan.TanggalPesanan,
+    IDStatusPesanan:   statusID,
+    MetodeBayar:       metodeBayar,
+    DaftarBarang:      listBarang,
   }
 
   // 🚀 8. SUKSES (200 OK)
@@ -539,7 +557,7 @@ func TerimaPesanan(c *gin.Context) {
 
 	// 🚀 5. UPDATE STATUS PESANAN
 	// Kita ubah status pesanan biar nggak nongol lagi di daftar "Cari Order" kurir lain
-	config.DB.Model(&pesanan).Update("status_pesanan", "Dikirim")
+	config.DB.Model(&pesanan).Update("id_status_pesanan", utils.GetStatusPesananID("Dikirim"))
 
 	// 🚀 6. KEMBALIKAN PUBLIC ID PENGANTARAN KE FLUTTER
 	// Tarik ulang datanya buat mastiin Public ID-nya ke-generate dari database

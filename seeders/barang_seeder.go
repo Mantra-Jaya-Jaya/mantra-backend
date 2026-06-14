@@ -60,9 +60,9 @@ func SeedBarang() {
 			NamaBarang:   item.Nama,
 			GambarBarang: fmt.Sprintf("https://picsum.photos/seed/%d/400/400", fake.Number(1, 1000)),
 			Deskripsi:    fake.Sentence(10),
-			DiskonId:     &diskon.IdDiskon,
-			SatuanId:     satuan.IdSatuan,
-			KategoriId:   kategori.IdKategori,
+			DiskonID:     &diskon.IdDiskon,
+			SatuanID:     satuan.IdSatuan,
+			KategoriID:   kategori.IdKategori,
 		}
 
 		if err := config.DB.Where("nama_barang = ?", item.Nama).FirstOrCreate(&barang).Error; err == nil {

@@ -9,6 +9,7 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -36,10 +37,10 @@ func StartTransaksi(c *gin.Context) {
 	}
 
 	pesanan := models.Pesanan{
-		KasirId:        &kasir.IdKasir,
-		TanggalPesanan: time.Now(),
-		TipePesanan:    "Offline",
-		StatusPesanan:  "Draft",
+		KasirID:         &kasir.IdKasir,
+		TanggalPesanan:  time.Now(),
+		TipePesananID:   utils.GetTipePesananID("Offline"),
+		StatusPesananID: utils.GetStatusPesananID("Draft"),
 	}
 
 	if err := config.DB.Create(&pesanan).Error; err != nil {
@@ -177,11 +178,11 @@ func UpdateQuantityItem(c *gin.Context) {
 		}
 
 		pesananBaru := models.Pesanan{
-			CustomerId:     customer.IdCustomer,
-			KasirId:        &kasir.IdKasir,
-			TanggalPesanan: time.Now(),
-			TipePesanan:    "Offline",
-			StatusPesanan:  "Draft",
+			CustomerID:      customer.IdCustomer,
+			KasirID:         &kasir.IdKasir,
+			TanggalPesanan:  time.Now(),
+			TipePesananID:   utils.GetTipePesananID("Offline"),
+			StatusPesananID: utils.GetStatusPesananID("Draft"),
 		}
 		if err := tx.Create(&pesananBaru).Error; err != nil {
 			tx.Rollback()
@@ -192,8 +193,8 @@ func UpdateQuantityItem(c *gin.Context) {
 	} else {
 		// Proteksi: Jangan edit pesanan yang sudah Selesai
 		var pesanan models.Pesanan
-		if err := tx.First(&pesanan, input.IdPesanan).Error; err == nil {
-			if pesanan.StatusPesanan == "Selesai" || pesanan.StatusPesanan == "Dibatalkan" {
+		if err := tx.Preload("StatusPesanan").First(&pesanan, input.IdPesanan).Error; err == nil {
+			if pesanan.StatusPesanan.NamaStatus == "Selesai" || pesanan.StatusPesanan.NamaStatus == "Dibatalkan" {
 				tx.Rollback()
 				c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Pesanan ini sudah selesai dan tidak dapat diubah lagi."})
 				return
@@ -216,8 +217,8 @@ func UpdateQuantityItem(c *gin.Context) {
 			}
 
 			detailBaru := models.DetailPesanan{
-				PesananId:           input.IdPesanan,
-				SpesifikasiBarangId: input.IdSpesifikasiBarang,
+				PesananID:           input.IdPesanan,
+				SpesifikasiBarangID: input.IdSpesifikasiBarang,
 				Jumlah:              input.Jumlah,
 				HargaSatuan:         spek.HargaBarang,
 				Subtotal:            input.Jumlah * spek.HargaBarang,
@@ -314,7 +315,7 @@ func BayarTunai(c *gin.Context) {
 	kembalian := input.Bayar - totalAkhir
 	tx := config.DB.Begin()
 
-	pesanan.StatusPesanan = "Selesai"
+	pesanan.StatusPesananID = utils.GetStatusPesananID("Selesai")
 	if err := tx.Save(&pesanan).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal update status"})
@@ -322,11 +323,11 @@ func BayarTunai(c *gin.Context) {
 	}
 
 	pembayaran := models.Pembayaran{
-		PesananID:       pesanan.IdPesanan,
-		PaymentType:     "cash",
-		StatusTransaksi: "settlement",
-		FraudStatus:     "accept",
-		TotalDibayar:    totalAkhir,
+		PesananID:          pesanan.IdPesanan,
+		TipePembayaranID:   utils.GetTipePembayaranID("cash"),
+		StatusTransaksiID:  utils.GetStatusTransaksiID("settlement"),
+		FraudStatusID:      utils.GetFraudStatusID("accept"),
+		TotalDibayar:       totalAkhir,
 	}
 	now := time.Now()
 	pembayaran.WaktuPembayaran = &now
@@ -375,7 +376,7 @@ func BayarNonTunai(c *gin.Context) {
 	// Jika ini adalah simulasi (untuk demo PBL/localhost tanpa webhook)
 	if input.Simulasi {
 		tx := config.DB.Begin()
-		pesanan.StatusPesanan = "Selesai"
+		pesanan.StatusPesananID = utils.GetStatusPesananID("Selesai")
 		if err := tx.Save(&pesanan).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal update status simulasi"})
@@ -383,11 +384,11 @@ func BayarNonTunai(c *gin.Context) {
 		}
 
 		pembayaran := models.Pembayaran{
-			PesananID:       pesanan.IdPesanan,
-			PaymentType:     "non-cash (simulation)",
-			StatusTransaksi: "settlement",
-			FraudStatus:     "accept",
-			TotalDibayar:    pesanan.TotalPembayaran,
+			PesananID:          pesanan.IdPesanan,
+			TipePembayaranID:   utils.GetTipePembayaranID("non-cash"),
+			StatusTransaksiID:  utils.GetStatusTransaksiID("settlement"),
+			FraudStatusID:      utils.GetFraudStatusID("accept"),
+			TotalDibayar:       pesanan.TotalPembayaran,
 		}
 		now := time.Now()
 		pembayaran.WaktuPembayaran = &now
@@ -432,14 +433,15 @@ func BayarNonTunai(c *gin.Context) {
 	}
 
 	// Update status pesanan jadi "Menunggu Pembayaran"
-	config.DB.Model(&pesanan).Update("status_pesanan", "Menunggu Pembayaran")
+	pesanan.StatusPesananID = utils.GetStatusPesananID("Menunggu Pembayaran")
+	config.DB.Save(&pesanan)
 
 	// Simpan data pembayaran awal (status: pending) agar webhook bisa mencocokkan order_id_midtrans
 	pembayaran := models.Pembayaran{
-		PesananID:       pesanan.IdPesanan,
-		OrderIdMidtrans: orderID,
-		PaymentType:     "non-cash",
-		StatusTransaksi: "pending",
+		PesananID:          pesanan.IdPesanan,
+		OrderIdMidtrans:    orderID,
+		TipePembayaranID:   utils.GetTipePembayaranID("non-cash"),
+		StatusTransaksiID:  utils.GetStatusTransaksiID("pending"),
 	}
 	config.DB.Create(&pembayaran)
 

@@ -11,7 +11,7 @@ func (Alamat) TableName() string {
 type Alamat struct {
 	IdAlamat       uint      `gorm:"primaryKey;column:id_alamat" json:"id_alamat"`
 	PublicId       uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
-	CustomerId     uint    `gorm:"column:id_customer" json:"id_customer"`
+	CustomerID     uint    `gorm:"column:id_customer" json:"id_customer"`
 	NamaPenerima   string  `gorm:"column:nama_penerima" json:"nama_penerima"`
 	LabelAlamat    string  `gorm:"column:label_alamat" json:"label_alamat"`
 	NoTelpPenerima string  `gorm:"column:no_telp_penerima" json:"no_telp_penerima"`
@@ -23,5 +23,5 @@ type Alamat struct {
 	IsUtama        bool    `gorm:"column:is_utama" json:"is_utama"`
 
 	// Relasi ke tabel customer
-	Customer Customer `gorm:"foreignKey:CustomerId;references:IdCustomer" json:"customer"`
+	Customer Customer `gorm:"foreignKey:CustomerID;references:IdCustomer" json:"customer"`
 }

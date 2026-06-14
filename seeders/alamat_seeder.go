@@ -29,7 +29,7 @@ func SeedAlamat() {
 	// 3. Kita racik 2 alamat sakti (Kost & Rumah)
 	daftarAlamat := []models.Alamat{
 		{
-			CustomerId:     customer.IdCustomer,
+			CustomerID:     customer.IdCustomer,
 			NamaPenerima:   user.NamaLengkap,
 			LabelAlamat:    "Kost",
 			NoTelpPenerima: "08" + gofakeit.DigitN(10),
@@ -40,7 +40,7 @@ func SeedAlamat() {
 			IsUtama:        true,
 		},
 		{
-			CustomerId:     customer.IdCustomer,
+			CustomerID:     customer.IdCustomer,
 			NamaPenerima:   user.NamaLengkap,
 			LabelAlamat:    "Rumah",
 			NoTelpPenerima: "08" + gofakeit.DigitN(10),
@@ -54,7 +54,7 @@ func SeedAlamat() {
 
 	// 4. Looping buat masukin ke database
 	for _, alamat := range daftarAlamat {
-		if err := config.DB.Where("id_customer = ? AND label_alamat = ?", alamat.CustomerId, alamat.LabelAlamat).FirstOrCreate(&alamat).Error; err != nil {
+		if err := config.DB.Where("id_customer = ? AND label_alamat = ?", alamat.CustomerID, alamat.LabelAlamat).FirstOrCreate(&alamat).Error; err != nil {
 			fmt.Println("Error insert alamat", alamat.LabelAlamat, ":", err)
 			continue
 		}

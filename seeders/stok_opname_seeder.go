@@ -20,6 +20,7 @@ func SeedStokOpname() {
 
 	totalRiwayat := 0
 	keteranganList := []string{"Stok masuk dari supplier", "Stok keluar penjualan", "Retur barang", "Stok opname bulanan"}
+	tipePergerakanList := []string{"masuk", "keluar", "retur", "penyesuaian"}
 
 	for _, varian := range daftarVarian {
 		var count int64
@@ -29,8 +30,8 @@ func SeedStokOpname() {
 		}
 
 		for i := 0; i < 3; i++ {
-			status := (i%2 == 0) // Mix true and false
-			
+			tipePergerakan := tipePergerakanList[i%len(tipePergerakanList)] // Mix different types
+
 			// Modal selalu lebih murah dari harga jual
 			modal := varian.HargaBarang - fake.IntRange(1000, 15000)
 			if modal < 0 {
@@ -39,7 +40,7 @@ func SeedStokOpname() {
 
 			stokOpname := models.StokOpname{
 				HargaBeli:           modal,
-				Status:              status,
+				TipePergerakan:      tipePergerakan,
 				JumlahStok:          fake.IntRange(10, 100),
 				Keterangan:          fake.RandomString(keteranganList),
 				Tanggal:             time.Now().AddDate(0, 0, -fake.IntRange(1, 30)),

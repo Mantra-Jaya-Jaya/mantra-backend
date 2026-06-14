@@ -169,7 +169,7 @@ func GetDetailBarang(c *gin.Context) {
   var responseVarian []gin.H
   for _, v := range varians {
     hargaDiskon := v.HargaBarang
-    if barang.DiskonId != nil && barang.Diskon.IdDiskon != 0 {
+    if barang.DiskonID != nil && barang.Diskon.IdDiskon != 0 {
       if barang.Diskon.TglMulai.Before(now) && barang.Diskon.TglSelesai.After(now) {
         hargaDiskon = v.HargaBarang - (v.HargaBarang * barang.Diskon.BesarDiskon / 100)
       }
@@ -207,7 +207,7 @@ func GetDetailBarang(c *gin.Context) {
   }
 
   var diskonData interface{} = nil
-  if barang.DiskonId != nil && barang.Diskon.IdDiskon != 0 {
+  if barang.DiskonID != nil && barang.Diskon.IdDiskon != 0 {
     diskonData = gin.H{
       "id_diskon":    barang.Diskon.IdDiskon, 
       "nama_diskon":  barang.Diskon.NamaDiskon,
@@ -307,9 +307,9 @@ func TambahBarang(c *gin.Context) {
 		NamaBarang:   input.InformasiBarang.Nama,
 		GambarBarang: input.Media,
 		Deskripsi:    input.InformasiBarang.Deskripsi,
-		KategoriId:   kategori.IdKategori,
-		SatuanId:     satuan.IdSatuan,
-		DiskonId:     idDiskonPointer,
+		KategoriID:   kategori.IdKategori,
+		SatuanID:     satuan.IdSatuan,
+		DiskonID:     idDiskonPointer,
 	}
 
 	if err := tx.Create(&barang).Error; err != nil {
@@ -365,7 +365,7 @@ func TambahBarang(c *gin.Context) {
 			stokOpname := models.StokOpname{
 				SpesifikasiBarangID: spekBarang.IdSpesifikasiBarang, // Nempel ke variasi ini aja
 				HargaBeli:           hargaBeliInt,                   // Suntik harga beli dari induk
-				Status:              true,                           // Boolean True = Barang Masuk
+				TipePergerakan:      "masuk",                        // String: masuk, keluar, penyesuaian, retur
 				JumlahStok:          stokInt,                        // Jumlah stok MURNI dari variasi ini
 				Keterangan:          "menambahkan barang pertama kali", // Teks sesuai request lu
 				Tanggal:             time.Now(),                     // Tanggal otomatis terekam saat ini
@@ -553,10 +553,14 @@ func UpdateBarang(c *gin.Context) {
 			tx.Model(&spekBarang).Update("jumlah", spekBarang.Jumlah)
 
 			// Catat ke log riwayat gudang
+			tipePergerakan := "keluar"
+			if spek.PenyesuaianStok.IsMasuk {
+				tipePergerakan = "masuk"
+			}
 			stokOpname := models.StokOpname{
 				SpesifikasiBarangID: spekBarang.IdSpesifikasiBarang,
 				HargaBeli:           hargaBeliInt,
-				Status:              spek.PenyesuaianStok.IsMasuk,
+				TipePergerakan:      tipePergerakan,
 				JumlahStok:          qty,
 				Keterangan:          spek.PenyesuaianStok.Keterangan,
 				Tanggal:             time.Now(),
@@ -676,7 +680,7 @@ func GetDetailBarangByScan(c *gin.Context) {
 	now := time.Now()
 	for _, v := range varians {
 		hargaDiskon := v.HargaBarang
-		if barcode.SpesifikasiBarang.Barang.DiskonId != nil && barcode.SpesifikasiBarang.Barang.Diskon.IdDiskon != 0 {
+		if barcode.SpesifikasiBarang.Barang.DiskonID != nil && barcode.SpesifikasiBarang.Barang.Diskon.IdDiskon != 0 {
 			if barcode.SpesifikasiBarang.Barang.Diskon.TglMulai.Before(now) && barcode.SpesifikasiBarang.Barang.Diskon.TglSelesai.After(now) {
 				hargaDiskon = v.HargaBarang - (v.HargaBarang * barcode.SpesifikasiBarang.Barang.Diskon.BesarDiskon / 100)
 			}
@@ -693,7 +697,7 @@ func GetDetailBarangByScan(c *gin.Context) {
 	}
 
 	var diskonData interface{} = nil
-	if barcode.SpesifikasiBarang.Barang.DiskonId != nil && barcode.SpesifikasiBarang.Barang.Diskon.IdDiskon != 0 {
+	if barcode.SpesifikasiBarang.Barang.DiskonID != nil && barcode.SpesifikasiBarang.Barang.Diskon.IdDiskon != 0 {
 		diskonData = gin.H{
 			"nama_diskon":  barcode.SpesifikasiBarang.Barang.Diskon.NamaDiskon,
 			"besar_diskon": barcode.SpesifikasiBarang.Barang.Diskon.BesarDiskon,
@@ -743,7 +747,7 @@ func CariProdukTransaksi(c *gin.Context) {
 		spek := barcode.SpesifikasiBarang
 		now := time.Now()
 		harga := spek.HargaBarang
-		if spek.Barang.DiskonId != nil && spek.Barang.Diskon.IdDiskon != 0 {
+		if spek.Barang.DiskonID != nil && spek.Barang.Diskon.IdDiskon != 0 {
 			if spek.Barang.Diskon.TglMulai.Before(now) && spek.Barang.Diskon.TglSelesai.After(now) {
 				harga = spek.HargaBarang - (spek.HargaBarang * spek.Barang.Diskon.BesarDiskon / 100)
 			}
@@ -788,7 +792,7 @@ func CariProdukTransaksi(c *gin.Context) {
 		var varianList []gin.H
 		for _, v := range speks {
 			harga := v.HargaBarang
-			if b.DiskonId != nil && b.Diskon.IdDiskon != 0 {
+			if b.DiskonID != nil && b.Diskon.IdDiskon != 0 {
 				if b.Diskon.TglMulai.Before(now) && b.Diskon.TglSelesai.After(now) {
 					harga = v.HargaBarang - (v.HargaBarang * b.Diskon.BesarDiskon / 100)
 				}
