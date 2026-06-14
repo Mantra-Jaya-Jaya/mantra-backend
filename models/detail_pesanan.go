@@ -1,5 +1,7 @@
 package models
 
+import "gorm.io/gorm"
+
 func (DetailPesanan) TableName() string {
 	return "detail_pesanan"
 }
@@ -20,13 +22,13 @@ type DetailPesanan struct {
 }
 
 // BeforeCreate hook untuk auto-compute Subtotal saat INSERT
-func (d *DetailPesanan) BeforeCreate() error {
+func (d *DetailPesanan) BeforeCreate(tx *gorm.DB) error {
 	d.Subtotal = d.Jumlah * d.HargaSatuan
 	return nil
 }
 
 // BeforeUpdate hook untuk auto-compute Subtotal saat UPDATE
-func (d *DetailPesanan) BeforeUpdate() error {
+func (d *DetailPesanan) BeforeUpdate(tx *gorm.DB) error {
 	d.Subtotal = d.Jumlah * d.HargaSatuan
 	return nil
 }
