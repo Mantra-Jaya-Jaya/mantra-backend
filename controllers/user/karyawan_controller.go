@@ -41,12 +41,13 @@ func GetDaftarKaryawan(c *gin.Context) {
 
 	status := c.Query("status")
 	if status != "" && status != "Semua Status" {
-		query = query.Where("karyawan.status = ?", status)
+		// Pakai ID lookup — kolom 'karyawan.status' (string lama) sudah tidak diisi lagi
+		query = query.Where("karyawan.id_status_karyawan = ?", utils.GetStatusKaryawanID(status))
 	}
 
 	query.Count(&total)
 
-	if err := query.Preload("User").Preload("User.Role").Offset(offset).Limit(limit).Find(&karyawans).Error; err != nil {
+	if err := query.Preload("User").Preload("User.Role").Preload("StatusKaryawanRel").Offset(offset).Limit(limit).Find(&karyawans).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal mengambil data karyawan",
@@ -72,7 +73,10 @@ func GetDaftarKaryawan(c *gin.Context) {
 			"email":         k.User.Email,
 			"role":          k.User.Role.NamaRole,
 			"no_telp":       k.NoTelp,
-			"status":        k.Status,
+			"status":        func() string {
+				if k.StatusKaryawanRel != nil { return k.StatusKaryawanRel.NamaStatus }
+				return k.Status // fallback ke kolom lama jika relasi belum di-migrate
+			}(),
 			"foto_profil":   fotoProfil,
 			"terakhir_login": "Belum pernah", // TODO: Implement using RefreshToken table if needed
 			"inisial":       getInisial(k.User.NamaLengkap),
@@ -236,7 +240,7 @@ func getInisial(name string) string {
 func GetDetailKaryawan(c *gin.Context) {
 	id := c.Param("public_id")
 	var karyawan models.Karyawan
-	if err := config.DB.Preload("User").Preload("User.Role").Where("public_id = ?", id).First(&karyawan).Error; err != nil {
+	if err := config.DB.Preload("User").Preload("User.Role").Preload("StatusKaryawanRel").Where("public_id = ?", id).First(&karyawan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Karyawan tidak ditemukan"})
 		return
 	}
@@ -267,7 +271,10 @@ func GetDetailKaryawan(c *gin.Context) {
 			"nik":                 karyawan.Nik,
 			"role":                karyawan.User.Role.NamaRole,
 			"shift":               shift,
-			"status":              karyawan.Status,
+			"status":              func() string {
+				if karyawan.StatusKaryawanRel != nil { return karyawan.StatusKaryawanRel.NamaStatus }
+				return karyawan.Status // fallback ke kolom lama
+			}(),
 			"foto_profil":         karyawan.User.FotoProfil,
 			"dibuat_pada":         "Tidak tersedia", // TODO: Tambahkan field created_at di tabel
 			"login_terakhir":      "Belum pernah",   // TODO: Ambil dari refresh token atau tracking login
