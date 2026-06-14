@@ -725,6 +725,7 @@ func GetDetailBarangByScan(c *gin.Context) {
 // Dipakai oleh: kasir (GET /kasir/katalog/cari)
 // Auth: Wajib login, role kasir
 func CariProdukTransaksi(c *gin.Context) {
+	// 1. Nangkap dari URL Query: /transaksi/produk?q=12345
 	query := c.Query("q")
 	if query == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -734,12 +735,12 @@ func CariProdukTransaksi(c *gin.Context) {
 		return
 	}
 
-	// Cari di tabel barcode dulu (berdasarkan id_barcode = kode barcode)
+	// 2. 🚀 CARI BERDASARKAN KODE BARCODE (Bukan ID!)
 	var barcode models.Barcode
 	barcodeErr := config.DB.
 		Preload("SpesifikasiBarang.Barang.Diskon").
 		Preload("SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
-		Where("id_barcode = ?", query).
+		Where("kode_barcode = ?", query). // 🚀 Ganti ini jadi kolom kode lu!
 		First(&barcode).Error
 
 	if barcodeErr == nil {
@@ -770,9 +771,9 @@ func CariProdukTransaksi(c *gin.Context) {
 		return
 	}
 
-	// Cari berdasarkan nama barang (LIKE)
+	// 3. Cari berdasarkan nama barang (LIKE)
 	var barangList []models.Barang
-	config.DB.Where("nama_barang LIKE ?", "%"+query+"%").Limit(10).Find(&barangList)
+	config.DB.Where("nama_barang ILIKE ?", "%"+query+"%").Limit(10).Find(&barangList) // 🚀 Kasih ILIKE biar case-insensitive di Postgres!
 
 	if len(barangList) == 0 {
 		c.JSON(http.StatusNotFound, gin.H{
