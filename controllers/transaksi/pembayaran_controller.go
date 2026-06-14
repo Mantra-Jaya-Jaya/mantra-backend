@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"strings"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -13,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/midtrans/midtrans-go"
-	"github.com/midtrans/midtrans-go/snap"
+	"github.com/midtrans/midtrans-go/coreapi"
 )
 
 // StartTransaksi membuat pesanan baru dengan status Draft untuk kasir POS.
@@ -357,8 +358,8 @@ func hitungPajak(subtotal int) int {
 // Auth: Wajib login, role kasir
 func BayarNonTunai(c *gin.Context) {
 	var input struct {
-		IdPesanan uint `json:"id_pesanan"`
-		Simulasi  bool `json:"simulasi"`
+		IdPesanan uint   `json:"id_pesanan"`
+		Metode    string `json:"metode"` // "qris", "bca", "bni", atau "bri"
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -366,85 +367,151 @@ func BayarNonTunai(c *gin.Context) {
 		return
 	}
 
+	// 1. Cari Data Pesanan
 	var pesanan models.Pesanan
 	if err := config.DB.First(&pesanan, "id_pesanan = ?", input.IdPesanan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pesanan tidak ditemukan"})
 		return
 	}
 
-	// Jika ini adalah simulasi (untuk demo PBL/localhost tanpa webhook)
-	if input.Simulasi {
-		tx := config.DB.Begin()
-		pesanan.StatusPesanan = "Selesai"
-		if err := tx.Save(&pesanan).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal update status simulasi"})
-			return
-		}
+	// 🚀 2. CARI ID METODE PEMBAYARAN DARI DATABASE LU
+	metodeInput := strings.ToLower(input.Metode)
+	kodeMetodeDb := "qris" // Default ke QRIS (id: 2 di seeder lu)
+	if metodeInput == "bca" || metodeInput == "bni" || metodeInput == "bri" {
+		kodeMetodeDb = "va" // Set ke VA (id: 3 di seeder lu)
+	}
 
-		pembayaran := models.Pembayaran{
-			PesananID:       pesanan.IdPesanan,
-			PaymentType:     "non-cash (simulation)",
-			StatusTransaksi: "settlement",
-			FraudStatus:     "accept",
-			TotalDibayar:    pesanan.TotalPembayaran,
-		}
-		now := time.Now()
-		pembayaran.WaktuPembayaran = &now
-		
-		if err := tx.Create(&pembayaran).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal simpan pembayaran simulasi"})
-			return
-		}
-		tx.Commit()
-
-		invoiceNum := "INV-" + pesanan.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(pesanan.IdPesanan))
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "success",
-			"message": "Pembayaran simulasi berhasil",
-			"data": gin.H{
-				"nomor_invoice": invoiceNum,
-			},
-		})
+	var metodeDb models.MetodePembayaran
+	if err := config.DB.Where("kode_metode = ?", kodeMetodeDb).First(&metodeDb).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Metode pembayaran belum disetup di database"})
 		return
 	}
 
-	// Jika bukan simulasi, panggil Midtrans
-	totalAkhir := pesanan.TotalPembayaran
-
-	var s snap.Client
-	s.New(os.Getenv("MIDTRANS_SERVER_KEY"), midtrans.Sandbox)
-
+	// 3. Setup Midtrans Core API
+	var coreClient coreapi.Client
+	coreClient.New(os.Getenv("MIDTRANS_SERVER_KEY"), midtrans.Sandbox)
 	orderID := "MID-" + strconv.Itoa(int(pesanan.IdPesanan)) + "-" + strconv.FormatInt(time.Now().Unix(), 10)
 
-	req := &snap.Request{
+	req := &coreapi.ChargeReq{
 		TransactionDetails: midtrans.TransactionDetails{
 			OrderID:  orderID,
-			GrossAmt: int64(totalAkhir),
+			GrossAmt: int64(pesanan.TotalPembayaran), 
 		},
 	}
 
-	snapResp, err := s.CreateTransaction(req)
+	// 4. Atur Request Tipe Pembayaran
+	if metodeInput == "bca" {
+		req.PaymentType = coreapi.PaymentTypeBankTransfer
+		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBca}
+	} else if metodeInput == "bni" {
+		req.PaymentType = coreapi.PaymentTypeBankTransfer
+		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBni}
+	} else if metodeInput == "bri" {
+		req.PaymentType = coreapi.PaymentTypeBankTransfer
+		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBri}
+	} else {
+		req.PaymentType = coreapi.PaymentTypeGopay // Pakai trik Gopay buat narik QRIS
+	}
+
+	// 5. Tembak Midtrans
+	coreResp, err := coreClient.ChargeTransaction(req)
 	if err != nil {
+		fmt.Println("❌ ERROR MIDTRANS:", err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal terhubung ke Midtrans"})
 		return
 	}
 
-	// Update status pesanan jadi "Menunggu Pembayaran"
-	config.DB.Model(&pesanan).Update("status_pesanan", "Menunggu Pembayaran")
-
-	// Simpan data pembayaran awal (status: pending) agar webhook bisa mencocokkan order_id_midtrans
-	pembayaran := models.Pembayaran{
-		PesananID:       pesanan.IdPesanan,
-		OrderIdMidtrans: orderID,
-		PaymentType:     "non-cash",
-		StatusTransaksi: "pending",
+	// 6. Ekstrak Data Balikan (QR atau VA)
+	var qrUrl, vaNumber string
+	if metodeInput == "bca" || metodeInput == "bni" || metodeInput == "bri" {
+		if len(coreResp.VaNumbers) > 0 {
+			vaNumber = coreResp.VaNumbers[0].VANumber
+		}
+	} else {
+		for _, action := range coreResp.Actions {
+			if action.Name == "generate-qr-code" {
+				qrUrl = action.URL
+				break
+			}
+		}
 	}
-	config.DB.Create(&pembayaran)
+
+	// 🚀 7. SIMPAN KE DATABASE SECARA ATOMIC (TRANSACTION)
+	tx := config.DB.Begin()
+
+	// Update Status Pesanan
+	if err := tx.Model(&pesanan).Update("status_pesanan", "Menunggu Pembayaran").Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal update pesanan"})
+		return
+	}
+
+	// Buat Record Pembayaran Induk
+	pembayaran := models.Pembayaran{
+		PesananID:          pesanan.IdPesanan,
+		OrderIdMidtrans:    orderID,
+		PaymentType:        metodeInput,
+		StatusTransaksi:    "pending",
+		MetodePembayaranID: &metodeDb.IdMetodePembayaran, // 🔥 Relasi ke tabel metode pembayaran!
+	}
+	if err := tx.Create(&pembayaran).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat pembayaran"})
+		return
+	}
+
+	// Buat Record Detail Pembayaran (Buat Nota Kasir Nanti)
+	detailPembayaran := models.DetailPembayaran{
+		PembayaranID:    pembayaran.IdPembayaran,
+		KanalPembayaran: metodeInput,
+	}
+	
+	if metodeInput == "qris" || metodeInput == "gopay" {
+		detailPembayaran.QrCode = qrUrl // Masukin link gambarnya
+	} else {
+		detailPembayaran.NomorVA = vaNumber // Masukin nomor rekeningnya
+		detailPembayaran.NamaBank = strings.ToUpper(metodeInput)
+	}
+
+	if err := tx.Create(&detailPembayaran).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan detail pembayaran"})
+		return
+	}
+
+	tx.Commit() // Berhasil semua, patenkan datanya!
+
+	// 8. Kirim Response ke Flutter
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Transaksi berhasil digenerate",
+		"data": gin.H{
+			"order_id":  orderID,
+			"metode":    metodeInput,
+			"qr_url":    qrUrl,
+			"va_number": vaNumber,
+		},
+	})
+}
+
+func CekStatusPembayaran(c *gin.Context) {
+	orderId := c.Param("order_id") // Kita cek berdasarkan order_id dari Midtrans (contoh: MID-257-1781411165)
+
+	var pembayaran models.Pembayaran
+	// Cari data pembayaran di database
+	if err := config.DB.Where("order_id_midtrans = ?", orderId).First(&pembayaran).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pembayaran tidak ditemukan"})
+		return
+	}
+
+	// Kasih tau Flutter kalau statusnya udah lunas (settlement/capture)
+	isLunas := pembayaran.StatusTransaksi == "settlement" || pembayaran.StatusTransaksi == "capture"
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"data":   gin.H{"midtrans_data": gin.H{"token": snapResp.Token}},
+		"status":   "success",
+		"is_lunas": isLunas,
+		"data": gin.H{
+			"status_transaksi": pembayaran.StatusTransaksi,
+		},
 	})
 }
