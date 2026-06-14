@@ -65,11 +65,13 @@ func SeedPembayaran() {
 		}
 
 		pembayaran := models.Pembayaran{
-			OrderIdMidtrans:  orderIdMidtrans,
-			TipePembayaranID: utils.GetTipePembayaranID(ptype),
+			OrderIdMidtrans:   orderIdMidtrans,
+			TipePembayaranID:  utils.GetTipePembayaranID(ptype),
+			StatusTransaksi:   status,
 			StatusTransaksiID: utils.GetStatusTransaksiID(status),
-			FraudStatusID:    utils.GetFraudStatusID("accept"),
-			PesananID:        pesanan.IdPesanan,
+			FraudStatus:       "accept",
+			FraudStatusID:      utils.GetFraudStatusID("accept"),
+			PesananID:         pesanan.IdPesanan,
 		}
 
 		if err := config.DB.Create(&pembayaran).Error; err == nil {
