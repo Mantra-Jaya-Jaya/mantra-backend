@@ -9,7 +9,7 @@ import (
 func SeedStatusNotifikasi() {
 	fmt.Println("Seeding status notifikasi...")
 
-	statusList := []string{"unread", "read", "aktif"}
+	statusList := []string{"unread", "read"}
 	for _, nama := range statusList {
 		status := models.StatusNotifikasi{NamaStatus: nama}
 		if err := config.DB.Where("nama_status = ?", nama).FirstOrCreate(&status).Error; err != nil {

@@ -9,7 +9,7 @@ func (DetailPembayaran) TableName() string {
 type DetailPembayaran struct {
 	IdDetailPembayaran uint      `gorm:"primaryKey;column:id_detail_pembayaran" json:"id_detail_pembayaran"`
 	PublicId           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
-	PembayaranID       uint      `gorm:"column:id_pembayaran" json:"id_pembayaran"`
+	PembayaranID       uint      `gorm:"column:id_pembayaran;not null" json:"id_pembayaran"`
 	KanalPembayaran    string    `gorm:"column:kanal_pembayaran" json:"kanal_pembayaran"`
 	NomorVA            string    `gorm:"column:nomor_va" json:"nomor_va"`
 	BillKey            string    `gorm:"column:bill_key" json:"bill_key"`

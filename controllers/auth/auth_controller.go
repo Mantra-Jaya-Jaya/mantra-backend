@@ -151,6 +151,10 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
+	// Perbarui CreatedAt sebagai penanda waktu aktivitas/login terakhir
+	storedToken.CreatedAt = time.Now()
+	config.DB.Save(&storedToken)
+
 	// Cari user dan role
 	var user models.User
 	if err := config.DB.Preload("Role").First(&user, storedToken.UserID).Error; err != nil {
@@ -232,7 +236,7 @@ func Logout(c *gin.Context) {
 		RespondWithError(c, http.StatusInternalServerError, "Kesalahan sistem", "SERVER_001", "Format ID user tidak valid")
 		return
 	}
-		if tokenStr != "" {
+	if tokenStr != "" {
 		now := time.Now()
 		// Update RevokedAt untuk token yang bersangkutan & milik user tsb
 		result := config.DB.Model(&models.RefreshToken{}).

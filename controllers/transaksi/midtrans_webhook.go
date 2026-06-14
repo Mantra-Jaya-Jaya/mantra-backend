@@ -35,15 +35,15 @@ type midtransNotification struct {
 		Bank     string `json:"bank"`
 		VaNumber string `json:"va_number"`
 	} `json:"va_numbers"`
-	BillKey       string `json:"bill_key"`
-	BillCode      string `json:"bill_code"`
-	Store         string `json:"store"`
-	PaymentCode   string `json:"payment_code"`
+	BillKey         string `json:"bill_key"`
+	BillCode        string `json:"bill_code"`
+	Store           string `json:"store"`
+	PaymentCode     string `json:"payment_code"`
 	PermataVaNumber string `json:"permata_va_number"`
-	QrCodeUrl     string `json:"qr_code_url"`
-	MerchantID    string `json:"merchant_id"`
-	Acquirer      string `json:"acquirer"`
-	Currency      string `json:"currency"`
+	QrCodeUrl       string `json:"qr_code_url"`
+	MerchantID      string `json:"merchant_id"`
+	Acquirer        string `json:"acquirer"`
+	Currency        string `json:"currency"`
 }
 
 func MidtransNotificationHandler(c *gin.Context) {

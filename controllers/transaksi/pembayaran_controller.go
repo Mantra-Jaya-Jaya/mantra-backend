@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"time"
 	"strings"
+	"time"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -294,23 +294,23 @@ func BayarTunai(c *gin.Context) {
 	var totalAkhir int
 
 	config.DB.
-    	Model(&models.DetailPesanan{}).
-    	Where("id_pesanan = ?", input.IdPesanan).
-    	Select("COALESCE(SUM(subtotal),0)").
-    	Scan(&totalAkhir)
+		Model(&models.DetailPesanan{}).
+		Where("id_pesanan = ?", input.IdPesanan).
+		Select("COALESCE(SUM(subtotal),0)").
+		Scan(&totalAkhir)
 
 	fmt.Println("ID Pesanan =", input.IdPesanan)
 	fmt.Println("Bayar =", input.Bayar)
 	fmt.Println("TotalAkhir =", totalAkhir)
 	fmt.Println("TotalPembayaran =", pesanan.TotalPembayaran)
-	
+
 	if input.Bayar < totalAkhir {
-    	c.JSON(http.StatusBadRequest, gin.H{
-        	"status": "error",
-        	"message": "Uang pembayaran kurang. Total yang harus dibayar: Rp " +
-            	strconv.Itoa(totalAkhir),
-    	})
-    	return
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status": "error",
+			"message": "Uang pembayaran kurang. Total yang harus dibayar: Rp " +
+				strconv.Itoa(totalAkhir),
+		})
+		return
 	}
 
 	kembalian := input.Bayar - totalAkhir
@@ -324,11 +324,11 @@ func BayarTunai(c *gin.Context) {
 	}
 
 	pembayaran := models.Pembayaran{
-		PesananID:          pesanan.IdPesanan,
-		TipePembayaranID:   utils.GetTipePembayaranID("cash"),
-		StatusTransaksiID:  utils.GetStatusTransaksiID("settlement"),
-		FraudStatusID:      utils.GetFraudStatusID("accept"),
-		TotalDibayar:       totalAkhir,
+		PesananID:         pesanan.IdPesanan,
+		TipePembayaranID:  utils.GetTipePembayaranID("cash"),
+		StatusTransaksiID: utils.GetStatusTransaksiID("settlement"),
+		FraudStatusID:     utils.GetFraudStatusID("accept"),
+		TotalDibayar:      totalAkhir,
 	}
 	now := time.Now()
 	pembayaran.WaktuPembayaran = &now
@@ -396,7 +396,7 @@ func BayarNonTunai(c *gin.Context) {
 	req := &coreapi.ChargeReq{
 		TransactionDetails: midtrans.TransactionDetails{
 			OrderID:  orderID,
-			GrossAmt: int64(pesanan.TotalPembayaran), 
+			GrossAmt: int64(pesanan.TotalPembayaran),
 		},
 	}
 
@@ -460,7 +460,7 @@ func BayarNonTunai(c *gin.Context) {
 		PesananID:          pesanan.IdPesanan,
 		OrderIdMidtrans:    orderID,
 		TipePembayaranID:   utils.GetTipePembayaranID(tipePembayaranDB), // 🔥 Normalisasi: bank code → ID
-		StatusTransaksiID:  utils.GetStatusTransaksiID("pending"),        // 🔥 Normalisasi: string → ID
+		StatusTransaksiID:  utils.GetStatusTransaksiID("pending"),       // 🔥 Normalisasi: string → ID
 		MetodePembayaranID: &metodeDb.IdMetodePembayaran,
 	}
 	if err := tx.Create(&pembayaran).Error; err != nil {
@@ -474,7 +474,7 @@ func BayarNonTunai(c *gin.Context) {
 		PembayaranID:    pembayaran.IdPembayaran,
 		KanalPembayaran: metodeInput,
 	}
-	
+
 	if metodeInput == "qris" || metodeInput == "gopay" {
 		detailPembayaran.QrCode = qrUrl // Masukin link gambarnya
 	} else {

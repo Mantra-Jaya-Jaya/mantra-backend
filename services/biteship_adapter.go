@@ -231,3 +231,46 @@ func (b *BiteshipAdapter) TrackShipment(waybill string, courierCode string) ([]B
 	return result.History, nil
 }
 
+type BiteshipCourierItem struct {
+	CourierCode        string `json:"courier_code"`
+	CourierName        string `json:"courier_name"`
+	CourierServiceName string `json:"courier_service_name"`
+	CourierServiceCode string `json:"courier_service_code"`
+	Description        string `json:"description"`
+}
+
+type BiteshipCouriersResponse struct {
+	Success  bool                  `json:"success"`
+	Message  string                `json:"message"`
+	Couriers []BiteshipCourierItem `json:"couriers"`
+}
+
+// GetCouriers fetches all available couriers and services from Biteship API
+func (b *BiteshipAdapter) GetCouriers() ([]BiteshipCourierItem, error) {
+	reqHttp, _ := http.NewRequest("GET", b.baseURL+"/v1/couriers", nil)
+	reqHttp.Header.Set("Authorization", b.apiKey)
+
+	resp, err := b.client.Do(reqHttp)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("biteship error status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result BiteshipCouriersResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse biteship couriers: %w", err)
+	}
+
+	if !result.Success {
+		return nil, fmt.Errorf("biteship couriers fetch unsuccessful: %s", result.Message)
+	}
+
+	return result.Couriers, nil
+}
+
+

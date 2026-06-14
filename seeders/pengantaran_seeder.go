@@ -62,7 +62,7 @@ func SeedPengantaran() {
 		if i%2 != 0 {
 			statusID = statusJalan.IdStatusPengantaran
 			// 🚀 LOGIKA SAKTI: Kalau masih di jalan, waktu sampainya kita set NULL!
-			ptrWaktuSampai = nil 
+			ptrWaktuSampai = nil
 		}
 
 		// 🚀 2. MASUKIN ALAMAT MEMORI (&) KE DALAM STRUCT PENGANTARAN
@@ -73,9 +73,9 @@ func SeedPengantaran() {
 			LastLongitude:       110.438125,
 			FotoBuktiPengiriman: "https://picsum.photos/400/400",
 			PesananID:           pesanan.IdPesanan,
-			KurirID:             &idKurir,       // Pakai & (Pointer)
+			KurirID:             &idKurir, // Pakai & (Pointer)
 			StatusPengantaranID: statusID,
-			EkspedisiID:         &idEkspedisi,   // Pakai & (Pointer)
+			EkspedisiID:         &idEkspedisi, // Pakai & (Pointer)
 		}
 
 		if err := config.DB.Create(&pengantaran).Error; err != nil {

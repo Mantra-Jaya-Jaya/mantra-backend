@@ -203,18 +203,18 @@ func GetDashboardAdmin(c *gin.Context) {
 	now := time.Now()
 	startOfThisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 	startOfLastMonth := startOfThisMonth.AddDate(0, -1, 0)
-	
+
 	// 1. Total Revenue (Net vs Gross)
 	var penjualanHariIni, penjualanKotorHariIni int64
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
-	
+
 	// Net (Hanya Selesai)
 	selesaiID := utils.GetStatusPesananID("Selesai")
 	config.DB.Model(&models.Pesanan{}).
 		Where("id_status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", selesaiID, startOfDay, endOfDay).
 		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&penjualanHariIni)
-		
+
 	// Gross (Semua status)
 	config.DB.Model(&models.Pesanan{}).
 		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
@@ -287,7 +287,7 @@ func GetDashboardAdmin(c *gin.Context) {
 		} else {
 			varianName = "Default"
 		}
-		
+
 		statusStok := "warning"
 		if s.Jumlah <= 5 {
 			statusStok = "kritis"
@@ -405,8 +405,8 @@ func GetChartDashboardAdmin(c *gin.Context) {
 		senin := now.AddDate(0, 0, -day+1)
 		minggu := senin.AddDate(0, 0, 6)
 
-		label = fmt.Sprintf("%d %s - %d %s %d", 
-			senin.Day(), monthNames[senin.Month()-1][:3], 
+		label = fmt.Sprintf("%d %s - %d %s %d",
+			senin.Day(), monthNames[senin.Month()-1][:3],
 			minggu.Day(), monthNames[minggu.Month()-1][:3], minggu.Year())
 
 		namaHari := []string{"Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"}
@@ -424,14 +424,14 @@ func GetChartDashboardAdmin(c *gin.Context) {
 		}
 	} else if periode == "bulan" {
 		label = fmt.Sprintf("%s %d", monthNames[now.Month()-1], now.Year())
-		
+
 		// 5 minggu
 		startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		
+
 		for i := 0; i < 5; i++ {
 			startOfWeek := startOfMonth.AddDate(0, 0, i*7)
 			endOfWeek := startOfWeek.AddDate(0, 0, 7)
-			
+
 			// Jika startOfWeek sudah beda bulan, skip
 			if startOfWeek.Month() != now.Month() && i == 4 {
 				continue
@@ -446,7 +446,7 @@ func GetChartDashboardAdmin(c *gin.Context) {
 		}
 	} else if periode == "tahun" {
 		label = fmt.Sprintf("%d", now.Year())
-		
+
 		shortMonthNames := []string{"Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"}
 		for i := 1; i <= 12; i++ {
 			startOfMonth := time.Date(now.Year(), time.Month(i), 1, 0, 0, 0, 0, now.Location())
@@ -464,7 +464,7 @@ func GetChartDashboardAdmin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
 		"data": gin.H{
-			"bars": bars,
+			"bars":  bars,
 			"label": label,
 		},
 	})

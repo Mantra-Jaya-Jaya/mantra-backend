@@ -8,14 +8,14 @@ func (StokOpname) TableName() string {
 
 // Riwayat pergerakan stok per varian barang
 type StokOpname struct {
-	IdStokOpname uint      `gorm:"primaryKey;column:id_stok_opname" json:"id_stok_opname"`
-	HargaBeli    int       `gorm:"column:harga_beli" json:"harga_beli"`   // Harga beli/modal dalam Rupiah
-	TipePergerakan string  `gorm:"column:tipe_pergerakan" json:"tipe_pergerakan"` // masuk, keluar, penyesuaian, retur
-	JumlahStok   int       `gorm:"column:jumlah_stok" json:"jumlah_stok"` // yang sedang di masukkan atau keluar (bukan total stok)
-	Keterangan   string    `gorm:"type:text;column:keterangan" json:"keterangan"`
-	Tanggal      time.Time `gorm:"column:tanggal" json:"tanggal"`
+	IdStokOpname   uint      `gorm:"primaryKey;column:id_stok_opname" json:"id_stok_opname"`
+	HargaBeli      int       `gorm:"column:harga_beli" json:"harga_beli"`           // Harga beli/modal dalam Rupiah
+	TipePergerakan string    `gorm:"column:tipe_pergerakan" json:"tipe_pergerakan"` // masuk, keluar, penyesuaian, retur
+	JumlahStok     int       `gorm:"column:jumlah_stok" json:"jumlah_stok"`         // yang sedang di masukkan atau keluar (bukan total stok)
+	Keterangan     string    `gorm:"type:text;column:keterangan" json:"keterangan"`
+	Tanggal        time.Time `gorm:"column:tanggal" json:"tanggal"`
 
 	// Relasi ke SpesifikasiBarang
-	SpesifikasiBarangID uint              `gorm:"column:id_spesifikasi_barang" json:"id_spesifikasi_barang"`
+	SpesifikasiBarangID uint              `gorm:"column:id_spesifikasi_barang;not null" json:"id_spesifikasi_barang"`
 	SpesifikasiBarang   SpesifikasiBarang `gorm:"foreignKey:SpesifikasiBarangID;references:IdSpesifikasiBarang" json:"spesifikasi_barang"`
 }

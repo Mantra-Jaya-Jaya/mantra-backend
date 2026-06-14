@@ -46,8 +46,6 @@ func SeedPesanan() {
 		}
 	}
 
-
-
 	totalCreated := 0
 	kasirLen := len(kasirs)
 	custLen := len(customers)
@@ -85,14 +83,13 @@ func SeedPesanan() {
 		totalPembayaran := fake.IntRange(50000, 5000000)
 
 		pesanan := models.Pesanan{
-			TotalPembayaran:  totalPembayaran,
-			TanggalPesanan:   tglPesanan,
-			TipePesanan:      tipePesanan,
-			TipePesananID:    utils.GetTipePesananID(tipePesanan),
-			StatusPesananID:  utils.GetStatusPesananID(statusName),
-			CustomerID:       cId,
-			KasirID:          &kId,
-			AlamatID:         alamatId,
+			TotalPembayaran: totalPembayaran,
+			TanggalPesanan:  tglPesanan,
+			TipePesananID:   utils.GetTipePesananID(tipePesanan),
+			StatusPesananID: utils.GetStatusPesananID(statusName),
+			CustomerID:      cId,
+			KasirID:         &kId,
+			AlamatID:        alamatId,
 		}
 
 		if err := config.DB.Create(&pesanan).Error; err == nil {

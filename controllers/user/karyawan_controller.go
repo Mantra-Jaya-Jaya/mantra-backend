@@ -22,8 +22,12 @@ func GetDaftarKaryawan(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	if page < 1 { page = 1 }
-	if limit < 1 { limit = 10 }
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
 	offset := (page - 1) * limit
 
 	var karyawans []models.Karyawan
@@ -33,7 +37,7 @@ func GetDaftarKaryawan(c *gin.Context) {
 	if search != "" {
 		query = query.Where("User.nama_lengkap ILIKE ? OR User.username ILIKE ? OR User.email ILIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
-	
+
 	role := c.Query("role")
 	if role != "" && role != "Semua Role" {
 		query = query.Where("\"User__Role\".nama_role = ?", role)
@@ -58,32 +62,67 @@ func GetDaftarKaryawan(c *gin.Context) {
 	var response []gin.H
 	baseURL := os.Getenv("BASE_URL")
 
+	// Collect user IDs to retrieve last login timestamps efficiently
+	var userIDs []uint
+	for _, k := range karyawans {
+		if k.User.IdUser != 0 {
+			userIDs = append(userIDs, k.User.IdUser)
+		}
+	}
+
+	lastLoginMap := make(map[uint]time.Time)
+	if len(userIDs) > 0 {
+		type LastLoginInfo struct {
+			IDUser    uint      `gorm:"column:id_user"`
+			LastLogin time.Time `gorm:"column:last_login"`
+		}
+		var lastLogins []LastLoginInfo
+		if err := config.DB.Model(&models.RefreshToken{}).
+			Select("id_user, MAX(created_at) as last_login").
+			Where("id_user IN ?", userIDs).
+			Group("id_user").
+			Scan(&lastLogins).Error; err == nil {
+			for _, l := range lastLogins {
+				lastLoginMap[l.IDUser] = l.LastLogin
+			}
+		}
+	}
+
 	for _, k := range karyawans {
 		fotoProfil := k.User.FotoProfil
 		if fotoProfil != "" && !strings.HasPrefix(fotoProfil, "http") && baseURL != "" {
 			fotoProfil = strings.TrimRight(baseURL, "/") + "/" + strings.TrimLeft(fotoProfil, "/")
 		}
 
+		terakhirLogin := "Belum pernah"
+		if t, ok := lastLoginMap[k.User.IdUser]; ok && !t.IsZero() {
+			terakhirLogin = t.Format("02 Jan 2006, 15:04")
+		}
+
 		response = append(response, gin.H{
-			"id_karyawan":   k.IdKaryawan,
-			"public_id":     k.PublicId,
-			"id_user":       k.User.IdUser,
-			"nama_lengkap":  k.User.NamaLengkap,
-			"username":      k.User.Username,
-			"email":         k.User.Email,
-			"role":          k.User.Role.NamaRole,
-			"no_telp":       k.NoTelp,
-			"status":        func() string {
-				if k.StatusKaryawanRel != nil { return k.StatusKaryawanRel.NamaStatus }
-				return k.Status // fallback ke kolom lama jika relasi belum di-migrate
+			"id_karyawan":  k.IdKaryawan,
+			"public_id":    k.PublicId,
+			"id_user":      k.User.IdUser,
+			"nama_lengkap": k.User.NamaLengkap,
+			"username":     k.User.Username,
+			"email":        k.User.Email,
+			"role":         k.User.Role.NamaRole,
+			"no_telp":      k.NoTelp,
+			"status": func() string {
+				if k.StatusKaryawanRel != nil {
+					return k.StatusKaryawanRel.NamaStatus
+				}
+				return "Aktif"
 			}(),
-			"foto_profil":   fotoProfil,
-			"terakhir_login": "Belum pernah", // TODO: Implement using RefreshToken table if needed
-			"inisial":       getInisial(k.User.NamaLengkap),
+			"foto_profil":    fotoProfil,
+			"terakhir_login": terakhirLogin,
+			"inisial":        getInisial(k.User.NamaLengkap),
 		})
 	}
-	
-	if response == nil { response = []gin.H{} }
+
+	if response == nil {
+		response = []gin.H{}
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -249,10 +288,16 @@ func GetDetailKaryawan(c *gin.Context) {
 	if karyawan.User.Role.NamaRole == "Kasir" {
 		var kasir models.Kasir
 		config.DB.Where("id_karyawan = ?", karyawan.IdKaryawan).First(&kasir)
-		shift = kasir.Shift
+		shift = "Pagi"
 		if kasir.ShiftKasirRel != nil {
 			shift = kasir.ShiftKasirRel.NamaShift
 		}
+	}
+
+	var lastLogin models.RefreshToken
+	loginTerakhirStr := "Belum pernah"
+	if err := config.DB.Where("id_user = ?", karyawan.User.IdUser).Order("created_at DESC").First(&lastLogin).Error; err == nil {
+		loginTerakhirStr = lastLogin.CreatedAt.Format("02 Jan 2006, 15:04")
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -271,13 +316,15 @@ func GetDetailKaryawan(c *gin.Context) {
 			"nik":                 karyawan.Nik,
 			"role":                karyawan.User.Role.NamaRole,
 			"shift":               shift,
-			"status":              func() string {
-				if karyawan.StatusKaryawanRel != nil { return karyawan.StatusKaryawanRel.NamaStatus }
-				return karyawan.Status // fallback ke kolom lama
+			"status": func() string {
+				if karyawan.StatusKaryawanRel != nil {
+					return karyawan.StatusKaryawanRel.NamaStatus
+				}
+				return "Aktif" // fallback ke kolom lama
 			}(),
-			"foto_profil":         karyawan.User.FotoProfil,
-			"dibuat_pada":         "Tidak tersedia", // TODO: Tambahkan field created_at di tabel
-			"login_terakhir":      "Belum pernah",   // TODO: Ambil dari refresh token atau tracking login
+			"foto_profil":    karyawan.User.FotoProfil,
+			"dibuat_pada":    "Tidak tersedia", // TODO: Tambahkan field created_at di tabel
+			"login_terakhir": loginTerakhirStr,
 		},
 	})
 }
@@ -315,10 +362,18 @@ func UpdateKaryawan(c *gin.Context) {
 	tx := config.DB.Begin()
 
 	// Update User
-	if input.Username != "" { karyawan.User.Username = input.Username }
-	if input.Email != "" { karyawan.User.Email = input.Email }
-	if input.NamaLengkap != "" { karyawan.User.NamaLengkap = input.NamaLengkap }
-	if input.FotoProfil != "" { karyawan.User.FotoProfil = input.FotoProfil }
+	if input.Username != "" {
+		karyawan.User.Username = input.Username
+	}
+	if input.Email != "" {
+		karyawan.User.Email = input.Email
+	}
+	if input.NamaLengkap != "" {
+		karyawan.User.NamaLengkap = input.NamaLengkap
+	}
+	if input.FotoProfil != "" {
+		karyawan.User.FotoProfil = input.FotoProfil
+	}
 	if input.Password != "" {
 		hashed, _ := bcrypt.GenerateFromPassword([]byte(input.Password), 12)
 		karyawan.User.Password = string(hashed)
@@ -330,17 +385,31 @@ func UpdateKaryawan(c *gin.Context) {
 	}
 
 	// Update Karyawan
-	if input.NoTelp != "" { karyawan.NoTelp = input.NoTelp }
-	if input.TempatLahir != "" { karyawan.TempatLahir = input.TempatLahir }
+	if input.NoTelp != "" {
+		karyawan.NoTelp = input.NoTelp
+	}
+	if input.TempatLahir != "" {
+		karyawan.TempatLahir = input.TempatLahir
+	}
 	if input.TanggalLahir != "" {
 		tgl, _ := time.Parse("2006-01-02", input.TanggalLahir)
 		karyawan.TanggalLahir = tgl
 	}
-	if input.JenisKelamin != "" { karyawan.JenisKelamin = input.JenisKelamin }
-	if input.Alamat != "" { karyawan.Alamat = input.Alamat }
-	if input.PendidikanTerakhir != "" { karyawan.PendidikanTerakhir = input.PendidikanTerakhir }
-	if input.Nik != "" { karyawan.Nik = input.Nik }
-	if input.Status != "" { karyawan.StatusKaryawanID = utils.GetStatusKaryawanID(input.Status) }
+	if input.JenisKelamin != "" {
+		karyawan.JenisKelamin = input.JenisKelamin
+	}
+	if input.Alamat != "" {
+		karyawan.Alamat = input.Alamat
+	}
+	if input.PendidikanTerakhir != "" {
+		karyawan.PendidikanTerakhir = input.PendidikanTerakhir
+	}
+	if input.Nik != "" {
+		karyawan.Nik = input.Nik
+	}
+	if input.Status != "" {
+		karyawan.StatusKaryawanID = utils.GetStatusKaryawanID(input.Status)
+	}
 
 	if err := tx.Save(&karyawan).Error; err != nil {
 		tx.Rollback()

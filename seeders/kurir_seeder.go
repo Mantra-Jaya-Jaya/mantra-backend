@@ -11,44 +11,53 @@ import (
 )
 
 func SeedKurir() {
-	// 1. Cari user lewat email kurir@mantra.com
-	var user models.User
-	err := config.DB.Where("email = ?", "kurir@mantra.com").First(&user).Error
+	gofakeit.Seed(0)
 
-	if err != nil {
-		fmt.Println("Waduh, akun (kurir@mantra.com) gak ketemu! Pastiin SeedUser jalan duluan.")
+	var role models.Role
+	if err := config.DB.Where("nama_role = ?", "Kurir").First(&role).Error; err != nil {
+		fmt.Println("Walah, Role Kurir gak ketemu!")
 		return
 	}
 
-	// 2. Siapin tanggal lahir (Misal: 10 Oktober 2003)
-	tglLahir := time.Date(2003, time.October, 10, 0, 0, 0, 0, time.Local)
-
-	// 3. Siapin profil Karyawan-nya
-	karyawanProfil := models.Karyawan{
-		NoTelp:             "08" + gofakeit.DigitN(10),
-		TempatLahir:        "Wonogiri", // Sesuaikan dengan vibes daerah lu bro!
-		TanggalLahir:       tglLahir,
-		JenisKelamin:       "Perempuan",
-		Alamat:             "Kecamatan Selogiri, Kabupaten Wonogiri",
-		PendidikanTerakhir: "SMA Negeri 1 Wonogiri",
-		Nik:                "3312" + gofakeit.DigitN(12), // 16 Digit NIK (Kode Wonogiri 3312)
-		Status:             "Aktif",
-		StatusKaryawanID:   utils.GetStatusKaryawanID("Aktif"),
-		UserID:             user.IdUser,
-	}
-
-	if err := config.DB.Where("id_user = ?", user.IdUser).FirstOrCreate(&karyawanProfil).Error; err != nil {
-		fmt.Println("Error:", err)
+	var users []models.User
+	if err := config.DB.Where("id_role = ?", role.IdRole).Find(&users).Error; err != nil || len(users) == 0 {
+		fmt.Println("Walah, akun Kurir gak ketemu! Pastiin SeedUser jalan duluan.")
 		return
 	}
 
-	kurirProfil := models.Kurir{
-		KaryawanID: karyawanProfil.IdKaryawan,
-	}
-	if err := config.DB.Where("id_karyawan = ?", karyawanProfil.IdKaryawan).FirstOrCreate(&kurirProfil).Error; err != nil {
-		fmt.Println("Error:", err)
-		return
+	totalKaryawan := 0
+	totalKurir := 0
+
+	for _, user := range users {
+		tglLahir := gofakeit.DateRange(time.Date(1995, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2003, 12, 31, 0, 0, 0, 0, time.UTC))
+
+		karyawanProfil := models.Karyawan{
+			NoTelp:             "08" + gofakeit.DigitN(10),
+			TempatLahir:        gofakeit.City(),
+			TanggalLahir:       tglLahir,
+			JenisKelamin:       gofakeit.RandomString([]string{"Laki-laki", "Perempuan"}),
+			Alamat:             gofakeit.Address().Address,
+			PendidikanTerakhir: gofakeit.RandomString([]string{"SMA/SMK", "D3", "S1"}),
+			Nik:                "3374" + gofakeit.DigitN(12),
+			StatusKaryawanID:   utils.GetStatusKaryawanID("Aktif"),
+			UserID:             user.IdUser,
+		}
+
+		if err := config.DB.Where("id_user = ?", user.IdUser).FirstOrCreate(&karyawanProfil).Error; err != nil {
+			fmt.Println("Error create karyawan untuk", user.NamaLengkap, ":", err)
+			continue
+		}
+		totalKaryawan++
+
+		kurirProfil := models.Kurir{
+			KaryawanID: karyawanProfil.IdKaryawan,
+		}
+		if err := config.DB.Where("id_karyawan = ?", karyawanProfil.IdKaryawan).FirstOrCreate(&kurirProfil).Error; err != nil {
+			fmt.Println("Error create kurir profil:", err)
+			continue
+		}
+		totalKurir++
 	}
 
-	fmt.Printf("Yeyy, Berhasil seed kurir!")
+	fmt.Printf("Yeyy, berhasil seed %d karyawan + %d kurir!\n", totalKaryawan, totalKurir)
 }

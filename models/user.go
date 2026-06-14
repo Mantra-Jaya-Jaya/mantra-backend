@@ -17,6 +17,6 @@ type User struct {
 	NamaLengkap string    `gorm:"column:nama_lengkap" json:"nama_lengkap"`
 	FotoProfil  string    `gorm:"column:foto_profil" json:"foto_profil"`
 
-	RoleID uint `gorm:"column:id_role" json:"id_role"`
+	RoleID uint `gorm:"column:id_role;not null" json:"id_role"`
 	Role   Role `gorm:"foreignKey:RoleID;references:IdRole" json:"role"`
 }

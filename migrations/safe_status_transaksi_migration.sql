@@ -1,6 +1,6 @@
 -- =============================================
 -- MIGRATION: Normalisasi StatusTransaksi
--- 
+--
 -- Tujuan: Convert kolom status_transaksi (string)
 -- menjadi id_status_transaksi (uint) dengan lookup
 -- table status_transaksi.
@@ -42,5 +42,16 @@ WHERE id_status_transaksi IS NULL;
 -- 6. Set NOT NULL setelah data terisi
 ALTER TABLE pembayaran
     ALTER COLUMN id_status_transaksi SET NOT NULL;
+
+-- 7. Tambah foreign key constraint
+ALTER TABLE pembayaran
+    ADD CONSTRAINT fk_pembayaran_status_transaksi
+    FOREIGN KEY (id_status_transaksi)
+    REFERENCES status_transaksi(id)
+    ON DELETE RESTRICT;
+
+-- 8. Tambah index untuk performansi query
+CREATE INDEX IF NOT EXISTS idx_pembayaran_status_transaksi
+    ON pembayaran(id_status_transaksi);
 
 COMMIT;

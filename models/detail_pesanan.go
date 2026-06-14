@@ -13,11 +13,11 @@ type DetailPesanan struct {
 	Subtotal        int  `gorm:"column:subtotal" json:"subtotal"`
 
 	// Foreign Key ke Pesanan
-	PesananID uint    `gorm:"column:id_pesanan" json:"id_pesanan"`
+	PesananID uint    `gorm:"column:id_pesanan;not null" json:"id_pesanan"`
 	Pesanan   Pesanan `gorm:"foreignKey:PesananID;references:IdPesanan" json:"pesanan"`
 
 	// Foreign Key ke SpesifikasiBarang (bukan ke Barang langsung — menyimpan varian yang dipilih)
-	SpesifikasiBarangID uint              `gorm:"column:id_spesifikasi_barang" json:"id_spesifikasi_barang"`
+	SpesifikasiBarangID uint              `gorm:"column:id_spesifikasi_barang;not null" json:"id_spesifikasi_barang"`
 	SpesifikasiBarang   SpesifikasiBarang `gorm:"foreignKey:SpesifikasiBarangID;references:IdSpesifikasiBarang" json:"spesifikasi_barang"`
 }
 

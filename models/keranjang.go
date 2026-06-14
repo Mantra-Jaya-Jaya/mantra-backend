@@ -15,10 +15,10 @@ type Keranjang struct {
 	Quantity    int       `gorm:"column:quantity" json:"quantity"`
 
 	// Relasi ke Customer
-	CustomerID uint     `gorm:"column:id_customer"`
+	CustomerID uint     `gorm:"column:id_customer;not null"`
 	Customer   Customer `gorm:"foreignKey:CustomerID;references:IdCustomer"`
 
 	// Relasi ke SpesifikasiBarang (varian spesifik yang dipilih)
-	SpesifikasiBarangID uint              `gorm:"column:id_spesifikasi_barang"`
+	SpesifikasiBarangID uint              `gorm:"column:id_spesifikasi_barang;not null"`
 	SpesifikasiBarang   SpesifikasiBarang `gorm:"foreignKey:SpesifikasiBarangID;references:IdSpesifikasiBarang"`
 }

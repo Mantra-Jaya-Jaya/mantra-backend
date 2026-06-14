@@ -1,9 +1,9 @@
 package notifikasi
 
 import (
+	"fmt"
 	"net/http"
 	"time"
-	"fmt"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -16,46 +16,46 @@ import (
 // Dipakai oleh: customer (GET /customer/notifikasi), kasir (GET /kasir/notifikasi), admin (GET /admin/notifikasi)
 // Auth: Wajib login, semua role boleh akses (dikontrol di route)
 func GetNotifikasi(c *gin.Context) {
-    // 1. Ambil dari context sebagai interface
-    val, exists := c.Get("user_id")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "User ID tidak ditemukan"})
-        return
-    }
+	// 1. Ambil dari context sebagai interface
+	val, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "User ID tidak ditemukan"})
+		return
+	}
 
-    // 2. Konversi ke uint secara eksplisit
-    var userID uint
-    switch v := val.(type) {
-    case int:
-        userID = uint(v)
-    case int64:
-        userID = uint(v)
-    case uint:
-        userID = v
-    default:
-        // Jika tipe data tidak dikenali, set ke 0
-        userID = 0
-    }
+	// 2. Konversi ke uint secara eksplisit
+	var userID uint
+	switch v := val.(type) {
+	case int:
+		userID = uint(v)
+	case int64:
+		userID = uint(v)
+	case uint:
+		userID = v
+	default:
+		// Jika tipe data tidak dikenali, set ke 0
+		userID = 0
+	}
 
-    // 3. Gunakan userID yang sudah pasti uint
-    var notifikasis []models.Notifikasi
-    if err := config.DB.Where("id_user = ?", userID).Find(&notifikasis).Error; err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{
-            "status":  "error",
-            "message": "Gagal mengambil notifikasi",
-        })
-        return
-    }
+	// 3. Gunakan userID yang sudah pasti uint
+	var notifikasis []models.Notifikasi
+	if err := config.DB.Preload("StatusNotifikasiRel").Where("id_user = ?", userID).Find(&notifikasis).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal mengambil notifikasi",
+		})
+		return
+	}
 
-    if notifikasis == nil {
-        notifikasis = []models.Notifikasi{}
-    }
+	if notifikasis == nil {
+		notifikasis = []models.Notifikasi{}
+	}
 
-    c.JSON(http.StatusOK, gin.H{
-        "status":  "success",
-        "message": "Notifikasi berhasil diambil",
-        "data":    notifikasis,
-    })
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Notifikasi berhasil diambil",
+		"data":    notifikasis,
+	})
 }
 
 // GetNotifikasiAdmin mengambil notifikasi khusus admin (stok menipis, dll).
@@ -72,14 +72,14 @@ func GetNotifikasiAdmin(c *gin.Context) {
 			responseData = append(responseData, gin.H{
 				"id_notifikasi": fmt.Sprintf("SYS-%d", n.IdNotifikasi),
 				"id_barang":     nil,
-				"public_id" : 	 nil,
+				"public_id":     nil,
 				"nama_barang":   nil,
 				"varian":        nil,
 				"stok_saat_ini": nil,
 				"batas_minimum": nil,
 				"pesan":         n.Pesan,
 				"judul":         n.Judul,
-				"status":        n.Status,
+				"status":        n.StatusNotifikasiRel.NamaStatus,
 				"created_at":    n.CreatedAt.Format(time.RFC3339),
 			})
 		}

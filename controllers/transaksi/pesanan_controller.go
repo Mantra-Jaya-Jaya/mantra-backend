@@ -219,12 +219,12 @@ func GetDetailPesanan(c *gin.Context) {
 		"status":  "success",
 		"message": "Detail pesanan berhasil diambil",
 		"data": gin.H{
-			"no_pesanan":          pesanan.PublicId,
-			"id_status_pesanan":   pesanan.StatusPesananID,
-			"tanggal_pesan":       pesanan.TanggalPesanan,
-			"items":               items,
-			"tujuan_pengantaran":  tujuanPengantaran,
-			"kurir":               kurirData,
+			"no_pesanan":         pesanan.PublicId,
+			"id_status_pesanan":  pesanan.StatusPesananID,
+			"tanggal_pesan":      pesanan.TanggalPesanan,
+			"items":              items,
+			"tujuan_pengantaran": tujuanPengantaran,
+			"kurir":              kurirData,
 			"rincian_pembayaran": gin.H{
 				"subtotal_items": subtotalItems,
 				"ongkir":         pesanan.OngkosKirim,
@@ -439,12 +439,12 @@ func CheckoutPesanan(c *gin.Context) {
 		"status":  "success",
 		"message": "Pesanan berhasil dibuat",
 		"data": gin.H{
-			"id_pesanan":      pesanan.PublicId,
-			"total_bayar":     grandTotal,
-			"ongkos_kirim":    ongkir,
-			"pajak":           pajak,
-			"midtrans_token":  midtransToken,
-			"redirect_url":    redirectURL,
+			"id_pesanan":     pesanan.PublicId,
+			"total_bayar":    grandTotal,
+			"ongkos_kirim":   ongkir,
+			"pajak":          pajak,
+			"midtrans_token": midtransToken,
+			"redirect_url":   redirectURL,
 		},
 	})
 }
@@ -558,8 +558,8 @@ func LacakPesanan(c *gin.Context) {
 				"status":  "success",
 				"message": "Data lacak pesanan berhasil diambil (Biteship offline/pending)",
 				"data": gin.H{
-					"id_pesanan":      idPesanan,
-					"nomor_resi":      *pesanan.NomorResi,
+					"id_pesanan":     idPesanan,
+					"nomor_resi":     *pesanan.NomorResi,
 					"ekspedisi":      pesanan.Ekspedisi.NamaEkspedisi,
 					"tipe_ekspedisi": "eksternal",
 					"history":        []interface{}{},
@@ -572,8 +572,8 @@ func LacakPesanan(c *gin.Context) {
 			"status":  "success",
 			"message": "Data lacak pesanan berhasil diambil",
 			"data": gin.H{
-				"id_pesanan":      idPesanan,
-				"nomor_resi":      *pesanan.NomorResi,
+				"id_pesanan":     idPesanan,
+				"nomor_resi":     *pesanan.NomorResi,
 				"ekspedisi":      pesanan.Ekspedisi.NamaEkspedisi,
 				"tipe_ekspedisi": "eksternal",
 				"history":        history,
@@ -615,7 +615,7 @@ func LacakPesanan(c *gin.Context) {
 		"status":  "success",
 		"message": "Data lacak pesanan berhasil diambil",
 		"data": gin.H{
-			"id_pesanan":      idPesanan,
+			"id_pesanan":     idPesanan,
 			"tipe_ekspedisi": "internal",
 			"kurir": gin.H{
 				"nama":       namaKurir,
@@ -713,8 +713,9 @@ func GetDashboardKasir(c *gin.Context) {
 
 	var aktivitasRaw []AktivitasResult
 	config.DB.Table("pesanan").
-		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(pembayaran.payment_type, 'tunai') as raw_payment_type").
+		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(tipe_pembayaran.nama_tipe, 'tunai') as raw_payment_type").
 		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
+		Joins("LEFT JOIN tipe_pembayaran ON tipe_pembayaran.id = pembayaran.id_tipe_pembayaran").
 		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
 		Order("pesanan.tanggal_pesanan DESC").
 		Limit(5).
@@ -771,8 +772,9 @@ func GetSemuaAktivitasHariIni(c *gin.Context) {
 
 	var aktivitasRaw []AktivitasResult
 	config.DB.Table("pesanan").
-		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(pembayaran.payment_type, 'tunai') as raw_payment_type").
+		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(tipe_pembayaran.nama_tipe, 'tunai') as raw_payment_type").
 		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
+		Joins("LEFT JOIN tipe_pembayaran ON tipe_pembayaran.id = pembayaran.id_tipe_pembayaran").
 		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
 		Order("pesanan.tanggal_pesanan DESC").
 		Scan(&aktivitasRaw)
@@ -1043,9 +1045,9 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 		"message": "Detail pesanan berhasil diambil",
 		"data": gin.H{
 			"order_info": gin.H{
-				"nomor_order":         "ORD-" + pesanan.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(pesanan.IdPesanan)),
-				"tanggal_waktu":       pesanan.TanggalPesanan,
-				"id_status_pesanan":   pesanan.StatusPesananID,
+				"nomor_order":       "ORD-" + pesanan.TanggalPesanan.Format("20060102") + "-" + strconv.Itoa(int(pesanan.IdPesanan)),
+				"tanggal_waktu":     pesanan.TanggalPesanan,
+				"id_status_pesanan": pesanan.StatusPesananID,
 			},
 			"pelanggan": gin.H{
 				"nama":   customerNama,
@@ -1061,4 +1063,3 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 		},
 	})
 }
-

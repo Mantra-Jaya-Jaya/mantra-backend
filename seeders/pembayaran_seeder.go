@@ -33,13 +33,12 @@ func SeedPembayaran() {
 		var countItem int64
 		config.DB.Model(&models.Pembayaran{}).Where("id_pesanan = ?", pesanan.IdPesanan).Count(&countItem)
 		if countItem > 0 {
-			continue // Skip jika pembayaran untuk pesanan ini sudah ada
+			continue
 		}
 
 		ptype := "cash"
 		status := "settlement"
 		orderIdMidtrans := ""
-
 		statusName := ""
 		if pesanan.StatusPesanan != nil {
 			statusName = pesanan.StatusPesanan.NamaStatus
@@ -47,11 +46,12 @@ func SeedPembayaran() {
 
 		if pesanan.TipePesananID == utils.GetTipePesananID("Online") {
 			ptype = fake.RandomString(onlinePaymentTypes)
-			if statusName == "Selesai" || statusName == "Dikirim" {
+			switch statusName {
+			case "Selesai", "Dikirim":
 				status = "settlement"
-			} else if statusName == "Dibatalkan" {
+			case "Dibatalkan":
 				status = "cancel"
-			} else {
+			default:
 				status = "pending"
 			}
 			orderIdMidtrans = fmt.Sprintf("MANTRA-%d-%d", pesanan.IdPesanan, time.Now().UnixNano())
@@ -67,10 +67,8 @@ func SeedPembayaran() {
 		pembayaran := models.Pembayaran{
 			OrderIdMidtrans:   orderIdMidtrans,
 			TipePembayaranID:  utils.GetTipePembayaranID(ptype),
-			StatusTransaksi:   status,
 			StatusTransaksiID: utils.GetStatusTransaksiID(status),
-			FraudStatus:       "accept",
-			FraudStatusID:      utils.GetFraudStatusID("accept"),
+			FraudStatusID:     utils.GetFraudStatusID("accept"),
 			PesananID:         pesanan.IdPesanan,
 		}
 
