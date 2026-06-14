@@ -447,12 +447,20 @@ func BayarNonTunai(c *gin.Context) {
 		return
 	}
 
+	// Petakan nama bank ke kode tipe pembayaran yang ada di tabel tipe_pembayaran
+	// Input user: "qris", "bca", "bni", "bri"
+	// Nilai valid di DB: "qris", "bank_transfer", "gopay", "cash", "non-cash"
+	tipePembayaranDB := metodeInput
+	if metodeInput == "bca" || metodeInput == "bni" || metodeInput == "bri" {
+		tipePembayaranDB = "bank_transfer"
+	}
+
 	// Buat Record Pembayaran Induk
 	pembayaran := models.Pembayaran{
 		PesananID:          pesanan.IdPesanan,
 		OrderIdMidtrans:    orderID,
-		TipePembayaranID:   utils.GetTipePembayaranID(metodeInput), // 🔥 Normalisasi: string → ID
-		StatusTransaksiID:  utils.GetStatusTransaksiID("pending"),  // 🔥 Normalisasi: string → ID
+		TipePembayaranID:   utils.GetTipePembayaranID(tipePembayaranDB), // 🔥 Normalisasi: bank code → ID
+		StatusTransaksiID:  utils.GetStatusTransaksiID("pending"),        // 🔥 Normalisasi: string → ID
 		MetodePembayaranID: &metodeDb.IdMetodePembayaran,
 	}
 	if err := tx.Create(&pembayaran).Error; err != nil {
@@ -499,8 +507,8 @@ func CekStatusPembayaran(c *gin.Context) {
 	orderId := c.Param("order_id") // Kita cek berdasarkan order_id dari Midtrans (contoh: MID-257-1781411165)
 
 	var pembayaran models.Pembayaran
-	// Cari data pembayaran di database
-	if err := config.DB.Where("order_id_midtrans = ?", orderId).First(&pembayaran).Error; err != nil {
+	// Cari data pembayaran di database, sertakan relasi status
+	if err := config.DB.Preload("StatusTransaksiRel").Where("order_id_midtrans = ?", orderId).First(&pembayaran).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pembayaran tidak ditemukan"})
 		return
 	}
@@ -510,11 +518,18 @@ func CekStatusPembayaran(c *gin.Context) {
 	captureID := utils.GetStatusTransaksiID("capture")
 	isLunas := pembayaran.StatusTransaksiID == settledID || pembayaran.StatusTransaksiID == captureID
 
+	// Ambil nama status dari relasi (untuk kompatibilitas mobile)
+	nama := ""
+	if pembayaran.StatusTransaksiRel != nil {
+		nama = pembayaran.StatusTransaksiRel.NamaStatus
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":   "success",
 		"is_lunas": isLunas,
 		"data": gin.H{
 			"id_status_transaksi": pembayaran.StatusTransaksiID,
+			"status_transaksi":    nama, // nama string untuk kompatibilitas mobile
 		},
 	})
 }

@@ -21,7 +21,7 @@ func SeedPembayaran() {
 	}
 
 	var daftarPesanan []models.Pesanan
-	if err := config.DB.Find(&daftarPesanan).Error; err != nil || len(daftarPesanan) == 0 {
+	if err := config.DB.Preload("StatusPesanan").Find(&daftarPesanan).Error; err != nil || len(daftarPesanan) == 0 {
 		fmt.Println("Gagal: Data Pesanan masih kosong!")
 		return
 	}

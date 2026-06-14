@@ -80,10 +80,15 @@ func MidtransNotificationHandler(c *gin.Context) {
 	}
 
 	pembayaran.TransaksiMidtransID = notif.TransactionID
-	pembayaran.TipePembayaranID = utils.GetTipePembayaranID(notif.PaymentType)
+
+	// Gunakan Safe version agar tidak panic jika Midtrans kirim tipe yang tidak dikenal
+	tipePembayaranID := utils.GetTipePembayaranIDSafe(notif.PaymentType)
+	if tipePembayaranID == 0 {
+		tipePembayaranID = utils.GetTipePembayaranID("non-cash") // fallback aman
+	}
+	pembayaran.TipePembayaranID = tipePembayaranID
 	pembayaran.StatusTransaksiID = utils.GetStatusTransaksiID(normalizedStatus)
 	pembayaran.FraudStatusID = utils.GetFraudStatusID(notif.FraudStatus)
-
 	grossAmount := 0
 	if err := parseGrossAmount(notif.GrossAmount, &grossAmount); err == nil {
 		pembayaran.TotalDibayar = grossAmount
