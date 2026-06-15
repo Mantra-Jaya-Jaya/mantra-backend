@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"backend-mantra/config"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/midtrans/midtrans-go"
+	"github.com/midtrans/midtrans-go/coreapi"
 	"github.com/midtrans/midtrans-go/snap"
 )
 
@@ -29,6 +31,8 @@ func GetDaftarPesanan(c *gin.Context) {
 	offset := (page - 1) * limit
 
 	role := c.GetString("role")
+	statusFilter := c.Query("status") // Ambil filter status dari query param
+
 	// 1. Ambil data dari context dengan aman
 	userIDInterface, exists := c.Get("user_id")
 	if !exists {
@@ -55,6 +59,11 @@ func GetDaftarPesanan(c *gin.Context) {
 	var pesanan []models.Pesanan
 	var total int64
 	query := config.DB.Model(&models.Pesanan{})
+
+	// Terapkan filter status jika ada
+	if statusFilter != "" && statusFilter != "Semua" {
+		query = query.Where("status_pesanan = ?", statusFilter)
+	}
 
 	switch role {
 	case "customer":
@@ -253,6 +262,14 @@ func GetDetailPesanan(c *gin.Context) {
 		}
 	}
 
+	// --- DATA PEMBAYARAN ---
+	var pembayaran models.Pembayaran
+	var payDetail models.DetailPembayaran
+	config.DB.Where("id_pesanan = ?", pesanan.IdPesanan).Order("id_pembayaran DESC").First(&pembayaran)
+	if pembayaran.IdPembayaran != 0 {
+		config.DB.Where("id_pembayaran = ?", pembayaran.IdPembayaran).First(&payDetail)
+	}
+
 	// Format nomor pesanan rapi: MNT/YYYYMMDD/000X
 	nomorPesanan := fmt.Sprintf("MNT/%s/%04d", pesanan.TanggalPesanan.Format("20060102"), pesanan.IdPesanan)
 
@@ -272,6 +289,12 @@ func GetDetailPesanan(c *gin.Context) {
 				"ongkir":         pesanan.OngkosKirim,
 				"biaya_proteksi": 0,
 				"total":          pesanan.TotalPembayaran,
+				"metode":         pembayaran.PaymentType,
+				"va_number":      payDetail.NomorVA,
+				"qr_url":         payDetail.QrCode,
+				"bill_key":       payDetail.BillKey,
+				"bill_code":      payDetail.BillCode,
+				"order_id":       pembayaran.OrderIdMidtrans,
 			},
 		},
 	})
@@ -281,126 +304,206 @@ func GetDetailPesanan(c *gin.Context) {
 // Bisa dari keranjang belanja atau langsung klik "Beli Sekarang".
 // Dipakai oleh: customer (POST /customer/pesanan/checkout)
 func CheckoutPesanan(c *gin.Context) {
+
 	type CheckoutItem struct {
 		IdSpesifikasiBarang uint `json:"id_spesifikasi_barang" binding:"required"`
-		Quantity            int  `json:"qty" binding:"required"`
+
+		Quantity int `json:"qty" binding:"required"`
 	}
 
 	type CheckoutInput struct {
-		IdAlamat         string         `json:"id_alamat" binding:"required"` // Terima UUID String
-		MetodePembayaran string         `json:"metode_pembayaran" binding:"required"`
-		Items            []CheckoutItem `json:"items" binding:"required"`
+		IdAlamat string `json:"id_alamat" binding:"required"` // Terima UUID String
+
+		MetodePembayaran string `json:"metode_pembayaran" binding:"required"`
+
+		Items []CheckoutItem `json:"items" binding:"required"`
 	}
 
 	var input CheckoutInput
+
 	if err := c.ShouldBindJSON(&input); err != nil {
+
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
+
+			"status": "error",
+
 			"message": "Input tidak valid",
-			"detail":  err.Error(),
+
+			"detail": err.Error(),
 		})
+
 		return
+
 	}
 
 	// 1. Ambil data dari context dengan aman
+
 	userIDInterface, exists := c.Get("user_id")
+
 	if !exists {
+
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  "error",
+
+			"status": "error",
+
 			"message": "User ID tidak ditemukan di session/token",
 		})
+
 		return
+
 	}
 
 	// 2. Lakukan type assertion ke int64 (sesuai data dari middleware)
+
 	userIDInt64, ok := userIDInterface.(int64)
+
 	if !ok {
+
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
+
+			"status": "error",
+
 			"message": "Terjadi kesalahan sistem: tipe data User ID tidak valid",
 		})
+
 		return
+
 	}
 
 	// 3. Konversi ke uint agar variabel `userID` di bawahnya tetap berfungsi tanpa mengubah query
+
 	userID := uint(userIDInt64)
 
 	// Cari id_customer
+
 	var customerIDResult struct{ IdCustomer uint }
+
 	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&customerIDResult).Error; err != nil {
+
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
+
+			"status": "error",
+
 			"message": "Gagal mengidentifikasi customer",
 		})
+
 		return
+
 	}
+
 	customerID := customerIDResult.IdCustomer
 
 	// Cari ID alamat asli (uint) berdasarkan PublicId (UUID string) yang dikirim
+
 	var alamat models.Alamat
+
 	if err := config.DB.Where("public_id = ? AND id_customer = ?", input.IdAlamat, customerID).First(&alamat).Error; err != nil {
+
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
+
+			"status": "error",
+
 			"message": "Alamat pengiriman tidak ditemukan",
 		})
+
 		return
+
 	}
+
 	idAlamatAsli := alamat.IdAlamat
 
 	tx := config.DB.Begin()
+
 	now := time.Now()
+
 	totalBayar := 0
+
 	var detailsToInsert []models.DetailPesanan
 
 	for _, item := range input.Items {
+
 		var spec models.SpesifikasiBarang
+
 		if err := tx.Preload("Barang.Diskon").Where("id_spesifikasi_barang = ?", item.IdSpesifikasiBarang).First(&spec).Error; err != nil {
+
 			tx.Rollback()
+
 			c.JSON(http.StatusBadRequest, gin.H{
-				"status":  "error",
+
+				"status": "error",
+
 				"message": fmt.Sprintf("Produk dengan ID varian %d tidak ditemukan", item.IdSpesifikasiBarang),
 			})
+
 			return
+
 		}
 
 		// Cek Stok
+
 		if spec.Jumlah < item.Quantity {
+
 			tx.Rollback()
+
 			c.JSON(http.StatusBadRequest, gin.H{
-				"status":  "error",
+
+				"status": "error",
+
 				"message": fmt.Sprintf("Stok %s tidak mencukupi", spec.Barang.NamaBarang),
 			})
+
 			return
+
 		}
 
 		// Hitung Harga (Gunakan harga dari DB agar aman dari manipulasi frontend)
+
 		hargaSatuan := spec.HargaBarang
+
 		if spec.Barang.DiskonId != nil && spec.Barang.Diskon.IdDiskon != 0 {
+
 			d := spec.Barang.Diskon
+
 			if d.TglMulai.Before(now) && d.TglSelesai.After(now) {
+
 				hargaSatuan = spec.HargaBarang - (spec.HargaBarang * d.BesarDiskon / 100)
+
 			}
+
 		}
 
 		subtotal := item.Quantity * hargaSatuan
+
 		totalBayar += subtotal
 
 		detailsToInsert = append(detailsToInsert, models.DetailPesanan{
+
 			SpesifikasiBarangId: item.IdSpesifikasiBarang,
-			Jumlah:              item.Quantity,
-			HargaSatuan:         hargaSatuan,
-			Subtotal:            subtotal,
+
+			Jumlah: item.Quantity,
+
+			HargaSatuan: hargaSatuan,
+
+			Subtotal: subtotal,
 		})
 
 		// Update Stok
+
 		if err := tx.Model(&spec).Update("jumlah", spec.Jumlah-item.Quantity).Error; err != nil {
+
 			tx.Rollback()
+
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":  "error",
+
+				"status": "error",
+
 				"message": "Gagal memperbarui stok",
 			})
+
 			return
+
 		}
+
 	}
 
 	// Buat Pesanan
@@ -410,7 +513,7 @@ func CheckoutPesanan(c *gin.Context) {
 		TotalPembayaran: totalBayar,
 		TanggalPesanan:  now,
 		TipePesanan:     "Online",
-		StatusPesanan:   "menunggu_pembayaran",
+		StatusPesanan:   "Belum Dibayar",
 	}
 
 	if err := tx.Create(&pesanan).Error; err != nil {
@@ -433,9 +536,137 @@ func CheckoutPesanan(c *gin.Context) {
 			})
 			return
 		}
-
 		// Logika: Hapus barang dari keranjang jika barang tersebut dibeli
 		tx.Where("id_customer = ? AND id_spesifikasi_barang = ?", customerID, detail.SpesifikasiBarangId).Delete(&models.Keranjang{})
+	}
+
+	// --- INTEGRASI MIDTRANS CORE API ---
+	var qrUrl, vaNumber, billKey, billCode string
+	var orderIDMidtrans string
+	metodeInput := strings.ToLower(input.MetodePembayaran)
+
+	// Normalisasi metodeInput (Flutter kirim va_bni, va_bri, dll)
+	cleanMetode := metodeInput
+	if strings.HasPrefix(metodeInput, "va_") {
+		cleanMetode = strings.Replace(metodeInput, "va_", "", 1)
+	}
+
+	if metodeInput != "tunai" && metodeInput != "cash" {
+		// Cari ID Metode Pembayaran dari database
+		kodeMetodeDb := "qris" // Default ke QRIS
+		if cleanMetode == "bca" || cleanMetode == "bni" || cleanMetode == "bri" || cleanMetode == "mandiri" || cleanMetode == "permata" {
+			kodeMetodeDb = "va"
+		}
+
+		var metodeDb models.MetodePembayaran
+		if err := tx.Where("kode_metode = ?", kodeMetodeDb).First(&metodeDb).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Metode pembayaran belum disetup"})
+			return
+		}
+
+		// Setup Midtrans Core API
+		var coreClient coreapi.Client
+		coreClient.New(os.Getenv("MIDTRANS_SERVER_KEY"), midtrans.Sandbox)
+		orderIDMidtrans = "MNT-CUST-" + strconv.Itoa(int(pesanan.IdPesanan)) + "-" + strconv.FormatInt(time.Now().Unix(), 10)
+
+		req := &coreapi.ChargeReq{
+			TransactionDetails: midtrans.TransactionDetails{
+				OrderID:  orderIDMidtrans,
+				GrossAmt: int64(pesanan.TotalPembayaran),
+			},
+		}
+
+		// Atur Request Tipe Pembayaran
+		if cleanMetode == "bca" {
+			req.PaymentType = coreapi.PaymentTypeBankTransfer
+			req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBca}
+		} else if cleanMetode == "bni" {
+			req.PaymentType = coreapi.PaymentTypeBankTransfer
+			req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBni}
+		} else if cleanMetode == "bri" {
+			req.PaymentType = coreapi.PaymentTypeBankTransfer
+			req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBri}
+		} else if cleanMetode == "mandiri" {
+			req.PaymentType = coreapi.PaymentTypeEChannel
+			req.EChannel = &coreapi.EChannelDetail{
+				BillInfo1: "Pembayaran Mantra",
+				BillInfo2: "Order ID: " + orderIDMidtrans,
+			}
+		} else if cleanMetode == "permata" {
+			req.PaymentType = coreapi.PaymentTypeBankTransfer
+			req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankPermata}
+		} else if cleanMetode == "qris" {
+			req.PaymentType = coreapi.PaymentTypeQris
+		} else {
+			req.PaymentType = coreapi.PaymentTypeGopay // Default QRIS via Gopay
+		}
+
+		// Tembak Midtrans
+		coreResp, err := coreClient.ChargeTransaction(req)
+		if err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal terhubung ke Midtrans"})
+			return
+		}
+
+		// Ekstrak Data Balikan
+		if cleanMetode == "bca" || cleanMetode == "bni" || cleanMetode == "bri" {
+			if len(coreResp.VaNumbers) > 0 {
+				vaNumber = coreResp.VaNumbers[0].VANumber
+			}
+		} else if cleanMetode == "mandiri" {
+			billKey = coreResp.BillKey
+			billCode = coreResp.BillerCode
+		} else if cleanMetode == "permata" {
+			vaNumber = coreResp.PermataVaNumber
+		} else {
+			// Cek di Actions untuk QRIS/Gopay
+			for _, action := range coreResp.Actions {
+				if action.Name == "generate-qr-code" {
+					qrUrl = action.URL
+					break
+				}
+			}
+		}
+
+		// Simpan Record Pembayaran
+		pembayaran := models.Pembayaran{
+			PesananID:          pesanan.IdPesanan,
+			OrderIdMidtrans:    orderIDMidtrans,
+			PaymentType:        metodeInput,
+			StatusTransaksi:    "pending",
+			MetodePembayaranID: &metodeDb.IdMetodePembayaran,
+			TotalDibayar:       pesanan.TotalPembayaran,
+		}
+		if err := tx.Create(&pembayaran).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat record pembayaran"})
+			return
+		}
+
+		// Simpan Detail Pembayaran
+		detailPembayaran := models.DetailPembayaran{
+			PembayaranID:    pembayaran.IdPembayaran,
+			KanalPembayaran: metodeInput,
+		}
+		if qrUrl != "" {
+			detailPembayaran.QrCode = qrUrl
+		} 
+		if vaNumber != "" {
+			detailPembayaran.NomorVA = vaNumber
+			detailPembayaran.NamaBank = strings.ToUpper(cleanMetode)
+		}
+		if billKey != "" && billCode != "" {
+			detailPembayaran.BillKey = billKey
+			detailPembayaran.BillCode = billCode
+		}
+
+		if err := tx.Create(&detailPembayaran).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan detail pembayaran"})
+			return
+		}
 	}
 
 	tx.Commit()
@@ -444,9 +675,13 @@ func CheckoutPesanan(c *gin.Context) {
 		"status":  "success",
 		"message": "Pesanan berhasil dibuat",
 		"data": gin.H{
-			"id_pesanan":     pesanan.PublicId,
-			"midtrans_token": "token-untuk-sdk-flutter",
-			"redirect_url":   "https://app.sandbox.midtrans.com/snap/v2/vtweb/...",
+			"id_pesanan": pesanan.PublicId,
+			"metode":     metodeInput,
+			"qr_url":     qrUrl,
+			"va_number":  vaNumber,
+			"bill_key":   billKey,
+			"bill_code":  billCode,
+			"order_id":   orderIDMidtrans,
 		},
 	})
 }
@@ -509,7 +744,7 @@ func BatalkanPesanan(c *gin.Context) {
 		return
 	}
 
-	if pesanan.StatusPesanan != "menunggu_pembayaran" {
+	if pesanan.StatusPesanan != "Belum Dibayar" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak bisa dibatalkan karena status saat ini: " + pesanan.StatusPesanan,
@@ -948,7 +1183,7 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 	}
 
 	// --- LOGIKA SYNC MIDTRANS (Hanya jika status belum Selesai dan Tipe Offline/Online non-tunai) ---
-	if pesanan.StatusPesanan == "Draft" || pesanan.StatusPesanan == "Menunggu Pembayaran" {
+	if pesanan.StatusPesanan == "Draft" || pesanan.StatusPesanan == "Belum Dibayar" {
 		var pembayaran models.Pembayaran
 		if err := config.DB.Where("id_pesanan = ? AND order_id_midtrans != ?", pesanan.IdPesanan, "").Order("id_pembayaran DESC").First(&pembayaran).Error; err == nil {
 

@@ -79,6 +79,7 @@ func SetupRoutes(r *gin.Engine) {
 			kasirGroup.GET("/transaksi/produk", katalog.CariProdukTransaksi)
 			kasirGroup.PATCH("/transaksi/item/update", transaksi.UpdateQuantityItem)
 			kasirGroup.GET("/transaksi/checkout", transaksi.GetRingkasanCheckout)
+			kasirGroup.GET("/metode-pembayaran", transaksi.GetMetodePembayaranAktif)
 			kasirGroup.POST("/transaksi/bayar/tunai", transaksi.BayarTunai)
 			kasirGroup.POST("/transaksi/bayar/non-tunai", transaksi.BayarNonTunai)
 			kasirGroup.GET("/transaksi/cek-status/:order_id", transaksi.CekStatusPembayaran)
