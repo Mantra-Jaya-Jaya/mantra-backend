@@ -572,32 +572,42 @@ func BayarNonTunai(c *gin.Context) {
 }
 
 func CekStatusPembayaran(c *gin.Context) {
-	orderId := c.Param("order_id") // Kita cek berdasarkan order_id dari Midtrans (contoh: MID-257-1781411165)
+	orderId := c.Param("order_id") // Cek berdasarkan order_id dari Midtrans
 
 	var pembayaran models.Pembayaran
 	// Cari data pembayaran di database, sertakan relasi status
 	if err := config.DB.Preload("StatusTransaksiRel").Where("order_id_midtrans = ?", orderId).First(&pembayaran).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pembayaran tidak ditemukan"})
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Pembayaran tidak ditemukan",
+			"data":    nil, // Kasih nil biar Flutter gak parsing string
+		})
 		return
 	}
 
-	// Cek status lunas menggunakan ID lookup (bukan string langsung)
-	settledID := utils.GetStatusTransaksiID("settlement")
-	captureID := utils.GetStatusTransaksiID("capture")
-	isLunas := pembayaran.StatusTransaksiID == settledID || pembayaran.StatusTransaksiID == captureID
+	// 🚀 AMANIN PAKAI FUNGSI SAFE (Biar gak jantungan / Panic)
+	settledID := utils.GetStatusTransaksiIDSafe("settlement")
+	captureID := utils.GetStatusTransaksiIDSafe("capture")
+	
+	isLunas := false
+	if pembayaran.StatusTransaksiID == settledID || pembayaran.StatusTransaksiID == captureID {
+		isLunas = true
+	}
 
 	// Ambil nama status dari relasi (untuk kompatibilitas mobile)
-	nama := ""
+	nama := "Menunggu Pembayaran"
 	if pembayaran.StatusTransaksiRel != nil {
 		nama = pembayaran.StatusTransaksiRel.NamaStatus
 	}
 
+	// 🚀 PINDAHIN is_lunas KE DALAM 'data' BIAR FLUTTER GAMPANG PARSINGNYA
 	c.JSON(http.StatusOK, gin.H{
-		"status":   "success",
-		"is_lunas": isLunas,
+		"status":  "success",
+		"message": "Status pembayaran berhasil dicek",
 		"data": gin.H{
+			"is_lunas":            isLunas,
 			"id_status_transaksi": pembayaran.StatusTransaksiID,
-			"status_transaksi":    nama, // nama string untuk kompatibilitas mobile
+			"status_transaksi":    nama,
 		},
 	})
 }
