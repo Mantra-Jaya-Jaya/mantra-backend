@@ -10,9 +10,7 @@ func SeedStatusPesanan() {
 	fmt.Println("Seeding status pesanan...")
 
 	statusList := []models.StatusPesanan{
-		{NamaStatus: "Draft"},
 		{NamaStatus: "Menunggu Pembayaran"},
-		{NamaStatus: "Diproses"},
 		{NamaStatus: "Dikemas"},
 		{NamaStatus: "Dikirim"},
 		{NamaStatus: "Selesai"},
