@@ -81,38 +81,34 @@ func MidtransNotificationHandler(c *gin.Context) {
 		return
 	}
 
-	// Normalize Midtrans status: "capture" dianggap "settlement"
-	normalizedStatus := notif.TransactionStatus
-	if normalizedStatus == "capture" {
-		normalizedStatus = "settlement"
-	}
-
 	pembayaran.TransaksiMidtransID = notif.TransactionID
-	
+
 	// Mapping payment_type dari Midtrans ke standar database kita
+	tipePembayaranDB := notif.PaymentType
 	if notif.PaymentType == "gopay" {
-		pembayaran.PaymentType = "qris"
-	} else {
-		pembayaran.PaymentType = notif.PaymentType
+		tipePembayaranDB = "qris"
+	}
+	tipePembayaranID := utils.GetTipePembayaranIDSafe(tipePembayaranDB)
+	if tipePembayaranID != 0 {
+		pembayaran.TipePembayaranID = tipePembayaranID
 	}
 
-	pembayaran.StatusTransaksi = notif.TransactionStatus
-	pembayaran.FraudStatus = notif.FraudStatus
-
-	// Gunakan Safe version agar tidak panic jika Midtrans kirim tipe yang tidak dikenal
-	tipePembayaranID := utils.GetTipePembayaranIDSafe(notif.PaymentType)
-	if tipePembayaranID == 0 {
-		tipePembayaranID = utils.GetTipePembayaranID("non-cash") // fallback aman
+	statusTransaksiID := utils.GetStatusTransaksiIDSafe(notif.TransactionStatus)
+	if statusTransaksiID != 0 {
+		pembayaran.StatusTransaksiID = statusTransaksiID
 	}
-	pembayaran.TipePembayaranID = tipePembayaranID
-	pembayaran.StatusTransaksiID = utils.GetStatusTransaksiID(normalizedStatus)
-	pembayaran.FraudStatusID = utils.GetFraudStatusID(notif.FraudStatus)
+
+	fraudStatusID := utils.GetFraudStatusIDSafe(notif.FraudStatus)
+	if fraudStatusID != 0 {
+		pembayaran.FraudStatusID = fraudStatusID
+	}
+
 	grossAmount := 0
 	if err := parseGrossAmount(notif.GrossAmount, &grossAmount); err == nil {
 		pembayaran.TotalDibayar = grossAmount
 	}
 
-	if pembayaran.StatusTransaksiID == utils.GetStatusTransaksiID("settlement") {
+	if notif.TransactionStatus == "settlement" || notif.TransactionStatus == "capture" {
 		now := time.Now()
 		pembayaran.WaktuPembayaran = &now
 		fmt.Println("✅ Webhook Info: Transaksi LUNAS")
@@ -122,15 +118,16 @@ func MidtransNotificationHandler(c *gin.Context) {
 		fmt.Printf("❌ Webhook Error: Gagal simpan status pembayaran: %s\n", err.Error())
 	}
 
-	if normalizedStatus == "settlement" {
-		var pesanan models.Pesanan
-		if err := config.DB.First(&pesanan, pembayaran.PesananID).Error; err == nil {
-			if pesanan.TipePesananID == utils.GetTipePesananID("Online") {
-				pesanan.StatusPesananID = utils.GetStatusPesananID("Dikemas")
+	if notif.TransactionStatus == "settlement" || notif.TransactionStatus == "capture" {
+		diprosesID := utils.GetStatusPesananIDSafe("Diproses")
+		if diprosesID != 0 {
+			err := config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pembayaran.PesananID).
+				Update("id_status_pesanan", diprosesID).Error
+			if err != nil {
+				fmt.Printf("❌ Webhook Error: Gagal update status pesanan: %s\n", err.Error())
 			} else {
-				pesanan.StatusPesananID = utils.GetStatusPesananID("Selesai")
+				fmt.Printf("✅ Webhook Success: Pesanan ID %d status berubah jadi 'Diproses'\n", pembayaran.PesananID)
 			}
-			config.DB.Save(&pesanan)
 		}
 	}
 

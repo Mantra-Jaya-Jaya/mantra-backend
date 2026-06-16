@@ -93,7 +93,7 @@ func SeedPesanan() {
 			TipePesananID:   utils.GetTipePesananID(tipePesanan),
 			StatusPesananID: utils.GetStatusPesananID(statusName),
 			CustomerID:      cId,
-			KasirID:         &kId,
+			KasirID:         kasirIdPtr,
 			AlamatID:        alamatId,
 		}
 
