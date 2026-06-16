@@ -377,9 +377,16 @@ func BayarNonTunai(c *gin.Context) {
 
 	// 🚀 2. CARI ID METODE PEMBAYARAN DARI DATABASE
 	metodeInput := strings.ToLower(input.Metode)
-	kodeMetodeDb := "qris" // Default ke QRIS
-	if metodeInput == "bca" || metodeInput == "bni" || metodeInput == "bri" {
-		kodeMetodeDb = "va" // Set ke VA
+	
+	// Normalisasi metodeInput (Flutter kirim va_bni, va_bri, dll)
+	cleanMetode := metodeInput
+	if strings.HasPrefix(metodeInput, "va_") {
+		cleanMetode = strings.Replace(metodeInput, "va_", "", 1)
+	}
+
+	kodeMetodeDb := "qris" // Default ke QRIS (id: 2 di seeder lu)
+	if cleanMetode == "bca" || cleanMetode == "bni" || cleanMetode == "bri" || cleanMetode == "mandiri" || cleanMetode == "permata" {
+		kodeMetodeDb = "va" // Set ke VA (id: 3 di seeder lu)
 	}
 
 	var metodeDb models.MetodePembayaran
@@ -400,16 +407,27 @@ func BayarNonTunai(c *gin.Context) {
 		},
 	}
 
-	// 4. Atur Request Tipe Pembayaran
-	if metodeInput == "bca" {
+	// 4. Atur Request Tipe Pembayaran (Gunakan cleanMetode untuk bank-specific)
+	if cleanMetode == "bca" {
 		req.PaymentType = coreapi.PaymentTypeBankTransfer
 		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBca}
-	} else if metodeInput == "bni" {
+	} else if cleanMetode == "bni" {
 		req.PaymentType = coreapi.PaymentTypeBankTransfer
 		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBni}
-	} else if metodeInput == "bri" {
+	} else if cleanMetode == "bri" {
 		req.PaymentType = coreapi.PaymentTypeBankTransfer
 		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBri}
+	} else if cleanMetode == "mandiri" {
+		req.PaymentType = coreapi.PaymentTypeEChannel
+		req.EChannel = &coreapi.EChannelDetail{
+			BillInfo1: "Pembayaran Mantra",
+			BillInfo2: "Order ID: " + orderID,
+		}
+	} else if cleanMetode == "permata" {
+		req.PaymentType = coreapi.PaymentTypeBankTransfer
+		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankPermata}
+	} else if cleanMetode == "qris" {
+		req.PaymentType = coreapi.PaymentTypeQris
 	} else {
 		req.PaymentType = coreapi.PaymentTypeGopay // Pakai trik Gopay buat narik QRIS
 	}
@@ -423,11 +441,16 @@ func BayarNonTunai(c *gin.Context) {
 	}
 
 	// 6. Ekstrak Data Balikan (QR atau VA)
-	var qrUrl, vaNumber string
-	if metodeInput == "bca" || metodeInput == "bni" || metodeInput == "bri" {
+	var qrUrl, vaNumber, billKey, billCode string
+	if cleanMetode == "bca" || cleanMetode == "bni" || cleanMetode == "bri" {
 		if len(coreResp.VaNumbers) > 0 {
 			vaNumber = coreResp.VaNumbers[0].VANumber
 		}
+	} else if cleanMetode == "mandiri" {
+		billKey = coreResp.BillKey
+		billCode = coreResp.BillerCode
+	} else if cleanMetode == "permata" {
+		vaNumber = coreResp.PermataVaNumber
 	} else {
 		for _, action := range coreResp.Actions {
 			if action.Name == "generate-qr-code" {
@@ -474,12 +497,15 @@ func BayarNonTunai(c *gin.Context) {
 		PembayaranID:    pembayaran.IdPembayaran,
 		KanalPembayaran: metodeInput,
 	}
-
-	if metodeInput == "qris" || metodeInput == "gopay" {
+	
+	if cleanMetode == "qris" || cleanMetode == "gopay" {
 		detailPembayaran.QrCode = qrUrl // Masukin link gambarnya
+	} else if cleanMetode == "mandiri" {
+		detailPembayaran.BillKey = billKey
+		detailPembayaran.BillCode = billCode
 	} else {
 		detailPembayaran.NomorVA = vaNumber // Masukin nomor rekeningnya
-		detailPembayaran.NamaBank = strings.ToUpper(metodeInput)
+		detailPembayaran.NamaBank = strings.ToUpper(cleanMetode)
 	}
 
 	if err := tx.Create(&detailPembayaran).Error; err != nil {
@@ -499,6 +525,8 @@ func BayarNonTunai(c *gin.Context) {
 			"metode":    metodeInput,
 			"qr_url":    qrUrl,
 			"va_number": vaNumber,
+			"bill_key":  billKey,
+			"bill_code": billCode,
 		},
 	})
 }
