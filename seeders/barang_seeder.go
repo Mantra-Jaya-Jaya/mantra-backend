@@ -14,7 +14,7 @@ func SeedBarang() {
 
 	var count int64
 	config.DB.Model(&models.Barang{}).Count(&count)
-	if count >= 15 {
+	if count >= 25 {
 		fmt.Printf("Tabel barang udah punya %d data, proses seeding dilewati.\n", count)
 		return
 	}
@@ -47,6 +47,16 @@ func SeedBarang() {
 		{"Olahraga", "Dumbbell Set 5kg"},
 		{"Olahraga", "Matras Yoga Anti Slip"},
 		{"Olahraga", "Raket Badminton Carbon"},
+		{"Elektronik", "Monitor LED 24 inch"},
+		{"Elektronik", "Keyboard Mechanical RGB"},
+		{"Fashion", "Tas Ransel Wanita"},
+		{"Fashion", "Sandal Gunung Eiger"},
+		{"Makanan & Minuman", "Biskuit Coklat Box"},
+		{"Makanan & Minuman", "Air Mineral Galon"},
+		{"Kesehatan", "Obat Flu & Batuk Sirup"},
+		{"Kesehatan", "Multivitamin Anak"},
+		{"Olahraga", "Bola Sepak Nike"},
+		{"Olahraga", "Sepeda Lipat"},
 	}
 
 	totalAdded := 0

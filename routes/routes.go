@@ -38,7 +38,7 @@ func SetupRoutes(r *gin.Engine) {
 
 		// Customer Routes
 		customerGroup := v1.Group("/customer")
-		customerGroup.Use(middleware.AuthMiddleware())
+		customerGroup.Use(middleware.AuthMiddleware(), middleware.RoleMiddleware("Customer"))
 		{
 			customerGroup.GET("/promo", katalog.GetPromo)
 			customerGroup.GET("/kategori", katalog.GetKategori)
@@ -66,7 +66,7 @@ func SetupRoutes(r *gin.Engine) {
 
 		// Kasir Routes
 		kasirGroup := v1.Group("/kasir")
-		kasirGroup.Use(middleware.AuthMiddleware())
+		kasirGroup.Use(middleware.AuthMiddleware(), middleware.RoleMiddleware("Kasir"))
 		{
 			kasirGroup.GET("/dashboard", transaksi.GetDashboardKasir)
 			kasirGroup.GET("/aktivitas-hari-ini", transaksi.GetSemuaAktivitasHariIni)
@@ -84,12 +84,13 @@ func SetupRoutes(r *gin.Engine) {
 			kasirGroup.POST("/transaksi/bayar/non-tunai", transaksi.BayarNonTunai)
 			kasirGroup.GET("/transaksi/cek-status/:order_id", transaksi.CekStatusPembayaran)
 			kasirGroup.GET("/profil", user.GetProfilKasir)
+			kasirGroup.PUT("/profil", user.UpdateProfilKasir)
 			kasirGroup.GET("/notifikasi", notifikasi.GetNotifikasi)
 		}
 
 		//Kurir Routes
 		kurirGroup := v1.Group("/kurir")
-		kurirGroup.Use(middleware.AuthMiddleware())
+		kurirGroup.Use(middleware.AuthMiddleware(), middleware.RoleMiddleware("Kurir"))
 		{
 			kurirGroup.GET("/tugas", pengantaran.GetDaftarPengantaran)
 			kurirGroup.GET("/laporan", pengantaran.GetLaporanHariIni)
@@ -108,7 +109,7 @@ func SetupRoutes(r *gin.Engine) {
 
 		// Admin Routes
 		adminGroup := v1.Group("/admin")
-		adminGroup.Use(middleware.AuthMiddleware())
+		adminGroup.Use(middleware.AuthMiddleware(), middleware.RoleMiddleware("Admin"))
 		{
 			adminGroup.GET("/dashboard", user.GetDashboardAdmin)
 			adminGroup.GET("/dashboard/chart", user.GetChartDashboardAdmin)
@@ -136,6 +137,8 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.PUT("/karyawan/:public_id", user.UpdateKaryawan)
 			adminGroup.DELETE("/karyawan/:public_id", user.HapusKaryawan)
 			adminGroup.GET("/notifikasi", notifikasi.GetNotifikasiAdmin)
+			adminGroup.PATCH("/notifikasi/:id/baca", notifikasi.BacaNotifikasi)
+			adminGroup.DELETE("/notifikasi/:id", notifikasi.HapusNotifikasi)
 			adminGroup.GET("/profil", user.GetProfilAdmin)
 			adminGroup.PUT("/profil", user.UpdateProfilAdmin)
 			adminGroup.GET("/ekspedisi", katalog.GetDaftarEkspedisi)

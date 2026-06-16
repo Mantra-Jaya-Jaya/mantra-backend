@@ -15,8 +15,8 @@ func SeedPesanan() {
 
 	var count int64
 	config.DB.Model(&models.Pesanan{}).Count(&count)
-	if count >= 100 {
-		fmt.Println("Tabel pesanan udah punya minimal 100 data, proses seeding dilewati.")
+	if count >= 800 {
+		fmt.Println("Tabel pesanan udah punya minimal 800 data, proses seeding dilewati.")
 		return
 	}
 
@@ -38,9 +38,19 @@ func SeedPesanan() {
 	now := time.Now()
 	var datesToGenerate []time.Time
 
-	// Per hari dalam 30 hari terakhir: 3-8 pesanan per hari
-	for d := 0; d < 30; d++ {
-		ordersPerDay := fake.IntRange(5, 10)
+	// Per hari selama 1 tahun terakhir: density makin jarak ke belakang makin kecil
+	for d := 0; d < 365; d++ {
+		var ordersPerDay int
+		switch {
+		case d < 30: // 30 hari terakhir: 4-8 per hari
+			ordersPerDay = fake.IntRange(4, 8)
+		case d < 90: // 31-90 hari lalu: 3-5 per hari
+			ordersPerDay = fake.IntRange(3, 5)
+		case d < 180: // 91-180 hari lalu: 2-4 per hari
+			ordersPerDay = fake.IntRange(2, 4)
+		default: // 181-365 hari lalu: 1-3 per hari
+			ordersPerDay = fake.IntRange(1, 3)
+		}
 		for i := 0; i < ordersPerDay; i++ {
 			datesToGenerate = append(datesToGenerate, now.AddDate(0, 0, -d))
 		}

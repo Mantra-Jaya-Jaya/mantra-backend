@@ -62,17 +62,31 @@ func GetDaftarPesanan(c *gin.Context) {
 	var total int64
 	query := config.DB.Model(&models.Pesanan{}).Preload("StatusPesanan")
 
-	// Terapkan filter status jika ada
+	// Terapkan filter status jika ada — konversi snake_case query ke nama_status di DB
 	if statusFilter != "" && statusFilter != "Semua" {
-		query = query.Where("status_pesanan = ?", statusFilter)
+		statusNameMap := map[string]string{
+			"menunggu_pembayaran": "Menunggu Pembayaran",
+			"diproses":           "Diproses",
+			"dikemas":            "Dikemas",
+			"dikirim":            "Dikirim",
+			"selesai":            "Selesai",
+			"dibatalkan":         "Dibatalkan",
+			"draft":              "Draft",
+		}
+		if namaStatus, ok := statusNameMap[statusFilter]; ok {
+			statusID := utils.GetStatusPesananIDSafe(namaStatus)
+			if statusID > 0 {
+				query = query.Where("id_status_pesanan = ?", statusID)
+			}
+		}
 	}
 
 	switch role {
 	case "customer":
-		// Customer hanya bisa lihat pesanan milik sendiri
 		query = query.Where("id_customer = (SELECT id_customer FROM customer WHERE id_user = ?)", userID)
-	case "kasir", "admin":
-		// Kasir dan admin bisa lihat semua pesanan
+	case "kasir":
+		query = query.Where("id_kasir = (SELECT id_kasir FROM kasir k JOIN karyawan kw ON kw.id_karyawan = k.id_karyawan WHERE kw.id_user = ?)", userID)
+	case "admin":
 	}
 
 	query.Count(&total)
@@ -225,22 +239,41 @@ func GetDetailPesanan(c *gin.Context) {
 	}
 
 	var details []models.DetailPesanan
-	config.DB.Preload("SpesifikasiBarang.Barang").Preload("SpesifikasiBarang.DetailSpesifikasi").Where("id_pesanan = ?", pesanan.IdPesanan).Find(&details)
+	if err := config.DB.Preload("SpesifikasiBarang.Barang").Preload("SpesifikasiBarang.DetailSpesifikasi").Where("id_pesanan = ?", pesanan.IdPesanan).Find(&details).Error; err != nil {
+		details = []models.DetailPesanan{}
+	}
 
 	var pengantaran models.Pengantaran
-	config.DB.Preload("Kurir.Karyawan.User").Preload("Ekspedisi").Where("id_pesanan = ?", pesanan.IdPesanan).First(&pengantaran)
+	if err := config.DB.Preload("Kurir.Karyawan.User").Preload("Ekspedisi").Where("id_pesanan = ?", pesanan.IdPesanan).First(&pengantaran).Error; err != nil {
+		pengantaran = models.Pengantaran{}
+	}
 
 	var items []gin.H
 	subtotalItems := 0
 	for _, d := range details {
 		subtotalItems += d.Subtotal
+		if d.SpesifikasiBarang.IdSpesifikasiBarang == 0 {
+			continue
+		}
+		idBarang := uint(0)
+		namaBarang := ""
+		gambar := ""
+		if d.SpesifikasiBarang.Barang.IdBarang != 0 {
+			idBarang = d.SpesifikasiBarang.BarangID
+			namaBarang = d.SpesifikasiBarang.Barang.NamaBarang
+			gambar = d.SpesifikasiBarang.Barang.GambarBarang
+		}
+		varian := ""
+		if d.SpesifikasiBarang.DetailSpesifikasi.IdDetailSpesifikasi != 0 {
+			varian = d.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi
+		}
 		items = append(items, gin.H{
-			"id_barang":    d.SpesifikasiBarang.BarangID,
-			"nama_barang":  d.SpesifikasiBarang.Barang.NamaBarang,
-			"varian":       d.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi,
+			"id_barang":    idBarang,
+			"nama_barang":  namaBarang,
+			"varian":       varian,
 			"jumlah":       d.Jumlah,
 			"harga_satuan": d.HargaSatuan,
-			"gambar":       d.SpesifikasiBarang.Barang.GambarBarang,
+			"gambar":       gambar,
 		})
 	}
 
@@ -452,13 +485,22 @@ func CheckoutPesanan(c *gin.Context) {
 	ongkir := input.OngkosKirim
 	grandTotal := totalBayar + ongkir
 
+	// Tentukan status awal pesanan berdasarkan metode pembayaran
+	metodeInput := strings.ToLower(input.MetodePembayaran)
+	var initialStatusID uint
+	if metodeInput == "tunai" || metodeInput == "cash" {
+		initialStatusID = utils.GetStatusPesananID("Diproses")
+	} else {
+		initialStatusID = utils.GetStatusPesananID("Menunggu Pembayaran")
+	}
+
 	// Buat Pesanan
 	pesanan := models.Pesanan{
 		CustomerID:         customerID,
 		TotalPembayaran:    grandTotal,
 		TanggalPesanan:     now,
 		TipePesananID:      utils.GetTipePesananID("Online"),
-		StatusPesananID:    utils.GetStatusPesananID("Diproses"),
+		StatusPesananID:    initialStatusID,
 		OngkosKirim:        ongkir,
 		Catatan:            input.Catatan,
 		EkspedisiID:        input.IdEkspedisi,
@@ -500,7 +542,6 @@ func CheckoutPesanan(c *gin.Context) {
 	// --- INTEGRASI MIDTRANS CORE API ---
 	var qrUrl, vaNumber, billKey, billCode string
 	var orderIDMidtrans string
-	metodeInput := strings.ToLower(input.MetodePembayaran)
 
 	// Normalisasi metodeInput (Flutter kirim va_bni, va_bri, dll)
 	cleanMetode := metodeInput
@@ -635,6 +676,24 @@ func CheckoutPesanan(c *gin.Context) {
 
 	tx.Commit()
 
+	// Notifikasi ke semua kasir bahwa ada pesanan online baru
+	go func() {
+		var kasirUsers []models.User
+		config.DB.Joins("JOIN role ON role.id_role = users.id_role").
+			Where("role.nama_role = ?", "Kasir").
+			Find(&kasirUsers)
+
+		for _, u := range kasirUsers {
+			notif := models.Notifikasi{
+				UserID:             u.IdUser,
+				Judul:              "Transaksi Baru",
+				Pesan:              "Ada pesanan online baru yang perlu dikonfirmasi.",
+				StatusNotifikasiID: utils.GetStatusNotifikasiID("unread"),
+			}
+			config.DB.Create(&notif)
+		}
+	}()
+
 	c.JSON(http.StatusCreated, gin.H{
 		"status":  "success",
 		"message": "Pesanan berhasil dibuat",
@@ -713,7 +772,7 @@ func BatalkanPesanan(c *gin.Context) {
 		statusName = pesanan.StatusPesanan.NamaStatus
 	}
 
-	if statusName != "Belum Dibayar" && statusName != "Diproses" {
+	if statusName != "Menunggu Pembayaran" && statusName != "Diproses" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak bisa dibatalkan karena status saat ini: " + statusName,
@@ -895,7 +954,7 @@ func GetDashboardKasir(c *gin.Context) {
 	var totalPendapatan struct{ Total int }
 	config.DB.Model(&models.Pesanan{}).
 		Select("COALESCE(SUM(total_pembayaran), 0) as total").
-		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
+		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ? AND id_kasir = ?", startOfDay, endOfDay, kasir.IdKasir).
 		Scan(&totalPendapatan)
 
 	// Hitung total pendapatan bersih hari ini (Net - Hanya Selesai)
@@ -903,19 +962,19 @@ func GetDashboardKasir(c *gin.Context) {
 	statusSelesaiID := utils.GetStatusPesananID("Selesai")
 	config.DB.Model(&models.Pesanan{}).
 		Select("COALESCE(SUM(total_pembayaran), 0) as total").
-		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ? AND id_status_pesanan = ?", startOfDay, endOfDay, statusSelesaiID).
+		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ? AND id_status_pesanan = ? AND id_kasir = ?", startOfDay, endOfDay, statusSelesaiID, kasir.IdKasir).
 		Scan(&totalPendapatanBersih)
 
 	// Hitung jumlah transaksi hari ini (Gross)
 	var jumlahTransaksi int64
 	config.DB.Model(&models.Pesanan{}).
-		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
+		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ? AND id_kasir = ?", startOfDay, endOfDay, kasir.IdKasir).
 		Count(&jumlahTransaksi)
 
 	// Hitung jumlah transaksi selesai hari ini (Net)
 	var jumlahTransaksiSelesai int64
 	config.DB.Model(&models.Pesanan{}).
-		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ? AND id_status_pesanan = ?", startOfDay, endOfDay, statusSelesaiID).
+		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ? AND id_status_pesanan = ? AND id_kasir = ?", startOfDay, endOfDay, statusSelesaiID, kasir.IdKasir).
 		Count(&jumlahTransaksiSelesai)
 
 	// Hitung total item terjual hari ini
@@ -923,7 +982,7 @@ func GetDashboardKasir(c *gin.Context) {
 	config.DB.Model(&models.DetailPesanan{}).
 		Select("COALESCE(SUM(detail_pesanan.jumlah), 0) as total").
 		Joins("JOIN pesanan ON pesanan.id_pesanan = detail_pesanan.id_pesanan").
-		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
+		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ? AND pesanan.id_kasir = ?", startOfDay, endOfDay, kasir.IdKasir).
 		Scan(&totalItemTerjual)
 
 	// Ambil 5 aktivitas terkini hari ini
@@ -939,7 +998,7 @@ func GetDashboardKasir(c *gin.Context) {
 		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(tipe_pembayaran.nama_tipe, 'tunai') as raw_payment_type").
 		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
 		Joins("LEFT JOIN tipe_pembayaran ON tipe_pembayaran.id = pembayaran.id_tipe_pembayaran").
-		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
+		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ? AND pesanan.id_kasir = ?", startOfDay, endOfDay, kasir.IdKasir).
 		Order("pesanan.tanggal_pesanan DESC").
 		Limit(5).
 		Scan(&aktivitasRaw)

@@ -3,10 +3,12 @@ package notifikasi
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -67,8 +69,12 @@ func GetNotifikasiAdmin(c *gin.Context) {
 	var responseData []gin.H
 
 	var notifikasis []models.Notifikasi
-	if err := config.DB.Where("id_user = ?", userID).Find(&notifikasis).Error; err == nil {
+	if err := config.DB.Preload("StatusNotifikasiRel").Where("id_user = ?", userID).Find(&notifikasis).Error; err == nil {
 		for _, n := range notifikasis {
+			statusName := "unknown"
+			if n.StatusNotifikasiRel != nil {
+				statusName = n.StatusNotifikasiRel.NamaStatus
+			}
 			responseData = append(responseData, gin.H{
 				"id_notifikasi": fmt.Sprintf("SYS-%d", n.IdNotifikasi),
 				"id_barang":     nil,
@@ -79,7 +85,7 @@ func GetNotifikasiAdmin(c *gin.Context) {
 				"batas_minimum": nil,
 				"pesan":         n.Pesan,
 				"judul":         n.Judul,
-				"status":        n.StatusNotifikasiRel.NamaStatus,
+				"status":        statusName,
 				"created_at":    n.CreatedAt.Format(time.RFC3339),
 			})
 		}
@@ -124,4 +130,49 @@ func GetNotifikasiAdmin(c *gin.Context) {
 		"message": "Notifikasi admin berhasil diambil",
 		"data":    responseData,
 	})
+}
+
+// BacaNotifikasi menandai notifikasi sebagai "read".
+// Dipakai oleh: admin (PATCH /admin/notifikasi/:id/baca)
+func BacaNotifikasi(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	idStr := c.Param("id")
+
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "ID notifikasi tidak valid"})
+		return
+	}
+
+	result := config.DB.Model(&models.Notifikasi{}).
+		Where("id_notifikasi = ? AND id_user = ?", id, userID).
+		Update("id_status_notifikasi", utils.GetStatusNotifikasiID("read"))
+
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Notifikasi tidak ditemukan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Notifikasi ditandai sudah dibaca"})
+}
+
+// HapusNotifikasi menghapus notifikasi dari database.
+// Dipakai oleh: admin (DELETE /admin/notifikasi/:id)
+func HapusNotifikasi(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	idStr := c.Param("id")
+
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "ID notifikasi tidak valid"})
+		return
+	}
+
+	result := config.DB.Where("id_notifikasi = ? AND id_user = ?", id, userID).Delete(&models.Notifikasi{})
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Notifikasi tidak ditemukan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Notifikasi berhasil dihapus"})
 }
