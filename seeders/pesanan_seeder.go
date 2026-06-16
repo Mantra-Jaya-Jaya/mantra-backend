@@ -45,8 +45,6 @@ func SeedPesanan() {
 		}
 	}
 
-
-
 	totalCreated := 0
 	kasirLen := len(kasirs)
 	custLen := len(customers)
@@ -83,13 +81,18 @@ func SeedPesanan() {
 		cId := customers[idx%custLen].IdCustomer
 		totalPembayaran := fake.IntRange(50000, 5000000)
 
+		var kasirIdPtr *uint = &kId
+		if tipePesanan == "Online" {
+			kasirIdPtr = nil // Online order doesn't have a cashier initially
+		}
+
 		pesanan := models.Pesanan{
 			TotalPembayaran: totalPembayaran,
 			TanggalPesanan:  tglPesanan,
 			TipePesanan:     tipePesanan,
 			StatusPesanan:   status,
 			CustomerId:      cId,
-			KasirId:         &kId,
+			KasirId:         kasirIdPtr,
 			AlamatId:        alamatId,
 		}
 

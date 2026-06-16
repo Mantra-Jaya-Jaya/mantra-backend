@@ -29,7 +29,32 @@ func TambahKeKeranjang(c *gin.Context) {
 		return
 	}
 
-	userID := c.GetInt64("user_id")
+	// --- POTONGAN KODE YANG DIUBAH ---
+
+	// 1. Ambil data dari context dengan aman
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "User ID tidak ditemukan di session/token",
+		})
+		return
+	}
+
+	// 2. Lakukan type assertion ke int64 (sesuai data dari middleware)
+	userIDInt64, ok := userIDInterface.(int64)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Terjadi kesalahan sistem: tipe data User ID tidak valid",
+		})
+		return
+	}
+
+	// 3. Konversi ke uint agar variabel `userID` di bawahnya tetap berfungsi tanpa mengubah query
+	userID := uint(userIDInt64)
+
+	// --- AKHIR DARI POTONGAN KODE YANG DIUBAH ---
 
 	// Cari id_customer berdasarkan user_id dari JWT
 	var result struct{ IdCustomer uint }
@@ -97,7 +122,28 @@ func UpdateKeranjang(c *gin.Context) {
 		return
 	}
 
-	userID := c.GetInt64("user_id")
+	// 1. Ambil data dari context dengan aman
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "User ID tidak ditemukan di session/token",
+		})
+		return
+	}
+
+	// 2. Lakukan type assertion ke int64 (sesuai data dari middleware)
+	userIDInt64, ok := userIDInterface.(int64)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Terjadi kesalahan sistem: tipe data User ID tidak valid",
+		})
+		return
+	}
+
+	// 3. Konversi ke uint agar variabel `userID` di bawahnya tetap berfungsi tanpa mengubah query
+	userID := uint(userIDInt64)
 
 	var result struct{ IdCustomer uint }
 	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
@@ -145,7 +191,28 @@ func UpdateKeranjang(c *gin.Context) {
 func HapusItemKeranjang(c *gin.Context) {
 	idKeranjang := c.Param("public_id")
 
-	userID := c.GetInt64("user_id")
+	// 1. Ambil data dari context dengan aman
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "User ID tidak ditemukan di session/token",
+		})
+		return
+	}
+
+	// 2. Lakukan type assertion ke int64 (sesuai data dari middleware)
+	userIDInt64, ok := userIDInterface.(int64)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Terjadi kesalahan sistem: tipe data User ID tidak valid",
+		})
+		return
+	}
+
+	// 3. Konversi ke uint agar variabel `userID` di bawahnya tetap berfungsi tanpa mengubah query
+	userID := uint(userIDInt64)
 
 	var result struct{ IdCustomer uint }
 	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
@@ -191,7 +258,28 @@ func HapusItemKeranjang(c *gin.Context) {
 // Auth: Wajib login, role customer
 // Ownership: id_customer diambil dari JWT (user_id), bukan dari body request
 func GetKeranjang(c *gin.Context) {
-	userID := c.GetInt64("user_id")
+	// 1. Ambil data dari context dengan aman
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "User ID tidak ditemukan di session/token",
+		})
+		return
+	}
+
+	// 2. Lakukan type assertion ke int64 (sesuai data dari middleware)
+	userIDInt64, ok := userIDInterface.(int64)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Terjadi kesalahan sistem: tipe data User ID tidak valid",
+		})
+		return
+	}
+
+	// 3. Konversi ke uint agar variabel `userID` di bawahnya tetap berfungsi tanpa mengubah query
+	userID := uint(userIDInt64)
 
 	// Cari id_customer berdasarkan user_id dari JWT
 	var result struct{ IdCustomer uint }
