@@ -379,7 +379,7 @@ func hitungPajak(subtotal int) int {
 func BayarNonTunai(c *gin.Context) {
 	var input struct {
 		IdPesanan uint   `json:"id_pesanan"`
-		Metode    string `json:"metode"` // "qris", "bca", "bni", atau "bri"
+		Metode    string `json:"metode"` // "qris", "bca", "bni", "bri", "permata"
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -396,16 +396,16 @@ func BayarNonTunai(c *gin.Context) {
 
 	// 🚀 2. CARI ID METODE PEMBAYARAN DARI DATABASE
 	metodeInput := strings.ToLower(input.Metode)
-	
-	// Normalisasi metodeInput (Flutter kirim va_bni, va_bri, dll)
+
+	// Normalisasi metodeInput (Flutter kirim va_bca, va_bni, dll)
 	cleanMetode := metodeInput
 	if strings.HasPrefix(metodeInput, "va_") {
 		cleanMetode = strings.Replace(metodeInput, "va_", "", 1)
 	}
 
-	kodeMetodeDb := "qris" // Default ke QRIS (id: 2 di seeder lu)
-	if cleanMetode == "bca" || cleanMetode == "bni" || cleanMetode == "bri" || cleanMetode == "mandiri" || cleanMetode == "permata" {
-		kodeMetodeDb = "va" // Set ke VA (id: 3 di seeder lu)
+	kodeMetodeDb := "qris" // Default ke QRIS
+	if cleanMetode == "bca" || cleanMetode == "bni" || cleanMetode == "bri" || cleanMetode == "permata" {
+		kodeMetodeDb = "va" // Set ke VA
 	}
 
 	var metodeDb models.MetodePembayaran
@@ -426,7 +426,7 @@ func BayarNonTunai(c *gin.Context) {
 		},
 	}
 
-	// 4. Atur Request Tipe Pembayaran (Gunakan cleanMetode untuk bank-specific)
+	// 4. Atur Request Tipe Pembayaran Midtrans (Tanpa Mandiri)
 	if cleanMetode == "bca" {
 		req.PaymentType = coreapi.PaymentTypeBankTransfer
 		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBca}
@@ -436,19 +436,13 @@ func BayarNonTunai(c *gin.Context) {
 	} else if cleanMetode == "bri" {
 		req.PaymentType = coreapi.PaymentTypeBankTransfer
 		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBri}
-	} else if cleanMetode == "mandiri" {
-		req.PaymentType = coreapi.PaymentTypeEChannel
-		req.EChannel = &coreapi.EChannelDetail{
-			BillInfo1: "Pembayaran Mantra",
-			BillInfo2: "Order ID: " + orderID,
-		}
 	} else if cleanMetode == "permata" {
 		req.PaymentType = coreapi.PaymentTypeBankTransfer
 		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankPermata}
 	} else if cleanMetode == "qris" {
 		req.PaymentType = coreapi.PaymentTypeQris
 	} else {
-		req.PaymentType = coreapi.PaymentTypeGopay // Pakai trik Gopay buat narik QRIS
+		req.PaymentType = coreapi.PaymentTypeGopay
 	}
 
 	// 5. Tembak Midtrans
@@ -459,15 +453,12 @@ func BayarNonTunai(c *gin.Context) {
 		return
 	}
 
-	// 6. Ekstrak Data Balikan (QR atau VA)
-	var qrUrl, vaNumber, billKey, billCode string
+	// 6. Ekstrak Data Balikan (Cuma QR atau VA)
+	var qrUrl, vaNumber string
 	if cleanMetode == "bca" || cleanMetode == "bni" || cleanMetode == "bri" {
 		if len(coreResp.VaNumbers) > 0 {
 			vaNumber = coreResp.VaNumbers[0].VANumber
 		}
-	} else if cleanMetode == "mandiri" {
-		billKey = coreResp.BillKey
-		billCode = coreResp.BillerCode
 	} else if cleanMetode == "permata" {
 		vaNumber = coreResp.PermataVaNumber
 	} else {
@@ -482,50 +473,64 @@ func BayarNonTunai(c *gin.Context) {
 	// 🚀 7. SIMPAN KE DATABASE SECARA ATOMIC (TRANSACTION)
 	tx := config.DB.Begin()
 
-	// Update Status Pesanan (pakai ID lookup, bukan string langsung)
-	if err := tx.Model(&pesanan).Update("id_status_pesanan", utils.GetStatusPesananID("Menunggu Pembayaran")).Error; err != nil {
+	// Update Status Pesanan (Safe Mode)
+	idStatusMenunggu := utils.GetStatusPesananIDSafe("Menunggu Pembayaran")
+	if idStatusMenunggu == 0 {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Status 'Menunggu Pembayaran' belum disetup di database"})
+		return
+	}
+
+	if err := tx.Model(&pesanan).Update("id_status_pesanan", idStatusMenunggu).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal update pesanan"})
 		return
 	}
 
-	// Petakan nama bank ke kode tipe pembayaran yang ada di tabel tipe_pembayaran
-	// Input user: "qris", "bca", "bni", "bri"
-	// Nilai valid di DB: "qris", "bank_transfer", "gopay", "cash", "non-cash"
-	tipePembayaranDB := metodeInput
-	if metodeInput == "bca" || metodeInput == "bni" || metodeInput == "bri" {
+	// 🚀 8. SIAPIN DATA UNTUK TABEL PEMBAYARAN YANG SUPER NORMALISASI
+	tipePembayaranDB := cleanMetode
+	if cleanMetode == "bca" || cleanMetode == "bni" || cleanMetode == "bri" || cleanMetode == "permata" {
 		tipePembayaranDB = "bank_transfer"
 	}
 
-	// Buat Record Pembayaran Induk
+	// Tarik semua ID Master
+	idTipePembayaran := utils.GetTipePembayaranIDSafe(tipePembayaranDB)
+	idStatusTransaksi := utils.GetStatusTransaksiIDSafe("pending")
+	idFraudStatus := utils.GetFraudStatusIDSafe("accept")
+
+	if idTipePembayaran == 0 || idStatusTransaksi == 0 || idFraudStatus == 0 {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Tabel master pembayaran belum lengkap (Tipe/Status/Fraud)"})
+		return
+	}
+
+	// Insert Record Pembayaran Induk
 	pembayaran := models.Pembayaran{
 		PesananID:          pesanan.IdPesanan,
 		OrderIdMidtrans:    orderID,
-		TipePembayaranID:   utils.GetTipePembayaranID(tipePembayaranDB),
-		StatusTransaksiID:  utils.GetStatusTransaksiID("pending"),
+		TipePembayaranID:   idTipePembayaran,
+		StatusTransaksiID:  idStatusTransaksi,
+		FraudStatusID:      idFraudStatus,
 		MetodePembayaranID: &metodeDb.IdMetodePembayaran,
 		TotalDibayar:       pesanan.TotalPembayaran,
-		FraudStatusID:      utils.GetFraudStatusID("accept"),
 	}
+	
 	if err := tx.Create(&pembayaran).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat pembayaran"})
 		return
 	}
 
-	// Buat Record Detail Pembayaran (Buat Nota Kasir Nanti)
+	// 9. Buat Record Detail Pembayaran
 	detailPembayaran := models.DetailPembayaran{
 		PembayaranID:    pembayaran.IdPembayaran,
 		KanalPembayaran: metodeInput,
 	}
-	
+
 	if cleanMetode == "qris" || cleanMetode == "gopay" {
-		detailPembayaran.QrCode = qrUrl // Masukin link gambarnya
-	} else if cleanMetode == "mandiri" {
-		detailPembayaran.BillKey = billKey
-		detailPembayaran.BillCode = billCode
+		detailPembayaran.QrCode = qrUrl
 	} else {
-		detailPembayaran.NomorVA = vaNumber // Masukin nomor rekeningnya
+		detailPembayaran.NomorVA = vaNumber
 		detailPembayaran.NamaBank = strings.ToUpper(cleanMetode)
 	}
 
@@ -535,9 +540,9 @@ func BayarNonTunai(c *gin.Context) {
 		return
 	}
 
-	tx.Commit() // Berhasil semua, patenkan datanya!
+	tx.Commit() // Berhasil!
 
-	// 8. Kirim Response ke Flutter
+	// 10. Kirim Response ke Flutter (Tanpa Bill Key & Bill Code)
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Transaksi berhasil digenerate",
@@ -546,8 +551,6 @@ func BayarNonTunai(c *gin.Context) {
 			"metode":    metodeInput,
 			"qr_url":    qrUrl,
 			"va_number": vaNumber,
-			"bill_key":  billKey,
-			"bill_code": billCode,
 		},
 	})
 }

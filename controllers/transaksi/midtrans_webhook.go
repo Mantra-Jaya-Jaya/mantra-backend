@@ -62,80 +62,109 @@ func MidtransNotificationHandler(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("ℹ️ Webhook Received: OrderID=%s, Status=%s, PaymentType=%s\n", notif.OrderID, notif.TransactionStatus, notif.PaymentType)
+	fmt.Printf("ℹ️ Webhook Received: OrderID=%s, Status=%s\n", notif.OrderID, notif.TransactionStatus)
 
+	// 1. Verifikasi Keamanan
 	serverKey := os.Getenv("MIDTRANS_SERVER_KEY")
 	expectedSignature := computeSignature(notif.OrderID, notif.StatusCode, notif.GrossAmount, serverKey)
 
 	if !hmac.Equal([]byte(notif.SignatureKey), []byte(expectedSignature)) {
-		fmt.Printf("❌ Webhook Error: Signature tidak valid. Expected: %s, Got: %s\n", expectedSignature, notif.SignatureKey)
 		if os.Getenv("MIDTRANS_ENVIRONMENT") == "production" {
 			c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Signature tidak valid"})
 			return
 		}
-		fmt.Println("⚠️  MIDTRANS_ENVIRONMENT bukan 'production' — signature tetap diverifikasi tapi dilanjutkan (development mode)")
 	}
 
+	// 2. Cari Data Pembayaran
 	var pembayaran models.Pembayaran
 	if err := config.DB.Where("order_id_midtrans = ?", notif.OrderID).First(&pembayaran).Error; err != nil {
-		fmt.Printf("❌ Webhook Error: Pembayaran dengan OrderID %s tidak ditemukan di DB\n", notif.OrderID)
 		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pembayaran tidak ditemukan"})
 		return
 	}
 
-	pembayaran.TransaksiMidtransID = notif.TransactionID
+	// 3. Siapkan Update Pembayaran
+	updatePembayaran := map[string]interface{}{
+		"transaksi_midtrans_id": notif.TransactionID,
+	}
 
-	// Mapping payment_type dari Midtrans ke standar database kita
 	tipePembayaranDB := notif.PaymentType
 	if notif.PaymentType == "gopay" {
 		tipePembayaranDB = "qris"
 	}
-	tipePembayaranID := utils.GetTipePembayaranIDSafe(tipePembayaranDB)
-	if tipePembayaranID != 0 {
-		pembayaran.TipePembayaranID = tipePembayaranID
+	if id := utils.GetTipePembayaranIDSafe(tipePembayaranDB); id != 0 {
+		updatePembayaran["id_tipe_pembayaran"] = id
 	}
-
-	statusTransaksiID := utils.GetStatusTransaksiIDSafe(notif.TransactionStatus)
-	if statusTransaksiID != 0 {
-		pembayaran.StatusTransaksiID = statusTransaksiID
+	if id := utils.GetStatusTransaksiIDSafe(notif.TransactionStatus); id != 0 {
+		updatePembayaran["id_status_transaksi"] = id
 	}
-
-	fraudStatusID := utils.GetFraudStatusIDSafe(notif.FraudStatus)
-	if fraudStatusID != 0 {
-		pembayaran.FraudStatusID = fraudStatusID
+	if id := utils.GetFraudStatusIDSafe(notif.FraudStatus); id != 0 {
+		updatePembayaran["id_fraud_status"] = id
 	}
 
 	grossAmount := 0
 	if err := parseGrossAmount(notif.GrossAmount, &grossAmount); err == nil {
-		pembayaran.TotalDibayar = grossAmount
+		updatePembayaran["total_dibayar"] = grossAmount
 	}
 
-	if notif.TransactionStatus == "settlement" || notif.TransactionStatus == "capture" {
-		now := time.Now()
-		pembayaran.WaktuPembayaran = &now
-		fmt.Println("✅ Webhook Info: Transaksi LUNAS")
+	isLunas := notif.TransactionStatus == "settlement" || notif.TransactionStatus == "capture"
+	if isLunas {
+		updatePembayaran["waktu_pembayaran"] = time.Now()
 	}
 
-	if err := config.DB.Save(&pembayaran).Error; err != nil {
-		fmt.Printf("❌ Webhook Error: Gagal simpan status pembayaran: %s\n", err.Error())
-	}
+	// 4. Update Database Pembayaran
+	config.DB.Model(&pembayaran).Updates(updatePembayaran)
 
-	if notif.TransactionStatus == "settlement" || notif.TransactionStatus == "capture" {
-		diprosesID := utils.GetStatusPesananIDSafe("Diproses")
-		if diprosesID != 0 {
-			err := config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pembayaran.PesananID).
-				Update("id_status_pesanan", diprosesID).Error
-			if err != nil {
-				fmt.Printf("❌ Webhook Error: Gagal update status pesanan: %s\n", err.Error())
-			} else {
-				fmt.Printf("✅ Webhook Success: Pesanan ID %d status berubah jadi 'Diproses'\n", pembayaran.PesananID)
-			}
+	// 5. Update Status Pesanan Jika Lunas
+	if isLunas {
+		if diprosesID := utils.GetStatusPesananIDSafe("Diproses"); diprosesID != 0 {
+			config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pembayaran.PesananID).Update("id_status_pesanan", diprosesID)
 		}
 	}
 
+	// 🚀 6. PANGGIL FUNGSI SAVE DETAIL BUAT INVOICE LUUU!!!
 	savePaymentDetails(&pembayaran, &notif)
 
-	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Notifikasi diterima"})
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Notifikasi diproses"})
+}
+
+// =========================================================================
+// 2. FUNGSI SAVE DETAIL (SUDAH DIPASANG HELM ANTI-DUPLIKAT)
+// =========================================================================
+func savePaymentDetails(pembayaran *models.Pembayaran, notif *midtransNotification) {
+	// 🚀 HELM PENGAMAN: Cek dulu apakah detailnya udah dibikin pas kasir ngeklik "Bayar"?
+	var count int64
+	config.DB.Model(&models.DetailPembayaran{}).Where("id_pembayaran = ?", pembayaran.IdPembayaran).Count(&count)
+
+	// Kalau udah ada (count > 0), STOP! Gak usah Create lagi biar tabel invoice lu gak beranak-pinak
+	if count > 0 {
+		return
+	}
+
+	// Kalau ternyata belum ada (misal transaksinya digenerate dari luar aplikasi kasir), baru kita Create
+	detail := models.DetailPembayaran{
+		PembayaranID: pembayaran.IdPembayaran,
+	}
+
+	// Isi data sesuai balikan Midtrans
+	if len(notif.VaNumbers) > 0 {
+		detail.KanalPembayaran = "va_" + strings.ToLower(notif.VaNumbers[0].Bank)
+		detail.NomorVA = notif.VaNumbers[0].VaNumber
+		detail.NamaBank = notif.VaNumbers[0].Bank
+	} else if notif.PermataVaNumber != "" {
+		detail.KanalPembayaran = "va_permata"
+		detail.NomorVA = notif.PermataVaNumber
+		detail.NamaBank = "permata"
+	} else if notif.QrCodeUrl != "" {
+		detail.KanalPembayaran = "qris"
+		detail.QrCode = notif.QrCodeUrl
+	} else if notif.PaymentCode != "" {
+		detail.KanalPembayaran = "payment_code"
+		detail.MerchantID = notif.MerchantID
+		detail.NamaBank = notif.Store
+	}
+
+	// Simpan 1 kali aja ke database!
+	config.DB.Create(&detail)
 }
 
 func computeSignature(orderID, statusCode, grossAmount, serverKey string) string {
@@ -154,54 +183,3 @@ func parseGrossAmount(amount string, result *int) error {
 	return nil
 }
 
-func savePaymentDetails(pembayaran *models.Pembayaran, notif *midtransNotification) {
-	for _, va := range notif.VaNumbers {
-		detail := models.DetailPembayaran{
-			PembayaranID:    pembayaran.IdPembayaran,
-			KanalPembayaran: "va_" + strings.ToLower(va.Bank),
-			NomorVA:         va.VaNumber,
-			NamaBank:        va.Bank,
-		}
-		config.DB.Create(&detail)
-	}
-
-	if notif.BillKey != "" && notif.BillCode != "" {
-		detail := models.DetailPembayaran{
-			PembayaranID:    pembayaran.IdPembayaran,
-			KanalPembayaran: "retail",
-			BillKey:         notif.BillKey,
-			BillCode:        notif.BillCode,
-			MerchantID:      notif.MerchantID,
-		}
-		config.DB.Create(&detail)
-	}
-
-	if notif.PermataVaNumber != "" {
-		detail := models.DetailPembayaran{
-			PembayaranID:    pembayaran.IdPembayaran,
-			KanalPembayaran: "va_permata",
-			NomorVA:         notif.PermataVaNumber,
-		}
-		config.DB.Create(&detail)
-	}
-
-	if notif.QrCodeUrl != "" {
-		detail := models.DetailPembayaran{
-			PembayaranID:    pembayaran.IdPembayaran,
-			KanalPembayaran: "qris",
-			QrCode:          notif.QrCodeUrl,
-		}
-		config.DB.Create(&detail)
-	}
-
-	if notif.PaymentCode != "" {
-		detail := models.DetailPembayaran{
-			PembayaranID:    pembayaran.IdPembayaran,
-			KanalPembayaran: "payment_code",
-			BillCode:        notif.PaymentCode,
-			MerchantID:      notif.MerchantID,
-			NamaBank:        notif.Store,
-		}
-		config.DB.Create(&detail)
-	}
-}
