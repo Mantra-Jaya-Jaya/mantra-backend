@@ -5,9 +5,13 @@ meta {
 }
 
 get {
-  url: 
+  url: {{baseUrl}}/kasir/transaksi/cek-status/MID-255-1781410994
   body: none
-  auth: inherit
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODE0MTM4MzYsImlhdCI6MTc4MTQxMjAzNiwicHVibGljX2lkIjoiNGRmYjM3ZjktZTkxNC00NjRkLWFiNDAtMjdlYjZkYjM0Mzg3Iiwicm9sZSI6Ikthc2lyIiwidXNlcl9pZCI6Mn0.BV7vkGRVH4ttf3bjC3j5B3KfIg0EbX-_J5p1ypY8rjI
 }
 
 settings {
