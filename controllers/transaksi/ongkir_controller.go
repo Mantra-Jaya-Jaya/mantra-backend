@@ -198,7 +198,16 @@ func CekRadius(c *gin.Context) {
 	}
 
 	if alamat.Latitude == 0 && alamat.Longitude == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Alamat belum memiliki koordinat"})
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"message": "Alamat belum memiliki koordinat, tidak bisa cek radius",
+			"data": gin.H{
+				"within_radius": false,
+				"distance_km":   0,
+				"max_radius_km": 5,
+				"note":          "Alamat belum memiliki koordinat",
+			},
+		})
 		return
 	}
 

@@ -2,6 +2,7 @@ package transaksi
 
 import (
 	"fmt"
+	"os"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -53,12 +54,13 @@ func processExternalShipment(pesananID uint) {
 
 	adapter := services.NewBiteshipAdapter()
 	result, err := adapter.CreateShipment(services.CreateShipmentRequest{
-		CourierCode:        pesanan.Ekspedisi.KodeApi,
-		CourierServiceCode: pesanan.LayananEkspedisi.NamaLayanan,
-		OriginCoordinate:   "",
-		DestinationAddress: pesanan.Alamat.AlamatLengkap,
+		OriginAddress:        os.Getenv("BITESHIP_STORE_ADDRESS"),
+		OriginCoordinate:     os.Getenv("BITESHIP_STORE_COORDINATE_LAT") + "," + os.Getenv("BITESHIP_STORE_COORDINATE_LONG"),
+		DestinationAddress:   pesanan.Alamat.AlamatLengkap,
 		DestinationCoordinate: fmt.Sprintf("%f,%f", pesanan.Alamat.Latitude, pesanan.Alamat.Longitude),
-		Items:              items,
+		CourierCode:          pesanan.Ekspedisi.KodeApi,
+		CourierServiceCode:   pesanan.LayananEkspedisi.NamaLayanan,
+		Items:                items,
 	})
 	if err != nil {
 		fmt.Printf("❌ Shipment Error: Gagal create shipment pesanan %d: %s\n", pesananID, err.Error())

@@ -18,7 +18,11 @@ import (
 func GetKategori(c *gin.Context) {
 	kategori := []models.Kategori{}
 
-	query := config.DB.Order("id_kategori ASC")
+	query := config.DB.
+		Where("id_kategori IN (?)",
+			config.DB.Table("barang").Select("DISTINCT id_kategori"),
+		).
+		Order("id_kategori ASC")
 
 	limitStr := c.Query("limit")
 	if limitStr != "" {

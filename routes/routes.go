@@ -157,6 +157,7 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.DELETE("/metode-pembayaran/:public_id", transaksi.HapusMetodePembayaran)
 			adminGroup.GET("/pengaturan", user.GetPengaturan)
 			adminGroup.PUT("/pengaturan", user.UpdatePengaturan)
+			adminGroup.GET("/pengantaran", transaksi.GetDaftarPengantaranAdmin)
 		}
 	}
 }
