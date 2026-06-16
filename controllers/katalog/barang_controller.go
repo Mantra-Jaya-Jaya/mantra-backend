@@ -710,6 +710,7 @@ func GetDetailBarangByScan(c *gin.Context) {
 		"message": "Data barang ditemukan",
 		"data": gin.H{
 			"id_barang":     barcode.SpesifikasiBarang.BarangID,
+			"public_id":     barcode.SpesifikasiBarang.Barang.PublicId,
 			"nama_barang":   barcode.SpesifikasiBarang.Barang.NamaBarang,
 			"kode_barcode":  kodeBarcode,
 			"gambar_barang": barcode.SpesifikasiBarang.Barang.GambarBarang,

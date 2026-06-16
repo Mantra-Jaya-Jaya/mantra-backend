@@ -3,6 +3,7 @@ package transaksi
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -49,7 +50,11 @@ func CekOngkir(c *gin.Context) {
 	for _, it := range input.Items {
 		var spek models.SpesifikasiBarang
 		if err := config.DB.Preload("Barang").First(&spek, it.IdSpesifikasiBarang).Error; err != nil {
-			continue
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "error",
+				"message": fmt.Sprintf("Item dengan ID %d tidak ditemukan", it.IdSpesifikasiBarang),
+			})
+			return
 		}
 		berat := spek.BeratBarang * it.Quantity
 		totalBerat += berat
@@ -67,10 +72,11 @@ func CekOngkir(c *gin.Context) {
 	}
 
 	ongkirReq := services.OngkirRequest{
-		DestPostal: alamat.KodePos,
-		DestLat:    alamat.Latitude,
-		DestLng:    alamat.Longitude,
-		Items:      daftarItem,
+		OriginPostal: os.Getenv("BITESHIP_STORE_POSTAL_CODE"),
+		DestPostal:   alamat.KodePos,
+		DestLat:      alamat.Latitude,
+		DestLng:      alamat.Longitude,
+		Items:        daftarItem,
 	}
 
 	adapter := services.NewBiteshipAdapter()

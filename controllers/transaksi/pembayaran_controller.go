@@ -139,13 +139,32 @@ func GetRingkasanCheckout(c *gin.Context) {
 // Auth: Wajib login, role kasir
 func UpdateQuantityItem(c *gin.Context) {
 	var input struct {
-		IdPesanan           uint `json:"id_pesanan"`
+		IdPesanan           uint `json:"id_pesanan" binding:"required"`
 		IdSpesifikasiBarang uint `json:"id_spesifikasi_barang"`
-		Jumlah              int  `json:"jumlah"`
+		KodeBarcode         string `json:"kode_barcode"`
+		Jumlah              int  `json:"jumlah" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Format inputan salah"})
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Format inputan salah. Pastikan id_pesanan dan jumlah dikirim dengan benar."})
+		return
+	}
+
+	if input.IdPesanan == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "ID pesanan tidak valid"})
+		return
+	}
+
+	// Resolusi barcode ke id_spesifikasi_barang jika id tidak dikirim
+	if input.IdSpesifikasiBarang == 0 && input.KodeBarcode != "" {
+		var barcode models.Barcode
+		if err := config.DB.Where("kode_barcode = ?", input.KodeBarcode).First(&barcode).Error; err == nil {
+			input.IdSpesifikasiBarang = barcode.SpesifikasiBarangID
+		}
+	}
+
+	if input.IdSpesifikasiBarang == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "ID spesifikasi barang tidak ditemukan. Kirim id_spesifikasi_barang atau kode_barcode yang valid."})
 		return
 	}
 
@@ -275,12 +294,17 @@ func UpdateQuantityItem(c *gin.Context) {
 // Auth: Wajib login, role kasir
 func BayarTunai(c *gin.Context) {
 	var input struct {
-		IdPesanan uint `json:"id_pesanan"`
-		Bayar     int  `json:"bayar"`
+		IdPesanan uint    `json:"id_pesanan" binding:"required"`
+		Bayar     float64 `json:"bayar" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Format inputan salah"})
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Format inputan salah. Pastikan id_pesanan dan bayar dikirim dengan benar."})
+		return
+	}
+
+	if input.IdPesanan == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "ID pesanan tidak valid"})
 		return
 	}
 
@@ -290,21 +314,16 @@ func BayarTunai(c *gin.Context) {
 		return
 	}
 
-	// Langsung gunakan TotalPembayaran tanpa pajak
 	var totalAkhir int
-
 	config.DB.
 		Model(&models.DetailPesanan{}).
 		Where("id_pesanan = ?", input.IdPesanan).
 		Select("COALESCE(SUM(subtotal),0)").
 		Scan(&totalAkhir)
 
-	fmt.Println("ID Pesanan =", input.IdPesanan)
-	fmt.Println("Bayar =", input.Bayar)
-	fmt.Println("TotalAkhir =", totalAkhir)
-	fmt.Println("TotalPembayaran =", pesanan.TotalPembayaran)
+	bayarInt := int(input.Bayar)
 
-	if input.Bayar < totalAkhir {
+	if bayarInt < totalAkhir {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status": "error",
 			"message": "Uang pembayaran kurang. Total yang harus dibayar: Rp " +
@@ -313,7 +332,7 @@ func BayarTunai(c *gin.Context) {
 		return
 	}
 
-	kembalian := input.Bayar - totalAkhir
+	kembalian := bayarInt - totalAkhir
 	tx := config.DB.Begin()
 
 	pesanan.StatusPesananID = utils.GetStatusPesananID("Selesai")
@@ -482,9 +501,11 @@ func BayarNonTunai(c *gin.Context) {
 	pembayaran := models.Pembayaran{
 		PesananID:          pesanan.IdPesanan,
 		OrderIdMidtrans:    orderID,
-		TipePembayaranID:   utils.GetTipePembayaranID(tipePembayaranDB), // 🔥 Normalisasi: bank code → ID
-		StatusTransaksiID:  utils.GetStatusTransaksiID("pending"),       // 🔥 Normalisasi: string → ID
+		TipePembayaranID:   utils.GetTipePembayaranID(tipePembayaranDB),
+		StatusTransaksiID:  utils.GetStatusTransaksiID("pending"),
 		MetodePembayaranID: &metodeDb.IdMetodePembayaran,
+		TotalDibayar:       pesanan.TotalPembayaran,
+		FraudStatusID:      utils.GetFraudStatusID("accept"),
 	}
 	if err := tx.Create(&pembayaran).Error; err != nil {
 		tx.Rollback()
