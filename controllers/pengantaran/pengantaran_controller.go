@@ -573,20 +573,41 @@ func UploadBuktiPengiriman(c *gin.Context) {
 // Auth: Wajib login, role kurir
 func AmbilPesanan(c *gin.Context) {
 	pesananPublicID := c.Param("public_id")
-	userID := c.GetInt64("user_id")
 
-	// 1. Cari ID Kurir berdasarkan user_id dari JWT
+	// 🚀 1. PENJINAK TOKEN JWT (Anti-Nganggur & Anti-Bug)
+	val, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: User belum login"})
+		return
+	}
+
+	var userID int64
+	switch v := val.(type) {
+	case float64:
+		userID = int64(v)
+	case int64:
+		userID = v
+	case int:
+		userID = int64(v)
+	case uint:
+		userID = int64(v)
+	default:
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: Format token tidak valid"})
+		return
+	}
+
+	// 🚀 2. CARI ID KURIR DARI YANG LOGIN
 	var result struct{ IdKurir uint }
 	if err := config.DB.Raw("SELECT id_kurir FROM kurir JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan WHERE karyawan.id_user = ?", userID).Scan(&result).Error; err != nil || result.IdKurir == 0 {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"status":  "error",
-			"message": "Data kurir tidak ditemukan",
+			"message": "Akses ditolak: Data kurir tidak ditemukan",
 		})
 		return
 	}
 	kurirID := result.IdKurir
 
-	// 2. Cari Pesanan berdasarkan public_id
+	// 🚀 3. CARI PESANAN (Beserta Statusnya)
 	var pesanan models.Pesanan
 	if err := config.DB.Preload("StatusPesanan").Where("public_id = ?", pesananPublicID).First(&pesanan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -596,60 +617,82 @@ func AmbilPesanan(c *gin.Context) {
 		return
 	}
 
-	if pesanan.StatusPesanan.NamaStatus != "Dikemas" {
+	// 🚀 4. VALIDASI STATUS: Kurir cuma bisa ambil kalau statusnya "Dikemas"
+	if pesanan.StatusPesanan == nil || pesanan.StatusPesanan.NamaStatus != "Dikemas" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
-			"message": "Pesanan tidak dapat diambil karena status bukan Dikemas",
+			"message": "Pesanan tidak dapat diambil karena statusnya belum selesai dikemas",
 		})
 		return
 	}
 
-	var status models.StatusPengantaran
-	status.IdStatusPengantaran = utils.GetStatusPengantaranID("Dalam Perjalanan")
+	// 🚀 5. AMBIL ID STATUS PAKAI UTILS TEMEN LU (Versi Safe!)
+	idStatusPesananBaru := utils.GetStatusPesananIDSafe("Dikirim")
+	idStatusPengantaranBaru := utils.GetStatusPengantaranIDSafe("Dalam Perjalanan")
 
+	// Cegah error kalau ternyata seeder di database belum jalan
+	if idStatusPesananBaru == 0 || idStatusPengantaranBaru == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Terjadi kesalahan: Setup status di database belum lengkap",
+		})
+		return
+	}
+
+	// 🚀 6. MULAI DATABASE TRANSACTION (Atomic Process)
 	tx := config.DB.Begin()
 
-	// Update status pesanan ke "Dikirim"
-	pesanan.StatusPesananID = utils.GetStatusPesananID("Dikirim")
-	if err := tx.Save(&pesanan).Error; err != nil {
+	// Update status pesanan jadi "Dikirim" (Pakai .Update biar GORM gak nimpa data lain)
+	if err := tx.Model(&pesanan).Update("id_status_pesanan", idStatusPesananBaru).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memperbarui status pesanan"})
 		return
 	}
 
-	// 4. Buat atau update record Pengantaran
+	// 🚀 7. BIKIN/UPDATE DATA KE TABEL PENGANTARAN
 	var pengantaran models.Pengantaran
 	now := time.Now()
-	if err := tx.Where("id_pesanan = ?", pesanan.IdPesanan).First(&pengantaran).Error; err == nil {
-		pengantaran.KurirID = &kurirID
-		pengantaran.WaktuPickup = &now
-		pengantaran.StatusPengantaranID = status.IdStatusPengantaran
-		if err := tx.Save(&pengantaran).Error; err != nil {
+
+	// Cek apakah data pengantaran udah ada (misal dari assign admin manual)
+	err := tx.Where("id_pesanan = ?", pesanan.IdPesanan).First(&pengantaran).Error
+	if err == nil {
+		// Kalau udah ada -> UPDATE
+		updateData := map[string]interface{}{
+			"id_kurir":              kurirID,
+			"waktu_pickup":          now,
+			"id_status_pengantaran": idStatusPengantaranBaru,
+		}
+		if err := tx.Model(&pengantaran).Updates(updateData).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memperbarui data pengantaran"})
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memperbarui data penugasan pengantaran"})
 			return
 		}
 	} else {
+		// Kalau belum ada -> INSERT BARU
 		pengantaran = models.Pengantaran{
 			WaktuPickup:         &now,
 			PesananID:           pesanan.IdPesanan,
 			KurirID:             &kurirID,
-			StatusPengantaranID: status.IdStatusPengantaran,
+			StatusPengantaranID: idStatusPengantaranBaru,
 		}
 		if err := tx.Create(&pengantaran).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat data pengantaran"})
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat data penugasan pengantaran"})
 			return
 		}
 	}
 
+	// 🚀 8. BERHASIL! COMMIT TRANSACTION
 	tx.Commit()
+
+	// Reload pengantaran biar PublicId barunya pasti dapet
+	config.DB.Where("id_pesanan = ?", pesanan.IdPesanan).First(&pengantaran)
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Pesanan berhasil diambil",
+		"message": "Pesanan berhasil diambil oleh Kurir",
 		"data": gin.H{
-			"id_pengantaran": pengantaran.PublicId,
+			"id_pengantaran": pengantaran.PublicId.String(),
 			"status":         "Dalam Perjalanan",
 		},
 	})
@@ -660,9 +703,30 @@ func AmbilPesanan(c *gin.Context) {
 // Auth: Wajib login, role kurir
 func UpdateStatusPengantaran(c *gin.Context) {
 	idPengantaran := c.Param("public_id")
-	userID := c.GetInt64("user_id")
 
-	// Ambil status dari form-data atau JSON
+	// 🚀 1. PENJINAK TOKEN JWT (Anti-Nganggur & Anti-Bug)
+	val, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: User belum login"})
+		return
+	}
+
+	var userID int64
+	switch v := val.(type) {
+	case float64:
+		userID = int64(v)
+	case int64:
+		userID = v
+	case int:
+		userID = int64(v)
+	case uint:
+		userID = int64(v)
+	default:
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: Format token tidak valid"})
+		return
+	}
+
+	// 🚀 2. TANGKAP STATUS INPUT (Dukung Multipart Form / JSON)
 	statusInput := c.PostForm("status")
 	if statusInput == "" {
 		var jsonInput struct {
@@ -678,15 +742,15 @@ func UpdateStatusPengantaran(c *gin.Context) {
 		return
 	}
 
-	// 1. Cari ID Kurir berdasarkan user_id dari JWT
+	// 🚀 3. CARI ID KURIR (Fix Typo SQL Join!)
 	var result struct{ IdKurir uint }
-	if err := config.DB.Raw("SELECT id_kurir FROM kurir JOIN karyawan ON kurir.id_karyawan = kurir.id_karyawan WHERE karyawan.id_user = ?", userID).Scan(&result).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengidentifikasi kurir"})
+	if err := config.DB.Raw("SELECT id_kurir FROM kurir JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan WHERE karyawan.id_user = ?", userID).Scan(&result).Error; err != nil || result.IdKurir == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Gagal mengidentifikasi data kurir. Akses ditolak."})
 		return
 	}
 	kurirID := result.IdKurir
 
-	// 2. Cari data pengantaran dan periksa kepemilikan
+	// 🚀 4. CARI PENGANTARAN & VALIDASI KEPEMILIKAN
 	var pengantaran models.Pengantaran
 	if err := config.DB.Preload("Pesanan").Where("public_id = ?", idPengantaran).First(&pengantaran).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Data pengantaran tidak ditemukan"})
@@ -698,65 +762,83 @@ func UpdateStatusPengantaran(c *gin.Context) {
 		return
 	}
 
-	// 3. Cari status di database berdasarkan nama status
-	var status models.StatusPengantaran
-	if err := config.DB.Where("nama_status = ?", statusInput).First(&status).Error; err != nil {
+	// 🚀 5. AMBIL ID STATUS PENGANTARAN (Pakai Utils Safe)
+	idStatusBaru := utils.GetStatusPengantaranIDSafe(statusInput)
+	if idStatusBaru == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Status pengantaran tidak valid"})
 		return
 	}
 
+	// 🚀 6. MULAI DATABASE TRANSACTION
 	tx := config.DB.Begin()
 
-	pengantaran.StatusPengantaranID = status.IdStatusPengantaran
+	// Siapkan kantong buat update tabel pengantaran
+	updatePengantaran := map[string]interface{}{
+		"id_status_pengantaran": idStatusBaru,
+	}
 
-	// 4. Logika tambahan jika status adalah Selesai
+	// 🚀 7. LOGIKA KHUSUS JIKA STATUS == "Selesai"
 	if statusInput == "Selesai" {
 		now := time.Now()
-		pengantaran.WaktuSampai = &now
+		updatePengantaran["waktu_sampai"] = now
 
-		// Upload foto ke MinIO jika ada file "foto" terunggah
+		// Upload foto ke MinIO (Jika ada)
 		fileUrl, err := utils.UploadFileToMinio(c, "foto", "pengantaran")
 		if err == nil && fileUrl != "" {
-			pengantaran.FotoBuktiPengiriman = fileUrl
+			updatePengantaran["foto_bukti_pengiriman"] = fileUrl
 		}
 
-		// Update status pesanan ke "Selesai"
-		if err := tx.Model(&models.Pesanan{}).Where("id_pesanan = ?", pengantaran.PesananID).Update("id_status_pesanan", utils.GetStatusPesananID("Selesai")).Error; err != nil {
+		// Update status pesanan ke "Selesai" (Pakai Utils Safe)
+		idStatusPesananSelesai := utils.GetStatusPesananIDSafe("Selesai")
+		if err := tx.Model(&models.Pesanan{}).Where("id_pesanan = ?", pengantaran.PesananID).Update("id_status_pesanan", idStatusPesananSelesai).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengupdate status pesanan"})
 			return
 		}
 
-		// Update status pembayaran ke settlement jika COD/Cash
+		// Update status pembayaran ke settlement (Jika COD/Cash)
 		var pembayaran models.Pembayaran
 		if err := tx.Where("id_pesanan = ?", pengantaran.PesananID).First(&pembayaran).Error; err == nil {
-			var metode models.MetodePembayaran
-			if err := tx.First(&metode, pembayaran.MetodePembayaranID).Error; err == nil {
-				if metode.KodeMetode == "cod" || metode.KodeMetode == "cash" {
-					pembayaran.StatusTransaksiID = utils.GetStatusTransaksiID("settlement")
-					pembayaran.TotalDibayar = pengantaran.Pesanan.TotalPembayaran
-					pembayaran.WaktuPembayaran = &now
-					tx.Save(&pembayaran)
+			// HELM PENGAMAN: Cek apakah ID Metode Pembayaran tidak nil
+			if pembayaran.MetodePembayaranID != nil {
+				var metode models.MetodePembayaran
+				if err := tx.First(&metode, *pembayaran.MetodePembayaranID).Error; err == nil {
+					if metode.KodeMetode == "cod" || metode.KodeMetode == "cash" {
+						// StatusTransaksi itu string (bukan relasi ID)
+						tx.Model(&pembayaran).Updates(map[string]interface{}{
+							"status_transaksi": "settlement",
+							"total_dibayar":    pengantaran.Pesanan.TotalPembayaran,
+							"waktu_pembayaran": now,
+						})
+					}
 				}
 			}
 		}
 	}
 
-	if err := tx.Save(&pengantaran).Error; err != nil {
+	// 🚀 8. EKSEKUSI UPDATE PENGANTARAN
+	if err := tx.Model(&pengantaran).Updates(updatePengantaran).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memperbarui status pengantaran"})
 		return
 	}
 
+	// 🚀 9. BUNGKUS TRANSAKSINYA
 	tx.Commit()
+
+	// Ambil foto kalau tadi berhasil ke-upload buat dimunculin di response
+	fotoOutput := ""
+	if val, ok := updatePengantaran["foto_bukti_pengiriman"]; ok {
+		fotoOutput = val.(string)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Status pengantaran berhasil diperbarui",
 		"data": gin.H{
-			"foto_bukti":   pengantaran.FotoBuktiPengiriman,
+			"foto_bukti":   fotoOutput,
 			"status":       statusInput,
-			"waktu_sampai": pengantaran.WaktuSampai,
+			"waktu_sampai": updatePengantaran["waktu_sampai"],
 		},
 	})
 }

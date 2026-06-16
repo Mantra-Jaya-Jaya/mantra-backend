@@ -60,8 +60,6 @@ func SeedPesanan() {
 			statusName = "Dikirim"
 		} else if randStatus <= 90 {
 			statusName = "Dikemas"
-		} else if randStatus <= 95 {
-			statusName = "Diproses"
 		} else {
 			statusName = "Dibatalkan"
 		}
