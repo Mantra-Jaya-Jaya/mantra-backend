@@ -2,9 +2,9 @@
 
 ---
 
-## GET /customer/notifikasi (Customer) / GET /kasir/notifikasi (Kasir)
+## GET /api/v1/customer/notifikasi (Customer) / GET /api/v1/kasir/notifikasi (Kasir) / GET /api/v1/kurir/notifikasi (Kurir)
 
-Auth. Mendapatkan daftar notifikasi milik user yang login.
+Auth. Mendapatkan daftar notifikasi milik user (customer, kasir, atau kurir) yang login.
 
 **Response:**
 ```json
@@ -24,7 +24,7 @@ Auth. Mendapatkan daftar notifikasi milik user yang login.
 
 ---
 
-## GET /admin/notifikasi
+## GET /api/v1/admin/notifikasi
 
 Auth (Admin). Mendapatkan notifikasi untuk admin.
 

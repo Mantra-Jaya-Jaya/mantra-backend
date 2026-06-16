@@ -2,7 +2,7 @@
 
 ---
 
-## GET /promo (Customer) / GET /admin/diskon (Admin)
+## GET /api/v1/customer/promo (Customer) / GET /api/v1/admin/diskon (Admin)
 
 Auth. Mendapatkan daftar promo/diskon yang aktif.
 
@@ -25,13 +25,13 @@ Auth. Mendapatkan daftar promo/diskon yang aktif.
 
 ---
 
-## GET /admin/diskon/semua
+## GET /api/v1/admin/diskon/semua
 
 Auth (Admin). Mendapatkan semua data diskon (tidak difilter tanggal).
 
 ---
 
-## POST /admin/diskon
+## POST /api/v1/admin/diskon
 
 Auth (Admin). Menambah diskon baru.
 
@@ -47,13 +47,13 @@ Auth (Admin). Menambah diskon baru.
 
 ---
 
-## DELETE /admin/diskon/:id_diskon
+## DELETE /api/v1/admin/diskon/:public_id
 
 Auth (Admin). Menghapus diskon.
 
 ---
 
-## POST /admin/diskon/upload
+## POST /api/v1/admin/diskon/upload
 
 Auth (Admin). Upload banner diskon ke MinIO.
 

@@ -4,7 +4,7 @@ Auth (Customer). Profil dan manajemen akun customer.
 
 ---
 
-## GET /customer/profil
+## GET /api/v1/customer/profil
 
 Mendapatkan profil customer yang login.
 
@@ -26,7 +26,7 @@ Mendapatkan profil customer yang login.
 
 ---
 
-## PUT /customer/akun
+## PUT /api/v1/customer/akun
 
 Mengupdate data akun customer.
 

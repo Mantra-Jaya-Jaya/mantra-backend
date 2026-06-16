@@ -3,7 +3,6 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"net/http"
 	"net/mail"
 	"time"
@@ -35,21 +34,15 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("[DEBUG] Login Attempt - Username: '%s', Password: '%s'\n", req.Username, req.Password)
-
 	var user models.User
 	// Cari user berdasarkan username atau email
 	if err := config.DB.Preload("Role").Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error; err != nil {
-		fmt.Printf("[DEBUG] User not found: %v\n", err)
 		RespondWithError(c, http.StatusUnauthorized, "Username/Email atau password salah", "AUTH_001", "Credential tidak valid")
 		return
 	}
 
-	fmt.Printf("[DEBUG] User Found - Stored Hash: '%s'\n", user.Password)
-
 	// Cek password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		fmt.Printf("[DEBUG] Password Mismatch: %v\n", err)
 		RespondWithError(c, http.StatusUnauthorized, "Username/Email atau password salah", "AUTH_001", "Credential tidak valid")
 		return
 	}
@@ -151,6 +144,10 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
+	// Perbarui CreatedAt sebagai penanda waktu aktivitas/login terakhir
+	storedToken.CreatedAt = time.Now()
+	config.DB.Save(&storedToken)
+
 	// Cari user dan role
 	var user models.User
 	if err := config.DB.Preload("Role").First(&user, storedToken.UserID).Error; err != nil {
@@ -232,7 +229,7 @@ func Logout(c *gin.Context) {
 		RespondWithError(c, http.StatusInternalServerError, "Kesalahan sistem", "SERVER_001", "Format ID user tidak valid")
 		return
 	}
-		if tokenStr != "" {
+	if tokenStr != "" {
 		now := time.Now()
 		// Update RevokedAt untuk token yang bersangkutan & milik user tsb
 		result := config.DB.Model(&models.RefreshToken{}).
@@ -337,7 +334,7 @@ func RegisterCustomer(c *gin.Context) {
 
 	newCustomer := models.Customer{
 		NoTelp: req.NoTelp,
-		UserId: newUser.IdUser,
+		UserID: newUser.IdUser,
 	}
 
 	if err := tx.Create(&newCustomer).Error; err != nil {

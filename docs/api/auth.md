@@ -4,7 +4,7 @@ Endpoint autentikasi — public dan protected.
 
 ---
 
-## POST /login
+## POST /api/v1/login
 
 Public. Login dengan username atau email.
 
@@ -42,7 +42,7 @@ Public. Login dengan username atau email.
 
 ---
 
-## POST /register
+## POST /api/v1/register
 
 Public. Registrasi customer baru.
 
@@ -82,7 +82,7 @@ Public. Registrasi customer baru.
 
 ---
 
-## POST /auth/refresh
+## POST /api/v1/auth/refresh
 
 Public. Mendapatkan access token baru menggunakan refresh token.
 
@@ -111,7 +111,7 @@ Public. Mendapatkan access token baru menggunakan refresh token.
 
 ---
 
-## POST /logout
+## POST /api/v1/logout
 
 Auth required. Menonaktifkan refresh token.
 
@@ -134,7 +134,7 @@ Auth required. Menonaktifkan refresh token.
 
 ---
 
-## PUT /change-password
+## PUT /api/v1/change-password
 
 Auth required. Mengubah password (semua session di-revoke).
 

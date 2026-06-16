@@ -122,10 +122,10 @@ func CekOngkir(c *gin.Context) {
 	}
 
 	type EkspedisiDTO struct {
-		IdEkspedisi    uint         `json:"id_ekspedisi"`
-		KodeEkspedisi  string       `json:"kode_ekspedisi"`
-		NamaEkspedisi  string       `json:"nama_ekspedisi"`
-		Layanan        []LayananDTO `json:"layanan"`
+		IdEkspedisi   uint         `json:"id_ekspedisi"`
+		KodeEkspedisi string       `json:"kode_ekspedisi"`
+		NamaEkspedisi string       `json:"nama_ekspedisi"`
+		Layanan       []LayananDTO `json:"layanan"`
 	}
 
 	var data []EkspedisiDTO

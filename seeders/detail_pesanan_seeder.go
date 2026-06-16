@@ -44,11 +44,11 @@ func SeedDetailPesanan() {
 				Jumlah:              qty,
 				HargaSatuan:         hargaSatuan,
 				Subtotal:            subtotal,
-				PesananId:           pesanan.IdPesanan,
-				SpesifikasiBarangId: varian.IdSpesifikasiBarang,
+				PesananID:           pesanan.IdPesanan,
+				SpesifikasiBarangID: varian.IdSpesifikasiBarang,
 			}
 
-			if err := config.DB.Where("id_pesanan = ? AND id_spesifikasi_barang = ?", detail.PesananId, detail.SpesifikasiBarangId).FirstOrCreate(&detail).Error; err == nil {
+			if err := config.DB.Where("id_pesanan = ? AND id_spesifikasi_barang = ?", detail.PesananID, detail.SpesifikasiBarangID).FirstOrCreate(&detail).Error; err == nil {
 				totalDetailDibuat++
 			}
 		}

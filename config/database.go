@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"backend-mantra/models"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
@@ -31,7 +33,20 @@ func ConnectDatabase() {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable search_path=public",
 		host, user, password, dbname, port)
 
-	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	// Logger kustom untuk menaikkan threshold SLOW SQL warning ke 2 detik
+	customLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags),
+		logger.Config{
+			SlowThreshold:             2 * time.Second,
+			LogLevel:                  logger.Warn,
+			IgnoreRecordNotFoundError: true,
+			Colorful:                  true,
+		},
+	)
+
+	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: customLogger,
+	})
 
 	if err != nil {
 		log.Fatal("Waduh, gagal konek ke database nih!")

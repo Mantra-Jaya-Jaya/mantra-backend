@@ -130,7 +130,7 @@ func TambahAlamat(c *gin.Context) {
 	}
 
 	newAlamat := models.Alamat{
-		CustomerId:     customerID,
+		CustomerID:     customerID,
 		LabelAlamat:    input.LabelAlamat,
 		NamaPenerima:   input.NamaPenerima,
 		NoTelpPenerima: input.NoTelpPenerima,
@@ -231,7 +231,7 @@ func UpdateAlamat(c *gin.Context) {
 	tx := config.DB.Begin()
 
 	if input.IsUtama && !alamat.IsUtama {
-		if err := tx.Model(&models.Alamat{}).Where("id_customer = ?", alamat.CustomerId).Update("is_utama", false).Error; err != nil {
+		if err := tx.Model(&models.Alamat{}).Where("id_customer = ?", alamat.CustomerID).Update("is_utama", false).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "error",

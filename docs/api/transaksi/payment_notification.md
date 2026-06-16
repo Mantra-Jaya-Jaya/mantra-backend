@@ -4,7 +4,7 @@ Public (Webhook). Endpoint untuk Midtrans mengirim notifikasi status pembayaran.
 
 ---
 
-## POST /payment/notification
+## POST /api/v1/payment/notification
 
 Menerima notifikasi dari Midtrans tentang perubahan status transaksi.
 
@@ -30,7 +30,7 @@ Verifikasi dilakukan dengan SHA-512 hash dari `order_id + status_code + gross_am
 **Status yang ditangani:**
 | transaction_status | Aksi |
 |--------------------|------|
-| `settlement` | Update status pesanan → "Diproses", catat waktu bayar |
+| `settlement` | Update status pesanan → "Dikemas" (jika pesanan Online) atau "Selesai" (jika pesanan POS/offline), catat waktu bayar |
 | `capture` | Sama dengan settlement (kartu kredit) |
 | `pending` | Tidak ada aksi (menunggu pembayaran) |
 | `deny` | Update status transaksi → deny |

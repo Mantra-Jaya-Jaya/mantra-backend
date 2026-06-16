@@ -4,7 +4,7 @@ Auth (Customer & Admin). Kelola dan lihat metode pembayaran yang tersedia.
 
 ---
 
-## GET /customer/metode-pembayaran
+## GET /api/v1/customer/metode-pembayaran
 
 Customer — daftar metode pembayaran aktif (urut berdasarkan `urutan`).
 
@@ -27,13 +27,13 @@ Customer — daftar metode pembayaran aktif (urut berdasarkan `urutan`).
 
 ---
 
-## GET /admin/metode-pembayaran
+## GET /api/v1/admin/metode-pembayaran
 
 Admin — daftar semua metode (aktif dan non-aktif).
 
 ---
 
-## POST /admin/metode-pembayaran
+## POST /api/v1/admin/metode-pembayaran
 
 Tambah metode pembayaran baru.
 
@@ -51,12 +51,12 @@ Tambah metode pembayaran baru.
 
 ---
 
-## PUT /admin/metode-pembayaran/:public_id
+## PUT /api/v1/admin/metode-pembayaran/:public_id
 
 Update metode pembayaran.
 
 ---
 
-## DELETE /admin/metode-pembayaran/:public_id
+## DELETE /api/v1/admin/metode-pembayaran/:public_id
 
 Hapus metode pembayaran.

@@ -2,7 +2,7 @@
 
 ---
 
-## GET /barang
+## GET /api/v1/customer/barang
 
 Auth (Customer). Mendapatkan daftar barang untuk customer.
 
@@ -25,13 +25,13 @@ Auth (Customer). Mendapatkan daftar barang untuk customer.
 
 ---
 
-## GET /admin/barang
+## GET /api/v1/admin/barang
 
 Auth (Admin). Mendapatkan daftar semua barang.
 
 ---
 
-## POST /admin/barang
+## POST /api/v1/admin/barang
 
 Auth (Admin). Menambah barang baru.
 
@@ -48,25 +48,25 @@ Auth (Admin). Menambah barang baru.
 
 ---
 
-## GET /admin/barang/detail/:public_id
+## GET /api/v1/admin/barang/detail/:public_id
 
 Auth (Admin). Mendapatkan detail barang berdasarkan public_id UUID.
 
 ---
 
-## PUT /admin/barang/:public_id
+## PUT /api/v1/admin/barang/:public_id
 
 Auth (Admin). Mengupdate data barang.
 
 ---
 
-## DELETE /admin/barang/:public_id
+## DELETE /api/v1/admin/barang/:public_id
 
 Auth (Admin). Menghapus barang.
 
 ---
 
-## POST /admin/barang/upload
+## POST /api/v1/admin/barang/upload
 
 Auth (Admin). Upload gambar barang ke MinIO.
 
@@ -74,7 +74,7 @@ Auth (Admin). Upload gambar barang ke MinIO.
 
 ---
 
-## GET /scan/:kode_barcode
+## GET /api/v1/scan/:kode_barcode
 
 Public. Mendapatkan detail barang berdasarkan kode barcode.
 
@@ -92,7 +92,7 @@ Public. Mendapatkan detail barang berdasarkan kode barcode.
 
 ---
 
-## POST /kasir/transaksi/produk
+## POST /api/v1/kasir/transaksi/produk
 
 Auth (Kasir). Mencari produk untuk transaksi POS.
 

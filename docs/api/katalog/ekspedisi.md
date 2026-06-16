@@ -4,7 +4,7 @@ Auth (Admin). Semua endpoint CRUD ekspedisi dan layanan pengiriman.
 
 ---
 
-## GET /admin/ekspedisi
+## GET /api/v1/admin/ekspedisi
 
 Daftar semua ekspedisi.
 
@@ -21,7 +21,7 @@ Daftar semua ekspedisi.
       "is_active": true,
       "layanan": [
         {
-          "id_ekspedisi_layanan": 1,
+          "public_id": "uuid-...",
           "nama_layanan": "REG",
           "estimasi_min": 2,
           "estimasi_max": 4,
@@ -35,7 +35,7 @@ Daftar semua ekspedisi.
 
 ---
 
-## POST /admin/ekspedisi
+## POST /api/v1/admin/ekspedisi
 
 Tambah ekspedisi baru.
 
@@ -52,19 +52,19 @@ Tambah ekspedisi baru.
 
 ---
 
-## PUT /admin/ekspedisi/:public_id
+## PUT /api/v1/admin/ekspedisi/:public_id
 
 Update data ekspedisi.
 
 ---
 
-## DELETE /admin/ekspedisi/:public_id
+## DELETE /api/v1/admin/ekspedisi/:public_id
 
 Hapus ekspedisi (cascade menghapus layanan terkait).
 
 ---
 
-## POST /admin/ekspedisi/layanan
+## POST /api/v1/admin/ekspedisi/layanan
 
 Tambah layanan baru untuk ekspedisi.
 
@@ -82,12 +82,12 @@ Tambah layanan baru untuk ekspedisi.
 
 ---
 
-## PUT /admin/ekspedisi/layanan/:id
+## PUT /api/v1/admin/ekspedisi/layanan/:public_id
 
-Update layanan (id = id_ekspedisi_layanan numeric).
+Update layanan.
 
 ---
 
-## DELETE /admin/ekspedisi/layanan/:id
+## DELETE /api/v1/admin/ekspedisi/layanan/:public_id
 
 Hapus layanan.

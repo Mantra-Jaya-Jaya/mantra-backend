@@ -57,5 +57,3 @@ func GetProfilKurir(c *gin.Context) {
 		},
 	})
 }
-
-

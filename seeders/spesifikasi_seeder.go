@@ -11,6 +11,10 @@ func SeedSpesifikasi() {
 	daftarSpesifikasi := []models.Spesifikasi{
 		{NamaSpesifikasi: "Warna"},
 		{NamaSpesifikasi: "Ukuran"},
+		{NamaSpesifikasi: "RAM"},
+		{NamaSpesifikasi: "Kapasitas"},
+		{NamaSpesifikasi: "Rasa"},
+		{NamaSpesifikasi: "Bahan"},
 	}
 
 	// Looping untuk masukin ke database

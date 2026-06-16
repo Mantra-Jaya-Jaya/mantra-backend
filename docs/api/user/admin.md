@@ -4,25 +4,25 @@ Auth (Admin). Dashboard, profil, dan chart admin.
 
 ---
 
-## GET /admin/dashboard
+## GET /api/v1/admin/dashboard
 
 Mendapatkan ringkasan dashboard admin.
 
 ---
 
-## GET /admin/dashboard/chart
+## GET /api/v1/admin/dashboard/chart
 
 Mendapatkan data chart untuk dashboard admin.
 
 ---
 
-## GET /admin/profil
+## GET /api/v1/admin/profil
 
 Mendapatkan profil admin yang login.
 
 ---
 
-## PUT /admin/profil
+## PUT /api/v1/admin/profil
 
 Mengupdate profil admin.
 

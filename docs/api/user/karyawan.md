@@ -4,13 +4,13 @@ Auth (Admin). Manajemen data karyawan. Karyawan adalah induk dari kasir dan kuri
 
 ---
 
-## GET /admin/karyawan
+## GET /api/v1/admin/karyawan
 
 Mendapatkan daftar semua karyawan.
 
 ---
 
-## POST /admin/karyawan
+## POST /api/v1/admin/karyawan
 
 Menambah karyawan baru (sekaligus membuat akun user + profil kasir/kurir).
 
@@ -35,25 +35,25 @@ Menambah karyawan baru (sekaligus membuat akun user + profil kasir/kurir).
 
 ---
 
-## GET /admin/karyawan/:id
+## GET /api/v1/admin/karyawan/:public_id
 
 Mendapatkan detail karyawan.
 
 ---
 
-## PUT /admin/karyawan/:id
+## PUT /api/v1/admin/karyawan/:public_id
 
 Mengupdate data karyawan.
 
 ---
 
-## DELETE /admin/karyawan/:id
+## DELETE /api/v1/admin/karyawan/:public_id
 
 Menghapus data karyawan.
 
 ---
 
-## POST /admin/karyawan/upload
+## POST /api/v1/admin/karyawan/upload
 
 Upload foto profil karyawan ke MinIO.
 

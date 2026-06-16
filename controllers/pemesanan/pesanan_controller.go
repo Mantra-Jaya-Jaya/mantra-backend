@@ -1,12 +1,13 @@
 package pemesanan
 
 import (
+	"fmt"
 	"net/http"
 	"time"
-	"fmt"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -44,14 +45,16 @@ func GetPesananTerbaru(c *gin.Context) {
 
 	// 🚀 2. QUERY DATABASE
 	var pesanan models.Pesanan
+	dikemasID := utils.GetStatusPesananID("Dikemas")
 	err := config.DB.
+		Preload("StatusPesanan").
 		Preload("Customer.User").
 		Preload("Alamat").
 		Preload("DetailPesanan.SpesifikasiBarang.Barang").
 		Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi").
 		Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
-		Where("tipe_pesanan = ?", "Online").
-		Where("status_pesanan = ?", "Dikemas"). // Sesuaikan status
+		Where("id_tipe_pesanan = ?", utils.GetTipePesananID("Online")).
+		Where("id_status_pesanan = ?", dikemasID).
 		Order("tanggal_pesanan DESC").
 		First(&pesanan).Error
 
@@ -76,7 +79,7 @@ func GetPesananTerbaru(c *gin.Context) {
 		PublicID        string       `json:"public_id"`
 		TotalPembayaran int          `json:"total_pembayaran"`
 		TanggalPesanan  time.Time    `json:"tanggal_pesanan"`
-		StatusPesanan   string       `json:"status_pesanan"`
+		IDStatusPesanan uint         `json:"id_status_pesanan"`
 		NamaCustomer    string       `json:"nama_customer"`
 		NoTelp          string       `json:"no_telp"`
 		AlamatLengkap   string       `json:"alamat_lengkap"`
@@ -105,17 +108,17 @@ func GetPesananTerbaru(c *gin.Context) {
 	for _, detail := range pesanan.DetailPesanan {
 		varian := "Default"
 		if detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi != "" {
-				namaSpesifikasi := detail.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi
-				nilaiSpesifikasi := detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi
-				
-				// Kalau master namanya ada, gabungin jadi "Warna: Hitam"
-				if namaSpesifikasi != "" {
-					varian = namaSpesifikasi + ": " + nilaiSpesifikasi
-				} else {
-					// Jaga-jaga kalau master namanya kosong
-					varian = nilaiSpesifikasi
-				}
+			namaSpesifikasi := detail.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi
+			nilaiSpesifikasi := detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi
+
+			// Kalau master namanya ada, gabungin jadi "Warna: Hitam"
+			if namaSpesifikasi != "" {
+				varian = namaSpesifikasi + ": " + nilaiSpesifikasi
+			} else {
+				// Jaga-jaga kalau master namanya kosong
+				varian = nilaiSpesifikasi
 			}
+		}
 
 		listBarang = append(listBarang, ItemBarang{
 			NamaBarang: detail.SpesifikasiBarang.Barang.NamaBarang,
@@ -125,11 +128,15 @@ func GetPesananTerbaru(c *gin.Context) {
 	}
 
 	// Bungkus ke DTO
+	var statusID uint
+	if pesanan.StatusPesanan != nil {
+		statusID = pesanan.StatusPesanan.IdStatusPesanan
+	}
 	dataBungkus := PesananRingkas{
 		PublicID:        pesanan.PublicId.String(),
 		TotalPembayaran: pesanan.TotalPembayaran,
 		TanggalPesanan:  pesanan.TanggalPesanan,
-		StatusPesanan:   pesanan.StatusPesanan,
+		IDStatusPesanan: statusID,
 		NamaCustomer:    namaCust,
 		NoTelp:          noTelp,
 		AlamatLengkap:   alamatLengkap,
@@ -178,14 +185,16 @@ func GetAllPesananOnline(c *gin.Context) {
 
 	// 🚀 2. QUERY DATABASE (Tarik Semua Pesanan)
 	var daftarPesanan []models.Pesanan
+	dikemasID := utils.GetStatusPesananID("Dikemas")
 	err := config.DB.
+		Preload("StatusPesanan").
 		Preload("Customer.User").
 		Preload("Alamat").
 		Preload("DetailPesanan.SpesifikasiBarang.Barang").
 		Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi").
 		Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
-		Where("tipe_pesanan = ?", "Online").
-		Where("status_pesanan = ?", "Dikemas"). // Filter biar kurir cuma liat yang nganggur/siap antar
+		Where("id_tipe_pesanan = ?", utils.GetTipePesananID("Online")).
+		Where("id_status_pesanan = ?", dikemasID). // Filter biar kurir cuma liat yang nganggur/siap antar
 		Order("tanggal_pesanan DESC").
 		Find(&daftarPesanan).Error
 
@@ -219,7 +228,7 @@ func GetAllPesananOnline(c *gin.Context) {
 		PublicID        string       `json:"public_id"`
 		TotalPembayaran int          `json:"total_pembayaran"`
 		TanggalPesanan  time.Time    `json:"tanggal_pesanan"`
-		StatusPesanan   string       `json:"status_pesanan"`
+		IDStatusPesanan uint         `json:"id_status_pesanan"`
 		NamaCustomer    string       `json:"nama_customer"`
 		NoTelp          string       `json:"no_telp"`
 		AlamatLengkap   string       `json:"alamat_lengkap"`
@@ -255,7 +264,7 @@ func GetAllPesananOnline(c *gin.Context) {
 			if detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi != "" {
 				namaSpesifikasi := detail.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi
 				nilaiSpesifikasi := detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi
-				
+
 				// Kalau master namanya ada, gabungin jadi "Warna: Hitam"
 				if namaSpesifikasi != "" {
 					varian = namaSpesifikasi + ": " + nilaiSpesifikasi
@@ -264,7 +273,7 @@ func GetAllPesananOnline(c *gin.Context) {
 					varian = nilaiSpesifikasi
 				}
 			}
-			
+
 			listBarang = append(listBarang, ItemBarang{
 				NamaBarang: detail.SpesifikasiBarang.Barang.NamaBarang,
 				Varian:     varian,
@@ -273,11 +282,15 @@ func GetAllPesananOnline(c *gin.Context) {
 		}
 
 		// Masukin pesanan yang udah langsing ini ke "keranjang" hasil akhir
+		var statusID uint
+		if pesanan.StatusPesanan != nil {
+			statusID = pesanan.StatusPesanan.IdStatusPesanan
+		}
 		hasilAkhir = append(hasilAkhir, PesananRingkas{
 			PublicID:        pesanan.PublicId.String(),
 			TotalPembayaran: pesanan.TotalPembayaran,
 			TanggalPesanan:  pesanan.TanggalPesanan,
-			StatusPesanan:   pesanan.StatusPesanan,
+			IDStatusPesanan: statusID,
 			NamaCustomer:    namaCust,
 			NoTelp:          noTelp,
 			AlamatLengkap:   alamatLengkap,
@@ -295,179 +308,188 @@ func GetAllPesananOnline(c *gin.Context) {
 }
 
 func GetDetailPesanan(c *gin.Context) {
-  // 🚀 1. ERROR HANDLING: CEK AUTH (Sama kayak referensi lu)
-  val, exists := c.Get("user_id")
-  if !exists {
-    c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: User belum login"})
-    return
-  }
+	// 🚀 1. ERROR HANDLING: CEK AUTH (Sama kayak referensi lu)
+	val, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: User belum login"})
+		return
+	}
 
-  var userID int64
-  switch v := val.(type) {
-  case float64:
-    userID = int64(v)
-  case int64:
-    userID = v
-  case int:
-    userID = int64(v)
-  case uint:
-    userID = int64(v)
-  default:
-    c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: Format token tidak valid"})
-    return
-  }
+	var userID int64
+	switch v := val.(type) {
+	case float64:
+		userID = int64(v)
+	case int64:
+		userID = v
+	case int:
+		userID = int64(v)
+	case uint:
+		userID = int64(v)
+	default:
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: Format token tidak valid"})
+		return
+	}
 
-  var count int64
-  config.DB.Table("kurir").Joins("JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan").Where("karyawan.id_user = ?", userID).Count(&count)
-  if count == 0 {
-    c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: Anda bukan kurir"})
-    return
-  }
+	var count int64
+	config.DB.Table("kurir").Joins("JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan").Where("karyawan.id_user = ?", userID).Count(&count)
+	if count == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Auth salah: Anda bukan kurir"})
+		return
+	}
 
-  // 🚀 2. TANGKAP PUBLIC ID DARI URL
-  publicID := c.Param("public_id")
+	// 🚀 2. TANGKAP PUBLIC ID DARI URL
+	publicID := c.Param("public_id")
 
-  // Variabel penampung ID asli (Primary Key)
-  var idPesananAsli uint
+	// Variabel penampung ID asli (Primary Key)
+	var idPesananAsli uint
 
-  // 🕵️ INTEL 1: Cek apakah ini UUID milik tabel Pesanan?
-  var cekPesanan models.Pesanan
-  if err := config.DB.Select("id_pesanan").Where("public_id = ?", publicID).First(&cekPesanan).Error; err == nil {
-      idPesananAsli = cekPesanan.IdPesanan // Dapet! Ini dari halaman Home
-  } else {
-      // 🕵️ INTEL 2: Kalau bukan, cek apakah ini UUID milik tabel Pengantaran?
-      var cekPengantaran models.Pengantaran
-      
-      // ⚠️ PERHATIAN: Pastikan nama kolom UUID di tabel pengantaran lu bener (biasanya 'public_id' atau 'id_pengantaran')
-      if err := config.DB.Select("id_pesanan").Where("public_id = ?", publicID).First(&cekPengantaran).Error; err == nil {
-          idPesananAsli = cekPengantaran.PesananID // Dapet! Ini dari halaman Peta, kita ambil FK pesanannya
-      }
-  }
+	// 🕵️ INTEL 1: Cek apakah ini UUID milik tabel Pesanan?
+	var cekPesanan models.Pesanan
+	if err := config.DB.Select("id_pesanan").Where("public_id = ?", publicID).First(&cekPesanan).Error; err == nil {
+		idPesananAsli = cekPesanan.IdPesanan // Dapet! Ini dari halaman Home
+	} else {
+		// 🕵️ INTEL 2: Kalau bukan, cek apakah ini UUID milik tabel Pengantaran?
+		var cekPengantaran models.Pengantaran
 
-  // 🚨 Kalau dua-duanya gagal total (Zonk)
-  if idPesananAsli == 0 {
-      c.JSON(http.StatusNotFound, gin.H{
-          "status":  "error",
-          "message": "Data tidak ditemukan (Bukan ID Pesanan maupun ID Pengantaran yang valid)",
-          "data":    nil,
-      })
-      return
-  }
+		// ⚠️ PERHATIAN: Pastikan nama kolom UUID di tabel pengantaran lu bener (biasanya 'public_id' atau 'id_pengantaran')
+		if err := config.DB.Select("id_pesanan").Where("public_id = ?", publicID).First(&cekPengantaran).Error; err == nil {
+			idPesananAsli = cekPengantaran.PesananID // Dapet! Ini dari halaman Peta, kita ambil FK pesanannya
+		}
+	}
 
-  // 🚀 3. TARIK DATA FULL (Karena ID Aslinya Udah Ketemu!)
-  var pesanan models.Pesanan
-  err := config.DB.
-    Preload("Customer.User").
-    Preload("Alamat").
-    Preload("Pembayaran.MetodePembayaran").
-    Preload("DetailPesanan.SpesifikasiBarang.Barang").
-    Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi").
-    Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
-    Where("id_pesanan = ?", idPesananAsli). // 👈 Tarik pakai ID asli (Primary Key) biar kenceng!
-    First(&pesanan).Error
+	// 🚨 Kalau dua-duanya gagal total (Zonk)
+	if idPesananAsli == 0 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Data tidak ditemukan (Bukan ID Pesanan maupun ID Pengantaran yang valid)",
+			"data":    nil,
+		})
+		return
+	}
 
-  if err != nil {
-    c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memuat detail pesanan"})
-    return
-  }
+	// 🚀 3. TARIK DATA FULL (Karena ID Aslinya Udah Ketemu!)
+	var pesanan models.Pesanan
+	err := config.DB.
+		Preload("Customer.User").
+		Preload("Alamat").
+		Preload("Pembayaran.MetodePembayaran").
+		Preload("DetailPesanan.SpesifikasiBarang.Barang").
+		Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi").
+		Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
+		Where("id_pesanan = ?", idPesananAsli). // 👈 Tarik pakai ID asli (Primary Key) biar kenceng!
+		First(&pesanan).Error
 
-  // 🚀 4. REFACTOR JSON (DTO KHUSUS DETAIL PESANAN)
-  type ItemBarang struct {
-    NamaBarang  string `json:"nama_barang"`
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memuat detail pesanan"})
+		return
+	}
+
+	// 🚀 4. REFACTOR JSON (DTO KHUSUS DETAIL PESANAN)
+	type ItemBarang struct {
+		NamaBarang   string `json:"nama_barang"`
 		GambarBarang string `json:"gambar_barang"`
-    Varian      string `json:"varian"`
-    Jumlah      int    `json:"jumlah_beli"`
-    HargaSatuan int    `json:"harga_satuan"`
-    Subtotal    int    `json:"subtotal_item"`
-  }
+		Varian       string `json:"varian"`
+		Jumlah       int    `json:"jumlah_beli"`
+		HargaSatuan  int    `json:"harga_satuan"`
+		Subtotal     int    `json:"subtotal_item"`
+	}
 
-  type MetodeBayarDTO struct {
-    IDMetode   string `json:"id_metode_bayar"`
-    NamaMetode string `json:"nama_metode"`
-  }
+	type MetodeBayarDTO struct {
+		IDMetode   string `json:"id_metode_bayar"`
+		NamaMetode string `json:"nama_metode"`
+	}
 
-  type DetailPesananBungkus struct {
-    PublicID        string         `json:"public_id"`
-		NamaCustomer    string         `json:"nama_customer"`  
-    AlamatLengkap   string         `json:"alamat_lengkap"` 
-    TotalPembayaran int            `json:"total_pembayaran"`
-    TanggalPesanan  time.Time      `json:"tanggal_pesanan"`
-    StatusPesanan   string         `json:"status_pesanan"`
-    MetodeBayar     MetodeBayarDTO `json:"metode_bayar"`
-    DaftarBarang    []ItemBarang   `json:"daftar_barang"`
-  }
+	type DetailPesananBungkus struct {
+		PublicID        string         `json:"public_id"`
+		NamaCustomer    string         `json:"nama_customer"`
+		NoTelp          string         `json:"no_telp"`
+		AlamatLengkap   string         `json:"alamat_lengkap"`
+		TotalPembayaran int            `json:"total_pembayaran"`
+		TanggalPesanan  time.Time      `json:"tanggal_pesanan"`
+		IDStatusPesanan uint           `json:"id_status_pesanan"`
+		MetodeBayar     MetodeBayarDTO `json:"metode_bayar"`
+		DaftarBarang    []ItemBarang   `json:"daftar_barang"`
+	}
 
-  // 🚀 5. MAPPING BARANG (Looping keranjang)
-  var listBarang []ItemBarang
-  for _, detail := range pesanan.DetailPesanan {
-    varian := "Default"
-    if detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi != "" {
-      namaSpesifikasi := detail.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi
-      nilaiSpesifikasi := detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi
-      
-      if namaSpesifikasi != "" {
-        varian = namaSpesifikasi + ": " + nilaiSpesifikasi
-      } else {
-        varian = nilaiSpesifikasi
-      }
-    }
-    
-    // Asumsi: field harga di tabel DetailPesanan lu namanya 'Harga' atau 'HargaSatuan'
-    hargaSatuan := detail.HargaSatuan // Ubah 'Harga' jadi nama field lu yang bener kalau beda
-    subtotalItem := hargaSatuan * detail.Jumlah // Kalau lu udah punya field Subtotal, tinggal panggil detail.Subtotal
+	// 🚀 5. MAPPING BARANG (Looping keranjang)
+	var listBarang []ItemBarang
+	for _, detail := range pesanan.DetailPesanan {
+		varian := "Default"
+		if detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi != "" {
+			namaSpesifikasi := detail.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi
+			nilaiSpesifikasi := detail.SpesifikasiBarang.DetailSpesifikasi.NamaDetailSpesifikasi
 
-    listBarang = append(listBarang, ItemBarang{
-      NamaBarang:  detail.SpesifikasiBarang.Barang.NamaBarang,
+			if namaSpesifikasi != "" {
+				varian = namaSpesifikasi + ": " + nilaiSpesifikasi
+			} else {
+				varian = nilaiSpesifikasi
+			}
+		}
+
+		// Asumsi: field harga di tabel DetailPesanan lu namanya 'Harga' atau 'HargaSatuan'
+		hargaSatuan := detail.HargaSatuan           // Ubah 'Harga' jadi nama field lu yang bener kalau beda
+		subtotalItem := hargaSatuan * detail.Jumlah // Kalau lu udah punya field Subtotal, tinggal panggil detail.Subtotal
+
+		listBarang = append(listBarang, ItemBarang{
+			NamaBarang:   detail.SpesifikasiBarang.Barang.NamaBarang,
 			GambarBarang: detail.SpesifikasiBarang.Barang.GambarBarang,
-      Varian:      varian,
-      Jumlah:      detail.Jumlah,
-      HargaSatuan: hargaSatuan,
-      Subtotal:    subtotalItem,
-    })
-  }
+			Varian:       varian,
+			Jumlah:       detail.Jumlah,
+			HargaSatuan:  hargaSatuan,
+			Subtotal:     subtotalItem,
+		})
+	}
 
-  // 🚀 6. MAPPING METODE BAYAR (Aman dari Nil Pointer)
-  metodeBayar := MetodeBayarDTO{
-    IDMetode:   "-",
-    NamaMetode: "Belum ada pembayaran",
-  }
+	// 🚀 6. MAPPING METODE BAYAR (Aman dari Nil Pointer)
+	metodeBayar := MetodeBayarDTO{
+		IDMetode:   "-",
+		NamaMetode: "Belum ada pembayaran",
+	}
 
-  // 🚀 PERBAIKAN DI SINI: Cek ganda! Pastikan Pembayaran ADA dan MetodePembayaran ADA!
-  if pesanan.Pembayaran != nil && pesanan.Pembayaran.MetodePembayaran != nil {
-    metodeBayar = MetodeBayarDTO{
-      IDMetode:   fmt.Sprintf("%d", pesanan.Pembayaran.MetodePembayaran.IdMetodePembayaran), 
-      NamaMetode: pesanan.Pembayaran.MetodePembayaran.NamaMetode, 
-    }
-  }
+	// 🚀 PERBAIKAN DI SINI: Cek ganda! Pastikan Pembayaran ADA dan MetodePembayaran ADA!
+	if pesanan.Pembayaran != nil && pesanan.Pembayaran.MetodePembayaran != nil {
+		metodeBayar = MetodeBayarDTO{
+			IDMetode:   fmt.Sprintf("%d", pesanan.Pembayaran.MetodePembayaran.IdMetodePembayaran),
+			NamaMetode: pesanan.Pembayaran.MetodePembayaran.NamaMetode,
+		}
+	}
 
 	namaCust := "Customer Offline"
-  alamatLengkap := "Ambil di Toko"
+	noTelp := "-"
+	alamatLengkap := "Ambil di Toko"
 
-  if pesanan.Alamat != nil {
-    namaCust = pesanan.Alamat.NamaPenerima
-    alamatLengkap = pesanan.Alamat.AlamatLengkap
-  } else if pesanan.Customer.User.NamaLengkap != "" {
-    namaCust = pesanan.Customer.User.NamaLengkap
-  }
+	if pesanan.Alamat != nil {
+		namaCust = pesanan.Alamat.NamaPenerima
+		noTelp = pesanan.Alamat.NoTelpPenerima
+		alamatLengkap = pesanan.Alamat.AlamatLengkap
+	} else if pesanan.Customer.User.NamaLengkap != "" {
+		namaCust = pesanan.Customer.User.NamaLengkap
+	}
 
-  // 🚀 7. BUNGKUS KE DTO FINAL
-  hasilAkhir := DetailPesananBungkus{
-    PublicID:        pesanan.PublicId.String(),
-		NamaCustomer:    namaCust,      
-    AlamatLengkap:   alamatLengkap, 
-    TotalPembayaran: pesanan.TotalPembayaran,
-    TanggalPesanan:  pesanan.TanggalPesanan,
-    StatusPesanan:   pesanan.StatusPesanan,
-    MetodeBayar:     metodeBayar,
-    DaftarBarang:    listBarang,
-  }
+	var statusID uint
+	if pesanan.StatusPesanan != nil {
+		statusID = pesanan.StatusPesanan.IdStatusPesanan
+	}
 
-  // 🚀 8. SUKSES (200 OK)
-  c.JSON(http.StatusOK, gin.H{
-    "status":  "success",
-    "message": "Detail pesanan berhasil diambil",
-    "data":    hasilAkhir,
-  })
+	// 🚀 7. BUNGKUS KE DTO FINAL
+	hasilAkhir := DetailPesananBungkus{
+		PublicID:        pesanan.PublicId.String(),
+		NamaCustomer:    namaCust,
+		NoTelp:          noTelp,
+		AlamatLengkap:   alamatLengkap,
+		TotalPembayaran: pesanan.TotalPembayaran,
+		TanggalPesanan:  pesanan.TanggalPesanan,
+		IDStatusPesanan: statusID,
+		MetodeBayar:     metodeBayar,
+		DaftarBarang:    listBarang,
+	}
+
+	// 🚀 8. SUKSES (200 OK)
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Detail pesanan berhasil diambil",
+		"data":    hasilAkhir,
+	})
 }
 
 func TerimaPesanan(c *gin.Context) {
@@ -480,10 +502,14 @@ func TerimaPesanan(c *gin.Context) {
 
 	var userID int64
 	switch v := val.(type) {
-	case float64: userID = int64(v)
-	case int64: userID = v
-	case int: userID = int64(v)
-	case uint: userID = int64(v)
+	case float64:
+		userID = int64(v)
+	case int64:
+		userID = v
+	case int:
+		userID = int64(v)
+	case uint:
+		userID = int64(v)
 	}
 
 	// Cari ID Kurir aslinya berdasarkan user_id
@@ -523,7 +549,7 @@ func TerimaPesanan(c *gin.Context) {
 	pengantaranBaru := models.Pengantaran{
 		PesananID:           pesanan.IdPesanan,
 		KurirID:             &kurir.IdKurir,
-		StatusPengantaranID: 1, // 🚀 Referensi image_1b2103.png (1 = Menunggu Pickup)
+		StatusPengantaranID: utils.GetStatusPengantaranID("Menunggu Pickup"),
 		EkspedisiID:         pesanan.EkspedisiID, // Oper data ekspedisi dari pesanan
 	}
 
@@ -535,7 +561,7 @@ func TerimaPesanan(c *gin.Context) {
 
 	// 🚀 5. UPDATE STATUS PESANAN
 	// Kita ubah status pesanan biar nggak nongol lagi di daftar "Cari Order" kurir lain
-	config.DB.Model(&pesanan).Update("status_pesanan", "Dikirim")
+	config.DB.Model(&pesanan).Update("id_status_pesanan", utils.GetStatusPesananID("Dikirim"))
 
 	// 🚀 6. KEMBALIKAN PUBLIC ID PENGANTARAN KE FLUTTER
 	// Tarik ulang datanya buat mastiin Public ID-nya ke-generate dari database

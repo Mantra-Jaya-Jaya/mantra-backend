@@ -4,7 +4,7 @@ Auth (Customer). Semua endpoint keranjang untuk customer.
 
 ---
 
-## POST /customer/keranjang
+## POST /api/v1/customer/keranjang
 
 Tambah item ke keranjang.
 
@@ -26,7 +26,7 @@ Tambah item ke keranjang.
 
 ---
 
-## PATCH /customer/keranjang/:id_keranjang
+## PATCH /api/v1/customer/keranjang/:public_id
 
 Update quantity item di keranjang.
 
@@ -37,9 +37,17 @@ Update quantity item di keranjang.
 }
 ```
 
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Jumlah item berhasil diperbarui"
+}
+```
+
 ---
 
-## DELETE /customer/keranjang/:id_keranjang
+## DELETE /api/v1/customer/keranjang/:public_id
 
 Hapus item dari keranjang.
 

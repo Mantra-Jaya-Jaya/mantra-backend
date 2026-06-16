@@ -43,6 +43,8 @@ func SetupRoutes(r *gin.Engine) {
 			customerGroup.GET("/promo", katalog.GetPromo)
 			customerGroup.GET("/kategori", katalog.GetKategori)
 			customerGroup.GET("/barang", katalog.GetDaftarBarang)
+			customerGroup.GET("/barang/detail/:public_id", katalog.GetDetailBarang)
+			customerGroup.GET("/keranjang", keranjang.GetKeranjang)
 			customerGroup.POST("/keranjang", keranjang.TambahKeKeranjang)
 			customerGroup.PATCH("/keranjang/:public_id", keranjang.UpdateKeranjang)
 			customerGroup.DELETE("/keranjang/:public_id", keranjang.HapusItemKeranjang)
@@ -77,6 +79,7 @@ func SetupRoutes(r *gin.Engine) {
 			kasirGroup.GET("/transaksi/produk", katalog.CariProdukTransaksi)
 			kasirGroup.PATCH("/transaksi/item/update", transaksi.UpdateQuantityItem)
 			kasirGroup.GET("/transaksi/checkout", transaksi.GetRingkasanCheckout)
+			kasirGroup.GET("/metode-pembayaran", transaksi.GetMetodePembayaranAktif)
 			kasirGroup.POST("/transaksi/bayar/tunai", transaksi.BayarTunai)
 			kasirGroup.POST("/transaksi/bayar/non-tunai", transaksi.BayarNonTunai)
 			kasirGroup.GET("/transaksi/cek-status/:order_id", transaksi.CekStatusPembayaran)
@@ -97,7 +100,10 @@ func SetupRoutes(r *gin.Engine) {
 			kurirGroup.POST("/pesanan/:public_id/terima", pemesanan.TerimaPesanan)
 			kurirGroup.GET("/pengantaran/:public_id/detail", pengantaran.GetDetailPengantaran)
 			kurirGroup.PUT("/pengantaran/:public_id/lokasi", pengantaran.UpdateLokasiKurir)
+			kurirGroup.POST("/pengantaran/:public_id/ambil", pengantaran.AmbilPesanan)
+			kurirGroup.POST("/pengantaran/:public_id/status", pengantaran.UpdateStatusPengantaran)
 			kurirGroup.PUT("/pengantaran/:public_id/selesai", pengantaran.UploadBuktiPengiriman)
+			kurirGroup.GET("/notifikasi", notifikasi.GetNotifikasi)
 		}
 
 		// Admin Routes
@@ -136,6 +142,7 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.POST("/ekspedisi", katalog.TambahEkspedisi)
 			adminGroup.PUT("/ekspedisi/:public_id", katalog.UpdateEkspedisi)
 			adminGroup.DELETE("/ekspedisi/:public_id", katalog.HapusEkspedisi)
+			adminGroup.POST("/ekspedisi/sync", katalog.SyncBiteshipCouriers)
 			adminGroup.POST("/ekspedisi/layanan", katalog.TambahLayanan)
 			adminGroup.PUT("/ekspedisi/layanan/:public_id", katalog.UpdateLayanan)
 			adminGroup.DELETE("/ekspedisi/layanan/:public_id", katalog.HapusLayanan)

@@ -4,13 +4,13 @@ Seluruh endpoint Auth (Kasir). Digunakan untuk alur POS di aplikasi Kasir.
 
 ---
 
-## GET /kasir/transaksi/checkout
+## GET /api/v1/kasir/transaksi/checkout
 
 Mendapatkan ringkasan checkout pesanan offline.
 
 ---
 
-## POST /kasir/transaksi/bayar/tunai
+## POST /api/v1/kasir/transaksi/bayar/tunai
 
 Memproses pembayaran tunai.
 
@@ -35,7 +35,7 @@ Memproses pembayaran tunai.
 
 ---
 
-## POST /kasir/transaksi/bayar/non-tunai
+## POST /api/v1/kasir/transaksi/bayar/non-tunai
 
 Memproses pembayaran non-tunai (QRIS, E-Wallet, VA, Kartu).
 
@@ -62,7 +62,7 @@ Memproses pembayaran non-tunai (QRIS, E-Wallet, VA, Kartu).
 
 ---
 
-## PATCH /kasir/transaksi/item/update
+## PATCH /api/v1/kasir/transaksi/item/update
 
 Mengupdate quantity item di pesanan offline sebelum checkout.
 
@@ -76,24 +76,24 @@ Mengupdate quantity item di pesanan offline sebelum checkout.
 
 ---
 
-## GET /kasir/dashboard
+## GET /api/v1/kasir/dashboard
 
 Mendapatkan data dashboard kasir (ringkasan penjualan hari ini).
 
 ---
 
-## GET /kasir/laporan
+## GET /api/v1/kasir/laporan
 
 Mendapatkan laporan ringkasan.
 
 ---
 
-## GET /kasir/laporan/produk/:id_produk
+## GET /api/v1/kasir/laporan/produk/:public_id
 
 Mendapatkan detail laporan per produk.
 
 ---
 
-## GET /kasir/laporan/produk/:id_produk/:id_pesanan
+## GET /api/v1/kasir/laporan/produk/:public_id/:pesanan_id
 
 Mendapatkan detail pesanan dari laporan produk.

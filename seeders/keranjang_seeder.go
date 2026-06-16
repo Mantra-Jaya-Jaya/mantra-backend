@@ -4,42 +4,55 @@ import (
 	"backend-mantra/config"
 	"backend-mantra/models"
 	"fmt"
+
+	"github.com/brianvoe/gofakeit/v7"
 )
 
 func SeedKeranjang() {
 	fmt.Println("⏳ Menyiapkan data keranjang...")
 
-	var count int64
-	config.DB.Model(&models.Keranjang{}).Count(&count)
-	if count > 0 {
-		fmt.Println("Tabel keranjang udah ada isinya, proses seeding dilewati.")
-		return
-	}
+	gofakeit.Seed(0)
 
-	var customer models.Customer
-	if err := config.DB.First(&customer).Error; err != nil {
+	var customers []models.Customer
+	if err := config.DB.Find(&customers).Error; err != nil || len(customers) == 0 {
 		fmt.Println("Gagal: Data Customer belum ada!")
 		return
 	}
 
 	var daftarSpek []models.SpesifikasiBarang
-	if err := config.DB.Limit(3).Find(&daftarSpek).Error; err != nil || len(daftarSpek) == 0 {
+	if err := config.DB.Find(&daftarSpek).Error; err != nil || len(daftarSpek) == 0 {
 		fmt.Println("Gagal: Data Spesifikasi Barang masih kosong!")
 		return
 	}
 
-	for _, spek := range daftarSpek {
-		keranjang := models.Keranjang{
-			Quantity:            2,
-			CustomerID:          customer.IdCustomer,
-			SpesifikasiBarangID: spek.IdSpesifikasiBarang,
-		}
+	totalKeranjang := 0
+	for _, customer := range customers {
+		numItems := gofakeit.IntRange(2, 4)
+		usedSpek := make(map[uint]bool)
 
-		if err := config.DB.Create(&keranjang).Error; err != nil {
-			fmt.Println("Error insert keranjang:", err)
-			continue
+		for i := 0; i < numItems; i++ {
+			spekIdx := gofakeit.IntRange(0, len(daftarSpek)-1)
+			spek := daftarSpek[spekIdx]
+
+			// Prevent duplicates in same cart
+			if usedSpek[spek.IdSpesifikasiBarang] {
+				continue
+			}
+			usedSpek[spek.IdSpesifikasiBarang] = true
+
+			keranjang := models.Keranjang{
+				Quantity:            gofakeit.IntRange(1, 5),
+				CustomerID:          customer.IdCustomer,
+				SpesifikasiBarangID: spek.IdSpesifikasiBarang,
+			}
+
+			if err := config.DB.Create(&keranjang).Error; err != nil {
+				fmt.Println("Error insert keranjang:", err)
+				continue
+			}
+			totalKeranjang++
 		}
 	}
 
-	fmt.Println("Yeyy, berhasil seed keranjang!")
+	fmt.Printf("Yeyy, berhasil seed %d keranjang!\n", totalKeranjang)
 }
