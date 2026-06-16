@@ -2,6 +2,7 @@ package transaksi
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -317,9 +318,10 @@ func GetDetailPesanan(c *gin.Context) {
 		"status":  "success",
 		"message": "Detail pesanan berhasil diambil",
 		"data": gin.H{
-			"no_pesanan":         pesanan.PublicId,
-			"id_status_pesanan":  pesanan.StatusPesananID,
-			"tanggal_pesan":      pesanan.TanggalPesanan,
+			"no_pesanan":             pesanan.PublicId,
+			"id_status_pesanan":      pesanan.StatusPesananID,
+			"nama_status_pesanan":    pesanan.StatusPesanan.NamaStatus,
+			"tanggal_pesan":          pesanan.TanggalPesanan,
 			"items":              items,
 			"tujuan_pengantaran": tujuanPengantaran,
 			"kurir":              kurirData,
@@ -357,6 +359,7 @@ func CheckoutPesanan(c *gin.Context) {
 		IdEkspedisi        *uint          `json:"id_ekspedisi"`
 		IdLayananEkspedisi *uint          `json:"id_layanan_ekspedisi"`
 		OngkosKirim        int            `json:"ongkos_kirim"`
+		IdTipeKurir        *uint          `json:"id_tipe_kurir"`
 	}
 
 	var input CheckoutInput
@@ -489,9 +492,15 @@ func CheckoutPesanan(c *gin.Context) {
 	metodeInput := strings.ToLower(input.MetodePembayaran)
 	var initialStatusID uint
 	if metodeInput == "tunai" || metodeInput == "cash" {
-		initialStatusID = utils.GetStatusPesananID("Diproses")
+		initialStatusID = utils.GetStatusPesananID("Dikemas")
 	} else {
 		initialStatusID = utils.GetStatusPesananID("Menunggu Pembayaran")
+	}
+
+	// Tentukan tipe kurir (default internal)
+	tipeKurirID := utils.GetTipeKurirID("internal")
+	if input.IdTipeKurir != nil && *input.IdTipeKurir == utils.GetTipeKurirID("external") {
+		tipeKurirID = utils.GetTipeKurirID("external")
 	}
 
 	// Buat Pesanan
@@ -501,6 +510,7 @@ func CheckoutPesanan(c *gin.Context) {
 		TanggalPesanan:     now,
 		TipePesananID:      utils.GetTipePesananID("Online"),
 		StatusPesananID:    initialStatusID,
+		TipeKurirID:        tipeKurirID,
 		OngkosKirim:        ongkir,
 		Catatan:            input.Catatan,
 		EkspedisiID:        input.IdEkspedisi,
@@ -772,7 +782,7 @@ func BatalkanPesanan(c *gin.Context) {
 		statusName = pesanan.StatusPesanan.NamaStatus
 	}
 
-	if statusName != "Menunggu Pembayaran" && statusName != "Diproses" {
+	if statusName != "Menunggu Pembayaran" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak bisa dibatalkan karena status saat ini: " + statusName,
@@ -823,7 +833,7 @@ func LacakPesanan(c *gin.Context) {
 	}
 
 	var pesanan models.Pesanan
-	if err := config.DB.Preload("StatusPesanan").Preload("Ekspedisi").Where("public_id = ?", idPesanan).First(&pesanan).Error; err != nil {
+	if err := config.DB.Preload("StatusPesanan").Preload("Ekspedisi").Preload("Alamat").Where("public_id = ?", idPesanan).First(&pesanan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak ditemukan",
@@ -893,6 +903,24 @@ func LacakPesanan(c *gin.Context) {
 		}
 	}
 
+	jarakMeter := 0
+	var estimasiTiba string
+	if pesanan.Alamat != nil && pengantaran.LastLatitude != 0 && pengantaran.LastLongitude != 0 {
+		distanceKm := services.Haversine(
+			pengantaran.LastLatitude, pengantaran.LastLongitude,
+			pesanan.Alamat.Latitude, pesanan.Alamat.Longitude,
+		)
+		jarakMeter = int(math.Round(distanceKm * 1000))
+		avgSpeedKmh := 30.0
+		hours := distanceKm / avgSpeedKmh
+		minutes := int(math.Round(hours * 60))
+		if minutes > 0 {
+			estimasiTiba = fmt.Sprintf("%d menit", minutes)
+		} else {
+			estimasiTiba = "< 1 menit"
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Data lacak pesanan berhasil diambil",
@@ -908,8 +936,8 @@ func LacakPesanan(c *gin.Context) {
 				"latitude":  pengantaran.LastLatitude,
 				"longitude": pengantaran.LastLongitude,
 			},
-			"estimasi_tiba": "",
-			"jarak_meter":   0,
+			"estimasi_tiba": estimasiTiba,
+			"jarak_meter":   jarakMeter,
 		},
 	})
 }
@@ -1342,6 +1370,144 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 				"pajak_nominal": 0,
 				"total_akhir":   pesanan.TotalPembayaran,
 			},
+		},
+	})
+}
+
+// KirimPesanan digunakan untuk input nomor resi oleh kasir/admin untuk ekspedisi eksternal.
+// Dipakai oleh: kasir (PATCH /kasir/pesanan/:public_id/kirim)
+// Auth: Wajib login, role kasir
+func KirimPesanan(c *gin.Context) {
+	publicID := c.Param("public_id")
+
+	var input struct {
+		NomorResi string `json:"nomor_resi" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Nomor resi harus diisi"})
+		return
+	}
+
+	var pesanan models.Pesanan
+	if err := config.DB.Where("public_id = ?", publicID).First(&pesanan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pesanan tidak ditemukan"})
+		return
+	}
+
+	if pesanan.StatusPesananID != utils.GetStatusPesananID("Dikemas") {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Pesanan harus berstatus Dikemas untuk dikirim"})
+		return
+	}
+
+	if pesanan.TipeKurirID != utils.GetTipeKurirID("external") {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Pesanan ini bukan ekspedisi eksternal"})
+		return
+	}
+
+	dikirimID := utils.GetStatusPesananID("Dikirim")
+	updates := map[string]interface{}{
+		"nomor_resi":        input.NomorResi,
+		"id_status_pesanan": dikirimID,
+	}
+	if err := config.DB.Model(&pesanan).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengirim pesanan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Pesanan berhasil dikirim, resi: " + input.NomorResi,
+	})
+}
+
+type PengantaranListResponse struct {
+	PublicID           string  `json:"public_id"`
+	NoPesanan          string  `json:"no_pesanan"`
+	CustomerNama       string  `json:"customer_nama"`
+	Ekspedisi          string  `json:"ekspedisi"`
+	StatusPengantaran  string  `json:"status_pengantaran"`
+	WaktuPickup        *string `json:"waktu_pickup,omitempty"`
+	WaktuSampai        *string `json:"waktu_sampai,omitempty"`
+	KurirNama          string  `json:"kurir_nama"`
+	AlamatTujuan       string  `json:"alamat_tujuan"`
+	LastLatitude       float64 `json:"last_latitude"`
+	LastLongitude      float64 `json:"last_longitude"`
+	IsExternal         bool    `json:"is_external"`
+	NomorResi          string  `json:"nomor_resi,omitempty"`
+}
+
+// GetDaftarPengantaranAdmin daftar pengantaran untuk admin monitoring.
+// Dipakai oleh: admin (GET /admin/pengantaran)
+func GetDaftarPengantaranAdmin(c *gin.Context) {
+	var results []PengantaranListResponse
+
+	rows, err := config.DB.Raw(`
+		SELECT
+			peng.public_id,
+			CONCAT('ORD-', DATE_FORMAT(pes.tanggal_pesanan, '%Y%m%d'), '-', pes.id_pesanan) AS no_pesanan,
+			COALESCE(cust.nama_lengkap, '-') AS customer_nama,
+			COALESCE(eks.nama_ekspedisi, 'Kurir Toko') AS ekspedisi,
+			COALESCE(sp.nama_status, 'Menunggu Kurir') AS status_pengantaran,
+			DATE_FORMAT(peng.waktu_pickup, '%Y-%m-%d %H:%i:%s') AS waktu_pickup,
+			DATE_FORMAT(peng.waktu_sampai, '%Y-%m-%d %H:%i:%s') AS waktu_sampai,
+			COALESCE(CONCAT(kary.nama_lengkap), '-') AS kurir_nama,
+			COALESCE(alamat.alamat_lengkap, '-') AS alamat_tujuan,
+			COALESCE(peng.last_latitude, 0) AS last_latitude,
+			COALESCE(peng.last_longitude, 0) AS last_longitude,
+			CASE WHEN tk.nama_tipe = 'external' THEN TRUE ELSE FALSE END AS is_external,
+			COALESCE(pes.nomor_resi, '') AS nomor_resi
+		FROM pengantaran peng
+		JOIN pesanan pes ON pes.id_pesanan = peng.id_pesanan
+		JOIN customer cust ON cust.id_customer = pes.id_customer
+		JOIN tipe_kurir tk ON tk.id_tipe_kurir = pes.id_tipe_kurir
+		LEFT JOIN status_pengantaran sp ON sp.id_status_pengantaran = peng.id_status_pengantaran
+		LEFT JOIN kurir kr ON kr.id_kurir = peng.id_kurir
+		LEFT JOIN karyawan kary ON kary.id_karyawan = kr.id_karyawan
+		LEFT JOIN alamat ON alamat.id_alamat = pes.id_alamat
+		LEFT JOIN ekspedisi eks ON eks.id_ekspedisi = peng.id_ekspedisi
+		ORDER BY peng.id_pengantaran DESC
+	`).Rows()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengambil data pengantaran"})
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var r PengantaranListResponse
+		var waktuPickup, waktuSampai *string
+		err := rows.Scan(
+			&r.PublicID,
+			&r.NoPesanan,
+			&r.CustomerNama,
+			&r.Ekspedisi,
+			&r.StatusPengantaran,
+			&waktuPickup,
+			&waktuSampai,
+			&r.KurirNama,
+			&r.AlamatTujuan,
+			&r.LastLatitude,
+			&r.LastLongitude,
+			&r.IsExternal,
+			&r.NomorResi,
+		)
+		if err != nil {
+			continue
+		}
+		if waktuPickup != nil && *waktuPickup != "" {
+			r.WaktuPickup = waktuPickup
+		}
+		if waktuSampai != nil && *waktuSampai != "" {
+			r.WaktuSampai = waktuSampai
+		}
+		results = append(results, r)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   results,
+		"meta": gin.H{
+			"total": len(results),
 		},
 	})
 }

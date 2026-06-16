@@ -86,23 +86,89 @@ func SeedPesanan() {
 			}
 		}
 
-		kId := kasirs[idx%kasirLen].IdKasir
-		cId := customers[idx%custLen].IdCustomer
-		totalPembayaran := fake.IntRange(50000, 5000000)
-
-		var kasirIdPtr *uint = &kId
-		if tipePesanan == "Online" {
-			kasirIdPtr = nil // Online order doesn't have a cashier initially
+		// Pilih status berdasarkan tipe pesanan
+		randStatus := fake.IntRange(1, 100)
+		var statusName string
+		if tipePesanan == "Offline" {
+			switch {
+			case randStatus <= 80:
+				statusName = "Selesai"
+			case randStatus <= 93:
+				statusName = "Dikemas"
+			default:
+				statusName = "Dibatalkan"
+			}
+		} else {
+			switch {
+			case randStatus <= 65:
+				statusName = "Selesai"
+			case randStatus <= 77:
+				statusName = "Dikirim"
+			case randStatus <= 90:
+				statusName = "Dikemas"
+			default:
+				statusName = "Dibatalkan"
+			}
 		}
+
+		// Tentukan tipe kurir
+		tipeKurir := "internal"
+		var ekspedisiID *uint = nil
+		var layananEkspedisiID *uint = nil
+		ongkir := 0
+		var nomorResi *string = nil
+		if tipePesanan == "Online" {
+			if fake.IntRange(1, 100) <= 50 {
+				tipeKurir = "external"
+				// Ambil random ekspedisi
+				var ekspedisi models.Ekspedisi
+				if err := config.DB.Where("is_active = ?", true).Order("RANDOM()").First(&ekspedisi).Error; err == nil {
+					ekspedisiID = &ekspedisi.IdEkspedisi
+					var layanan models.EkspedisiLayanan
+					if err := config.DB.Where("id_ekspedisi = ?", ekspedisi.IdEkspedisi).Order("RANDOM()").First(&layanan).Error; err == nil {
+						layananEkspedisiID = &layanan.IdEkspedisiLayanan
+					}
+					ongkir = fake.IntRange(5000, 50000)
+				}
+				// External yang Dikirim/Selesai set nomor resi
+				if statusName == "Dikirim" || statusName == "Selesai" {
+				nr := fmt.Sprintf("%s-%d-%d", ekspedisi.KodeApi, fake.IntRange(100000, 999999), fake.IntRange(1000, 9999))
+					nomorResi = &nr
+				}
+			} else {
+				tipeKurir = "internal"
+			}
+		}
+
+		// Tentukan kasir
+		var kasirIdPtr *uint = nil
+		setButuhKasir := map[string]bool{
+			"Dikemas": true, "Dikirim": true, "Selesai": true,
+		}
+		if tipePesanan == "Offline" {
+			kId := kasirs[fake.IntRange(0, kasirLen-1)].IdKasir
+			kasirIdPtr = &kId
+		} else if setButuhKasir[statusName] {
+			kId := kasirs[fake.IntRange(0, kasirLen-1)].IdKasir
+			kasirIdPtr = &kId
+		}
+
+		cId := customers[fake.IntRange(0, custLen-1)].IdCustomer
+		totalPembayaran := fake.IntRange(50000, 5000000)
 
 		pesanan := models.Pesanan{
 			TotalPembayaran: totalPembayaran,
 			TanggalPesanan:  tglPesanan,
 			TipePesananID:   utils.GetTipePesananID(tipePesanan),
 			StatusPesananID: utils.GetStatusPesananID(statusName),
+			TipeKurirID:     utils.GetTipeKurirID(tipeKurir),
 			CustomerID:      cId,
 			KasirID:         kasirIdPtr,
 			AlamatID:        alamatId,
+			EkspedisiID:     ekspedisiID,
+			LayananEkspedisiID: layananEkspedisiID,
+			OngkosKirim:     ongkir,
+			NomorResi:       nomorResi,
 		}
 
 		if err := config.DB.Create(&pesanan).Error; err == nil {

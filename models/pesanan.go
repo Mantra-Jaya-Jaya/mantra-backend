@@ -19,6 +19,8 @@ type Pesanan struct {
 	TipePesananRel  *TipePesanan   `gorm:"foreignKey:TipePesananID;references:IdTipePesanan" json:"tipe_pesanan,omitempty"`
 	StatusPesananID uint           `gorm:"column:id_status_pesanan;not null" json:"id_status_pesanan"`
 	StatusPesanan   *StatusPesanan `gorm:"foreignKey:StatusPesananID;references:IdStatusPesanan" json:"status_pesanan,omitempty"`
+	TipeKurirID     uint           `gorm:"column:id_tipe_kurir;not null;default:1" json:"id_tipe_kurir"`
+	TipeKurir       *TipeKurir     `gorm:"foreignKey:TipeKurirID;references:IdTipeKurir" json:"tipe_kurir,omitempty"`
 
 	CustomerID uint     `gorm:"column:id_customer;not null" json:"id_customer"`
 	KasirID    *uint    `gorm:"column:id_kasir" json:"id_kasir"`

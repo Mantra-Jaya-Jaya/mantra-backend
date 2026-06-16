@@ -55,6 +55,7 @@ func SetupRoutes(r *gin.Engine) {
 			customerGroup.GET("/pesanan/:public_id", transaksi.GetDetailPesanan)
 			customerGroup.GET("/pesanan/:public_id/lacak", transaksi.LacakPesanan)
 			customerGroup.POST("/ongkir/cek", transaksi.CekOngkir)
+			customerGroup.POST("/ongkir/cek-radius", transaksi.CekRadius)
 			customerGroup.GET("/metode-pembayaran", transaksi.GetMetodePembayaranAktif)
 			customerGroup.GET("/profil", user.GetProfilCustomer)
 			customerGroup.PUT("/akun", user.EditAkunCustomer)
@@ -85,6 +86,7 @@ func SetupRoutes(r *gin.Engine) {
 			kasirGroup.GET("/transaksi/cek-status/:order_id", transaksi.CekStatusPembayaran)
 			kasirGroup.GET("/profil", user.GetProfilKasir)
 			kasirGroup.PUT("/profil", user.UpdateProfilKasir)
+			kasirGroup.PATCH("/pesanan/:public_id/kirim", transaksi.KirimPesanan)
 			kasirGroup.GET("/notifikasi", notifikasi.GetNotifikasi)
 		}
 
@@ -153,6 +155,9 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.POST("/metode-pembayaran", transaksi.TambahMetodePembayaran)
 			adminGroup.PUT("/metode-pembayaran/:public_id", transaksi.UpdateMetodePembayaran)
 			adminGroup.DELETE("/metode-pembayaran/:public_id", transaksi.HapusMetodePembayaran)
+			adminGroup.GET("/pengaturan", user.GetPengaturan)
+			adminGroup.PUT("/pengaturan", user.UpdatePengaturan)
+			adminGroup.GET("/pengantaran", transaksi.GetDaftarPengantaranAdmin)
 		}
 	}
 }

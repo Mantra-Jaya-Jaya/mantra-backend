@@ -28,6 +28,8 @@ func RunAllSeeders() {
 	SeedTipePesanan()
 	SeedStatusPengantaran()
 	SeedMetodePembayaran()
+	SeedTipeKurir()
+	SeedPengaturanToko()
 	BackfillPublicId()
 
 	// Panggil seeder Child

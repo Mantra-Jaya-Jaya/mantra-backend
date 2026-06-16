@@ -469,3 +469,55 @@ func GetChartDashboardAdmin(c *gin.Context) {
 		},
 	})
 }
+
+// GetPengaturan mengambil semua pengaturan toko.
+// Dipakai oleh: admin (GET /admin/pengaturan)
+// Auth: Wajib login, role admin
+func GetPengaturan(c *gin.Context) {
+	var settings []models.PengaturanToko
+	if err := config.DB.Find(&settings).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengambil pengaturan"})
+		return
+	}
+
+	data := make(map[string]string)
+	for _, s := range settings {
+		data[s.Key] = s.Value
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   data,
+	})
+}
+
+// UpdatePengaturan memperbarui nilai pengaturan toko.
+// Dipakai oleh: admin (PUT /admin/pengaturan)
+// Auth: Wajib login, role admin
+func UpdatePengaturan(c *gin.Context) {
+	var input struct {
+		Key   string `json:"key" binding:"required"`
+		Value string `json:"value" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Input tidak valid"})
+		return
+	}
+
+	var setting models.PengaturanToko
+	if err := config.DB.Where("key = ?", input.Key).First(&setting).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pengaturan tidak ditemukan"})
+		return
+	}
+
+	setting.Value = input.Value
+	if err := config.DB.Save(&setting).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan pengaturan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Pengaturan berhasil diperbarui",
+	})
+}
