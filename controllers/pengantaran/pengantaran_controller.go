@@ -226,7 +226,7 @@ func UpdateLokasiKurir(c *gin.Context) {
 }
 
 func GetLaporanHariIni(c *gin.Context) {
-	// 🚀 PENJINAK TOKEN (Tetap sama)
+	// 🚀 PENJINAK TOKEN
 	val, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "User belum login"})
@@ -248,59 +248,55 @@ func GetLaporanHariIni(c *gin.Context) {
 		return
 	}
 
-	// 1. Cari ID Kurir (Tetap sama)
+	// 1. Cari ID Kurir
 	var result struct{ IdKurir uint }
-	if err := config.DB.Raw("SELECT id_kurir FROM kurir JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan WHERE karyawan.id_user = ?", userID).Scan(&result).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengidentifikasi kurir"})
-		return
-	}
-
-	if result.IdKurir == 0 {
+	if err := config.DB.Raw("SELECT id_kurir FROM kurir JOIN karyawan ON kurir.id_karyawan = karyawan.id_karyawan WHERE karyawan.id_user = ?", userID).Scan(&result).Error; err != nil || result.IdKurir == 0 {
 		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Data kurir tidak ditemukan."})
 		return
 	}
-
 	idKurir := result.IdKurir
 
-	// 2. Set rentang waktu HARI INI (Tetap sama)
 	now := time.Now()
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
-	// 🚀 SIAPIN 3 WADAH VARIABEL SEKARANG
-	var selesaiCount int64
-	var belumSelesaiCount int64
-	var pesananBaruCount int64
+	var selesaiCount, belumSelesaiCount, pesananBaruCount int64
 
-	// 3. QUERY 1: Hitung Pesanan yang "SELESAI" hari ini
-	selesaiPengantaranID := utils.GetStatusPengantaranID("Selesai") // lookup by name, bukan hardcode
-	config.DB.Model(&models.Pengantaran{}).
-		Where("id_kurir = ?", idKurir).
-		Where("id_status_pengantaran = ?", selesaiPengantaranID).
-		Where("waktu_sampai >= ? AND waktu_sampai < ?", startOfDay, endOfDay).
-		Count(&selesaiCount)
+	// 🚀 AMANIN PENCARIAN STATUS PAKAI VERSI SAFE
+	selesaiPengantaranID := utils.GetStatusPengantaranIDSafe("Selesai")
+	statusDikemasID := utils.GetStatusPesananIDSafe("Dikemas")
 
-	// 4. QUERY 2: Hitung Pesanan yang "BELUM SELESAI" (Masih dipegang kurir ini)
-	config.DB.Model(&models.Pengantaran{}).
-		Where("id_kurir = ?", idKurir).
-		Where("id_status_pengantaran != ?", selesaiPengantaranID).
-		Count(&belumSelesaiCount)
+	// Lanjut hitung kalau seeder database gak bermasalah
+	if selesaiPengantaranID > 0 {
+		config.DB.Model(&models.Pengantaran{}).
+			Where("id_kurir = ?", idKurir).
+			Where("id_status_pengantaran = ?", selesaiPengantaranID).
+			Where("waktu_sampai >= ? AND waktu_sampai < ?", startOfDay, endOfDay).
+			Count(&selesaiCount)
 
-	// 🚀 5. QUERY 3 (BARU!): Hitung Pesanan Online yang NGANGGUR / Siap Direbut
-	// Kita hitung dari tabel Pesanan langsung yang statusnya siap antar
-	config.DB.Model(&models.Pesanan{}).
-		Where("id_tipe_pesanan = ?", utils.GetTipePesananID("Online")).
-		Where("id_status_pesanan = ?", utils.GetStatusPesananID("Dikemas")).
-		Count(&pesananBaruCount)
+		config.DB.Model(&models.Pengantaran{}).
+			Where("id_kurir = ?", idKurir).
+			Where("id_status_pengantaran != ?", selesaiPengantaranID).
+			Count(&belumSelesaiCount)
+	}
 
-	// 6. Kembalikan 3 data tersebut ke Flutter
+	if statusDikemasID > 0 {
+		// Asumsi ID tipe Online itu 1 atau 2 (kalau Utils-nya belum support tipe pesanan safe)
+		// Kalau temen lu belum bikin GetTipePesananIDSafe, tembak manual ke relasi string:
+		config.DB.Model(&models.Pesanan{}).
+			Joins("JOIN tipe_pesanan ON pesanan.id_tipe_pesanan = tipe_pesanan.id_tipe_pesanan").
+			Where("tipe_pesanan.nama_tipe = ?", "Online").
+			Where("id_status_pesanan = ?", statusDikemasID).
+			Count(&pesananBaruCount)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Laporan hari ini berhasil diambil",
 		"data": gin.H{
 			"pesanan_selesai":  selesaiCount,
 			"pesanan_proses":   belumSelesaiCount,
-			"pesanan_tersedia": pesananBaruCount, // 🚀 Data incaran lu nangkring di sini!
+			"pesanan_tersedia": pesananBaruCount, 
 		},
 	})
 }
@@ -618,9 +614,10 @@ func AmbilPesanan(c *gin.Context) {
 	}
 	kurirID := result.IdKurir
 
-	// 🚀 3. CARI PESANAN (Beserta Statusnya)
+	// 🚀 3. CARI PESANAN (Beserta Status & Tipe Pesanan!)
 	var pesanan models.Pesanan
-	if err := config.DB.Preload("StatusPesanan").Where("public_id = ?", pesananPublicID).First(&pesanan).Error; err != nil {
+	// Kita Preload juga TipePesananRel biar tau ini pesanan Online atau Offline
+	if err := config.DB.Preload("StatusPesanan").Preload("TipePesananRel").Where("public_id = ?", pesananPublicID).First(&pesanan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak ditemukan",
@@ -628,7 +625,16 @@ func AmbilPesanan(c *gin.Context) {
 		return
 	}
 
-	// 🚀 4. VALIDASI STATUS: Kurir cuma bisa ambil kalau statusnya "Dikemas"
+	// 🚀 4. VALIDASI TIPE PESANAN (HANYA ONLINE YANG BOLEH DIAMBIL KURIR)
+	if pesanan.TipePesananRel == nil || pesanan.TipePesananRel.NamaTipe != "Online" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Pesanan ini bukan pesanan Online, tidak perlu diantar oleh kurir!",
+		})
+		return
+	}
+
+	// 🚀 5. VALIDASI STATUS: Kurir cuma bisa ambil kalau statusnya "Dikemas"
 	if pesanan.StatusPesanan == nil || pesanan.StatusPesanan.NamaStatus != "Dikemas" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
@@ -637,7 +643,7 @@ func AmbilPesanan(c *gin.Context) {
 		return
 	}
 
-	// 🚀 5. AMBIL ID STATUS PAKAI UTILS TEMEN LU (Versi Safe!)
+	// 🚀 6. AMBIL ID STATUS PAKAI UTILS TEMEN LU (Versi Safe!)
 	idStatusPesananBaru := utils.GetStatusPesananIDSafe("Dikirim")
 	idStatusPengantaranBaru := utils.GetStatusPengantaranIDSafe("Dalam Perjalanan")
 
@@ -650,7 +656,7 @@ func AmbilPesanan(c *gin.Context) {
 		return
 	}
 
-	// 🚀 6. MULAI DATABASE TRANSACTION (Atomic Process)
+	// 🚀 7. MULAI DATABASE TRANSACTION (Atomic Process)
 	tx := config.DB.Begin()
 
 	// Update status pesanan jadi "Dikirim" (Pakai .Update biar GORM gak nimpa data lain)
@@ -660,7 +666,7 @@ func AmbilPesanan(c *gin.Context) {
 		return
 	}
 
-	// 🚀 7. BIKIN/UPDATE DATA KE TABEL PENGANTARAN
+	// 🚀 8. BIKIN/UPDATE DATA KE TABEL PENGANTARAN
 	var pengantaran models.Pengantaran
 	now := time.Now()
 
@@ -693,7 +699,7 @@ func AmbilPesanan(c *gin.Context) {
 		}
 	}
 
-	// 🚀 8. BERHASIL! COMMIT TRANSACTION
+	// 🚀 9. BERHASIL! COMMIT TRANSACTION
 	tx.Commit()
 
 	// Reload pengantaran biar PublicId barunya pasti dapet
