@@ -139,61 +139,71 @@ func GetRingkasanCheckout(c *gin.Context) {
 // Auth: Wajib login, role kasir
 func UpdateQuantityItem(c *gin.Context) {
 	var input struct {
-		IdPesanan           uint `json:"id_pesanan" binding:"required"`
-		IdSpesifikasiBarang uint `json:"id_spesifikasi_barang"`
+		IdPesanan           uint   `json:"id_pesanan"`
+		IdSpesifikasiBarang uint   `json:"id_spesifikasi_barang"`
 		KodeBarcode         string `json:"kode_barcode"`
-		Jumlah              int  `json:"jumlah" binding:"required"`
+		Jumlah              int    `json:"jumlah"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Format inputan salah. Pastikan id_pesanan dan jumlah dikirim dengan benar."})
-		return
-	}
-
-	if input.IdPesanan == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "ID pesanan tidak valid"})
-		return
-	}
-
-	// Resolusi barcode ke id_spesifikasi_barang jika id tidak dikirim
-	if input.IdSpesifikasiBarang == 0 && input.KodeBarcode != "" {
-		var barcode models.Barcode
-		if err := config.DB.Where("kode_barcode = ?", input.KodeBarcode).First(&barcode).Error; err == nil {
-			input.IdSpesifikasiBarang = barcode.SpesifikasiBarangID
-		}
-	}
-
-	if input.IdSpesifikasiBarang == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "ID spesifikasi barang tidak ditemukan. Kirim id_spesifikasi_barang atau kode_barcode yang valid."})
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Format inputan salah."})
 		return
 	}
 
 	tx := config.DB.Begin()
 
-	// 1. Jika IdPesanan adalah 0, buat pesanan baru (Draft)
+	// 1. Resolusi barcode ke id_spesifikasi_barang jika id tidak dikirim (Scanner Mode)
+	if input.IdSpesifikasiBarang == 0 && input.KodeBarcode != "" {
+		var barcode models.Barcode
+		if err := tx.Where("kode_barcode = ?", input.KodeBarcode).First(&barcode).Error; err == nil {
+			input.IdSpesifikasiBarang = barcode.SpesifikasiBarangID
+		}
+	}
+
+	if input.IdSpesifikasiBarang == 0 {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "ID spesifikasi barang atau barcode tidak valid"})
+		return
+	}
+
+	// =========================================================
+	// 2. BIKIN DRAFT PESANAN (KALAU ID PESANAN == 0)
+	// =========================================================
 	if input.IdPesanan == 0 {
-		var userID uint
-		if id, exists := c.Get("user_id"); exists {
-			if idInt64, ok := id.(int64); ok {
-				userID = uint(idInt64)
-			} else if idUint, ok := id.(uint); ok {
-				userID = idUint
-			}
+		val, _ := c.Get("user_id")
+		var userID int64
+		switch v := val.(type) {
+		case float64:
+			userID = int64(v)
+		case int64:
+			userID = v
+		case int:
+			userID = int64(v)
+		case uint:
+			userID = int64(v)
 		}
 
-		// Cari data kasir
 		var kasir models.Kasir
 		if err := tx.Joins("JOIN karyawan ON karyawan.id_karyawan = kasir.id_karyawan").Where("karyawan.id_user = ?", userID).First(&kasir).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Data kasir tidak ditemukan. Pastikan Anda login sebagai kasir."})
+			c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Data kasir tidak ditemukan"})
 			return
 		}
 
-		// Cari customer pertama sebagai placeholder (Walk-in Customer)
 		var customer models.Customer
 		if err := tx.First(&customer).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusFailedDependency, gin.H{"status": "error", "message": "Data customer tidak ditemukan. Harap buat minimal satu data customer sebagai placeholder (Pelanggan POS)."})
+			c.JSON(http.StatusFailedDependency, gin.H{"status": "error", "message": "Data customer offline (placeholder) tidak ditemukan"})
+			return
+		}
+
+		// 🚀 FIX FATALNYA DI SINI ABANGKU! Ganti "Draft" jadi "Menunggu Pembayaran"
+		idStatusAwal := utils.GetStatusPesananIDSafe("Menunggu Pembayaran")
+		idTipeOffline := utils.GetTipePesananIDSafe("Offline")
+
+		if idStatusAwal == 0 || idTipeOffline == 0 {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Status/Tipe Pesanan belum disetup di DB"})
 			return
 		}
 
@@ -201,33 +211,37 @@ func UpdateQuantityItem(c *gin.Context) {
 			CustomerID:      customer.IdCustomer,
 			KasirID:         &kasir.IdKasir,
 			TanggalPesanan:  time.Now(),
-			TipePesananID:   utils.GetTipePesananID("Offline"),
-			StatusPesananID: utils.GetStatusPesananID("Draft"),
+			TipePesananID:   idTipeOffline,
+			StatusPesananID: idStatusAwal, // 🚀 Pakai status yang beneran ada di DB lu!
 		}
+		
 		if err := tx.Create(&pesananBaru).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat transaksi baru di database."})
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat transaksi baru"})
 			return
 		}
+		
 		input.IdPesanan = pesananBaru.IdPesanan
 	} else {
-		// Proteksi: Jangan edit pesanan yang sudah Selesai
+		// Proteksi: Jangan edit pesanan yang sudah Selesai / Batal
 		var pesanan models.Pesanan
 		if err := tx.Preload("StatusPesanan").First(&pesanan, input.IdPesanan).Error; err == nil {
-			if pesanan.StatusPesanan.NamaStatus == "Selesai" || pesanan.StatusPesanan.NamaStatus == "Dibatalkan" {
+			if pesanan.StatusPesanan != nil && (pesanan.StatusPesanan.NamaStatus == "Selesai" || pesanan.StatusPesanan.NamaStatus == "Dibatalkan") {
 				tx.Rollback()
-				c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Pesanan ini sudah selesai dan tidak dapat diubah lagi."})
+				c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Pesanan sudah selesai/dibatalkan"})
 				return
 			}
 		}
 	}
 
+	// =========================================================
+	// 3. LOGIC TAMBAH / UPDATE / HAPUS BARANG
+	// =========================================================
 	var detail models.DetailPesanan
-	// 2. Cek apakah barang udah ada di dalam pesanan
 	err := tx.Where("id_pesanan = ? AND id_spesifikasi_barang = ?", input.IdPesanan, input.IdSpesifikasiBarang).First(&detail).Error
 
 	if err != nil {
-		// 3. KALAU BELUM ADA (BARU DI-SCAN), BIKIN BARU!
+		// KALAU BARANGNYA BELUM ADA DI KERANJANG
 		if input.Jumlah > 0 {
 			var spek models.SpesifikasiBarang
 			if errSpek := tx.First(&spek, input.IdSpesifikasiBarang).Error; errSpek != nil {
@@ -250,7 +264,7 @@ func UpdateQuantityItem(c *gin.Context) {
 			}
 		}
 	} else {
-		// 4. KALAU BARANGNYA UDAH ADA DI KERANJANG KASIR
+		// KALAU BARANGNYA UDAH ADA DI KERANJANG
 		if input.Jumlah <= 0 {
 			if errDel := tx.Delete(&detail).Error; errDel != nil {
 				tx.Rollback()
@@ -268,7 +282,9 @@ func UpdateQuantityItem(c *gin.Context) {
 		}
 	}
 
-	// 5. Hitung ulang Total Pembayaran
+	// =========================================================
+	// 4. HITUNG ULANG TOTAL HARGA TRANSAKSI
+	// =========================================================
 	var totalBayar int64
 	tx.Model(&models.DetailPesanan{}).Where("id_pesanan = ?", input.IdPesanan).Select("COALESCE(SUM(subtotal), 0)").Scan(&totalBayar)
 
