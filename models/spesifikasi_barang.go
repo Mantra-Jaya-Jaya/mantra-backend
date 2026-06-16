@@ -13,10 +13,10 @@ type SpesifikasiBarang struct {
 	BeratBarang         int  `gorm:"column:berat_barang;default:0" json:"berat_barang"`
 
 	// Relasi ke Barang
-	BarangID uint   `gorm:"column:id_barang" json:"id_barang"`
+	BarangID uint   `gorm:"column:id_barang;not null" json:"id_barang"`
 	Barang   Barang `gorm:"foreignKey:BarangID;references:IdBarang" json:"barang"`
 
 	// Relasi ke DetailSpesifikasi
-	DetailSpesifikasiID uint              `gorm:"column:id_detail_spesifikasi" json:"id_detail_spesifikasi"`
+	DetailSpesifikasiID uint              `gorm:"column:id_detail_spesifikasi;not null" json:"id_detail_spesifikasi"`
 	DetailSpesifikasi   DetailSpesifikasi `gorm:"foreignKey:DetailSpesifikasiID;references:IdDetailSpesifikasi" json:"detail_spesifikasi"`
 }

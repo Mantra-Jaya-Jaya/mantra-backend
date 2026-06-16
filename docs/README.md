@@ -17,13 +17,14 @@ Dokumentasi endpoint API diorganisir per domain — mirror struktur `controllers
 | Metode Pembayaran | `api/transaksi/metode_pembayaran.md` | Auth | Customer, Admin |
 | Payment Notification | `api/transaksi/payment_notification.md` | Public (Webhook) | Midtrans |
 | Keranjang | `api/keranjang.md` | Auth | Customer |
-| Notifikasi | `api/notifikasi.md` | Auth | Customer, Kasir, Admin |
-| Pengantaran | `api/pengantaran.md` | Auth | Customer |
+| Notifikasi | `api/notifikasi.md` | Auth | Customer, Kasir, Admin, Kurir |
+| Pengantaran | `api/pengantaran.md` | Auth | Customer, Kurir |
 | Stok | `api/stok.md` | Auth | Admin |
 | Transaksi | `api/transaksi/pesanan.md` | Auth | Customer, Kasir |
 | Transaksi | `api/transaksi/pembayaran.md` | Auth | Kasir |
 | User | `api/user/customer.md` | Auth | Customer |
 | User | `api/user/kasir.md` | Auth | Kasir |
+| User | `api/user/kurir.md` | Auth | Kurir |
 | User | `api/user/admin.md` | Auth | Admin |
 | User | `api/user/karyawan.md` | Auth | Admin |
 | User | `api/user/alamat.md` | Auth | Customer |
@@ -67,6 +68,7 @@ Folder `api-collections/` berisi koleksi request API untuk **Bruno** (open-sourc
 | `api-collections/Public/` | Scan Barcode (no auth) |
 | `api-collections/Customer/` | Login, Register, Logout, Change Password, Refresh Token, Profil, Notifikasi, Promo, Kategori, Barang, Keranjang, Pesanan, Alamat |
 | `api-collections/Kasir/` | Login, Logout, Change Password, Refresh Token, Profil, Dashboard, Laporan, Transaksi |
+| `api-collections/Kurir/` | Login, Profil, Notifikasi, Pesanan, Pengantaran |
 | `api-collections/Admin/` | Login, Logout, Change Password, Refresh Token, Profil, Notifikasi, Dashboard, Kategori, Barang, Diskon, Karyawan, Satuan |
 | `api-collections/Admin/Ekspedisi/` | CRUD Ekspedisi & Layanan (Tambah, Update, Hapus, Daftar) |
 | `api-collections/Admin/Metode Pembayaran/` | CRUD Metode Pembayaran (Tambah, Update, Hapus, Daftar) |

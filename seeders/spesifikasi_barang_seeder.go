@@ -34,7 +34,7 @@ func SeedSpesifikasiBarang() {
 	for _, barang := range daftarBarang {
 		baseMin, baseMax := 10000, 100000
 		kat := barang.Kategori.NamaKategori
-		
+
 		if kat == "Elektronik" {
 			baseMin, baseMax = 1500000, 15000000
 		} else if kat == "Fashion" {

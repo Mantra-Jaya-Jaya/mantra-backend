@@ -100,7 +100,10 @@ func SetupRoutes(r *gin.Engine) {
 			kurirGroup.POST("/pesanan/:public_id/terima", pemesanan.TerimaPesanan)
 			kurirGroup.GET("/pengantaran/:public_id/detail", pengantaran.GetDetailPengantaran)
 			kurirGroup.PUT("/pengantaran/:public_id/lokasi", pengantaran.UpdateLokasiKurir)
+			kurirGroup.POST("/pengantaran/:public_id/ambil", pengantaran.AmbilPesanan)
+			kurirGroup.POST("/pengantaran/:public_id/status", pengantaran.UpdateStatusPengantaran)
 			kurirGroup.PUT("/pengantaran/:public_id/selesai", pengantaran.UploadBuktiPengiriman)
+			kurirGroup.GET("/notifikasi", notifikasi.GetNotifikasi)
 		}
 
 		// Admin Routes
@@ -139,6 +142,7 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.POST("/ekspedisi", katalog.TambahEkspedisi)
 			adminGroup.PUT("/ekspedisi/:public_id", katalog.UpdateEkspedisi)
 			adminGroup.DELETE("/ekspedisi/:public_id", katalog.HapusEkspedisi)
+			adminGroup.POST("/ekspedisi/sync", katalog.SyncBiteshipCouriers)
 			adminGroup.POST("/ekspedisi/layanan", katalog.TambahLayanan)
 			adminGroup.PUT("/ekspedisi/layanan/:public_id", katalog.UpdateLayanan)
 			adminGroup.DELETE("/ekspedisi/layanan/:public_id", katalog.HapusLayanan)

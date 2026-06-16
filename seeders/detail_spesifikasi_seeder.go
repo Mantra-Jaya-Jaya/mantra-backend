@@ -7,48 +7,36 @@ import (
 )
 
 func SeedDetailSpesifikasi() {
-	fmt.Println("⏳ Menyiapkan data Detail Spesifikasi (Warna & Ukuran)...")
+	fmt.Println("⏳ Menyiapkan data Detail Spesifikasi...")
 
-	// 1. Cari ID Spesifikasi "Warna" dulu
-	var spekWarna models.Spesifikasi
-	if err := config.DB.Where("nama_spesifikasi = ?", "Warna").First(&spekWarna).Error; err != nil {
-		fmt.Println("Spesifikasi 'Warna' gak ketemu! Pastiin SeedSpesifikasi jalan duluan.")
-		return
+	// Mapping spesifikasi → values
+	specValues := map[string][]string{
+		"Warna":     {"Merah", "Kuning", "Hijau", "Biru", "Hitam", "Putih"},
+		"Ukuran":    {"S", "M", "L", "XL", "XXL"},
+		"RAM":       {"4GB", "8GB", "16GB", "32GB"},
+		"Kapasitas": {"64GB", "128GB", "256GB", "512GB", "1TB"},
+		"Rasa":      {"Original", "Manis", "Asam", "Pedas"},
+		"Bahan":     {"Kain", "Katun", "Polyester", "Denim"},
 	}
 
-	// 2. Cari ID Spesifikasi "Ukuran"
-	var spekUkuran models.Spesifikasi
-	if err := config.DB.Where("nama_spesifikasi = ?", "Ukuran").First(&spekUkuran).Error; err != nil {
-		fmt.Println("Spesifikasi 'Ukuran' gak ketemu! Pastiin SeedSpesifikasi jalan duluan.")
-		return
-	}
+	totalCreated := 0
+	for specName, values := range specValues {
+		var spec models.Spesifikasi
+		if err := config.DB.Where("nama_spesifikasi = ?", specName).First(&spec).Error; err != nil {
+			fmt.Println("Spesifikasi", specName, "gak ketemu! Pastiin SeedSpesifikasi jalan duluan.")
+			continue
+		}
 
-	// 3. Masukin Data Warna (Merah, Kuning, Hijau)
-	daftarWarna := []string{"Merah", "Kuning", "Hijau"}
-	for _, warna := range daftarWarna {
-		detailWarna := models.DetailSpesifikasi{
-			NamaDetailSpesifikasi: warna,
-			SpesifikasiID:         spekWarna.IdSpesifikasi,
-		} // <--- INI DIA YANG HILANG BRO! NAMBAHIN INI DOANG WKWK
-
-		// FirstOrCreate biar gak dobel kalau Air restart
-		if err := config.DB.Where("nama_detail_spesifikasi = ? AND id_spesifikasi = ?", warna, spekWarna.IdSpesifikasi).FirstOrCreate(&detailWarna).Error; err != nil {
-			fmt.Println("Error", warna, ":", err)
+		for _, value := range values {
+			detail := models.DetailSpesifikasi{
+				NamaDetailSpesifikasi: value,
+				SpesifikasiID:         spec.IdSpesifikasi,
+			}
+			if err := config.DB.Where("nama_detail_spesifikasi = ? AND id_spesifikasi = ?", value, spec.IdSpesifikasi).FirstOrCreate(&detail).Error; err == nil {
+				totalCreated++
+			}
 		}
 	}
 
-	// 4. Masukin Data Ukuran (36 sampai 45) pakai looping
-	for i := 36; i <= 45; i++ {
-		ukuran := fmt.Sprintf("%d", i) // Ubah angka int jadi string
-		detailUkuran := models.DetailSpesifikasi{
-			NamaDetailSpesifikasi: ukuran,
-			SpesifikasiID:         spekUkuran.IdSpesifikasi, // Tempelin ke ID Ukuran
-		}
-
-		if err := config.DB.Where("nama_detail_spesifikasi = ? AND id_spesifikasi = ?", ukuran, spekUkuran.IdSpesifikasi).FirstOrCreate(&detailUkuran).Error; err != nil {
-			fmt.Println("Error", ukuran, ":", err)
-		}
-	}
-
-	fmt.Println("Yeyy, Berhasil seed detail spesifikasi!")
+	fmt.Printf("Yeyy, Berhasil seed %d detail spesifikasi!\n", totalCreated)
 }

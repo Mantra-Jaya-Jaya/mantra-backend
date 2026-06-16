@@ -3,6 +3,7 @@ package seeders
 import (
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 	"fmt"
 )
 
@@ -28,30 +29,30 @@ func SeedNotifikasi() {
 		switch user.Role.NamaRole {
 		case "Customer":
 			notifs = []models.Notifikasi{
-				{Judul: "Pesanan Diterima", Pesan: "Pesanan Anda sedang diproses oleh kasir.", Status: "unread"},
-				{Judul: "Pesanan Dikirim", Pesan: "Kurir sedang menuju ke alamat Anda.", Status: "unread"},
-				{Judul: "Promo Spesial", Pesan: "Dapatkan diskon 50% untuk produk baru!", Status: "unread"},
+				{Judul: "Pesanan Diterima", Pesan: "Pesanan Anda sedang diproses oleh kasir.", StatusNotifikasiID: utils.GetStatusNotifikasiID("unread")},
+				{Judul: "Pesanan Dikirim", Pesan: "Kurir sedang menuju ke alamat Anda.", StatusNotifikasiID: utils.GetStatusNotifikasiID("unread")},
+				{Judul: "Promo Spesial", Pesan: "Dapatkan diskon 50% untuk produk baru!", StatusNotifikasiID: utils.GetStatusNotifikasiID("unread")},
 			}
 		case "Kasir":
 			notifs = []models.Notifikasi{
-				{Judul: "Stok Menipis", Pesan: "Beberapa barang hampir habis, segera lakukan restock.", Status: "unread"},
-				{Judul: "Transaksi Baru", Pesan: "Ada pesanan online baru yang perlu dikonfirmasi.", Status: "unread"},
+				{Judul: "Stok Menipis", Pesan: "Beberapa barang hampir habis, segera lakukan restock.", StatusNotifikasiID: utils.GetStatusNotifikasiID("unread")},
+				{Judul: "Transaksi Baru", Pesan: "Ada pesanan online baru yang perlu dikonfirmasi.", StatusNotifikasiID: utils.GetStatusNotifikasiID("unread")},
 			}
 		case "Admin":
 			notifs = []models.Notifikasi{
-				{Judul: "Laporan Harian", Pesan: "Laporan penjualan hari ini sudah tersedia.", Status: "unread"},
-				{Judul: "Peringatan Sistem", Pesan: "Perlu pengecekan stok opname bulan ini.", Status: "unread"},
-				{Judul: "Karyawan Baru", Pesan: "Ada pendaftaran kasir baru yang menunggu persetujuan.", Status: "unread"},
+				{Judul: "Laporan Harian", Pesan: "Laporan penjualan hari ini sudah tersedia.", StatusNotifikasiID: utils.GetStatusNotifikasiID("unread")},
+				{Judul: "Peringatan Sistem", Pesan: "Perlu pengecekan stok opname bulan ini.", StatusNotifikasiID: utils.GetStatusNotifikasiID("unread")},
+				{Judul: "Karyawan Baru", Pesan: "Ada pendaftaran kasir baru yang menunggu persetujuan.", StatusNotifikasiID: utils.GetStatusNotifikasiID("unread")},
 			}
 		case "Kurir":
 			notifs = []models.Notifikasi{
-				{Judul: "Tugas Pickup", Pesan: "Ada pesanan baru yang harus diambil di toko.", Status: "unread"},
-				{Judul: "Rute Terupdate", Pesan: "Perhatikan rute pengantaran karena ada penutupan jalan.", Status: "unread"},
+				{Judul: "Tugas Pickup", Pesan: "Ada pesanan baru yang harus diambil di toko.", StatusNotifikasiID: utils.GetStatusNotifikasiID("unread")},
+				{Judul: "Rute Terupdate", Pesan: "Perhatikan rute pengantaran karena ada penutupan jalan.", StatusNotifikasiID: utils.GetStatusNotifikasiID("unread")},
 			}
 		}
 
 		for _, notif := range notifs {
-			notif.UserID = int64(user.IdUser)
+			notif.UserID = user.IdUser
 			if err := config.DB.Create(&notif).Error; err != nil {
 				fmt.Println("Error insert notifikasi:", err)
 			}

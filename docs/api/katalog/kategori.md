@@ -2,7 +2,7 @@
 
 ---
 
-## GET /kategori (Customer & Kasir) / GET /admin/kategori (Admin)
+## GET /api/v1/customer/kategori (Customer) / GET /api/v1/kasir/kategori (Kasir) / GET /api/v1/admin/kategori (Admin)
 
 Auth. Mendapatkan daftar semua kategori.
 
@@ -22,7 +22,7 @@ Auth. Mendapatkan daftar semua kategori.
 
 ---
 
-## POST /admin/kategori
+## POST /api/v1/admin/kategori
 
 Auth (Admin). Menambah kategori baru.
 
@@ -35,19 +35,19 @@ Auth (Admin). Menambah kategori baru.
 
 ---
 
-## PUT /admin/kategori/:id_kategori
+## PUT /api/v1/admin/kategori/:public_id
 
 Auth (Admin). Mengupdate nama kategori.
 
 ---
 
-## DELETE /admin/kategori/:id_kategori
+## DELETE /api/v1/admin/kategori/:public_id
 
 Auth (Admin). Menghapus kategori.
 
 ---
 
-## POST /admin/kategori/upload
+## POST /api/v1/admin/kategori/upload
 
 Auth (Admin). Upload icon kategori ke MinIO.
 

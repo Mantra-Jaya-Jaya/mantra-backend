@@ -16,6 +16,7 @@ func SeedDiskon() {
 	diskons := []models.Diskon{
 		{
 			NamaDiskon:   "Flash Sale Elektronik",
+			TipeDiskon:   "persen",
 			BesarDiskon:  15,
 			BannerDiskon: fmt.Sprintf("https://placehold.co/800x300?text=%s", url.QueryEscape("Flash Sale Elektronik")),
 			TglMulai:     now,
@@ -23,6 +24,7 @@ func SeedDiskon() {
 		},
 		{
 			NamaDiskon:   "Promo Akhir Bulan",
+			TipeDiskon:   "persen",
 			BesarDiskon:  20,
 			BannerDiskon: fmt.Sprintf("https://placehold.co/800x300?text=%s", url.QueryEscape("Promo Akhir Bulan")),
 			TglMulai:     now,
@@ -30,7 +32,8 @@ func SeedDiskon() {
 		},
 		{
 			NamaDiskon:   "Diskon Member Baru",
-			BesarDiskon:  10,
+			TipeDiskon:   "nominal",
+			BesarDiskon:  10000,
 			BannerDiskon: fmt.Sprintf("https://placehold.co/800x300?text=%s", url.QueryEscape("Diskon Member Baru")),
 			TglMulai:     now,
 			TglSelesai:   now.AddDate(0, 0, 60),

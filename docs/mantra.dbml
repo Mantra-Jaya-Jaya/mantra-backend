@@ -1,7 +1,7 @@
 // =============================================================================
 // MANTRA - Database Schema (DBML)
-// Version    : 2.1.0
-// Updated    : 2026-06-09
+// Version    : 2.3.0
+// Updated    : 2026-06-14
 // =============================================================================
 //
 // CARA PAKAI FILE INI:
@@ -17,7 +17,7 @@
 // - Kolom penting diberi [note: '...']
 //
 // SINGLE SOURCE OF TRUTH:
-// File ini adalah representasi dari 28 struct GORM di folder models/.
+// File ini adalah representasi dari 42 struct GORM di folder models/.
 // Setiap perubahan tabel WAJIB diikuti update struct GORM dan file ini.
 //
 // ARSITEKTUR SINGKAT:
@@ -86,6 +86,7 @@ Table karyawan {
   id_karyawan         int       [pk]
   public_id           uuid      [note: 'gen_random_uuid()']
   id_user             int
+  id_status_karyawan  int       [note: 'FK ke status_karyawan (Aktif | Nonaktif | Probation)']
   no_telp             varchar
   tempat_lahir        varchar
   tanggal_lahir       date
@@ -93,24 +94,23 @@ Table karyawan {
   alamat              text
   pendidikan_terakhir varchar
   nik                 varchar   [note: 'unique']
-  status              varchar
   created_at          timestamp
   updated_at          timestamp
 }
 
 // Profil kasir. Dibuat dari data karyawan yang sudah ada
 Table kasir {
-  id_kasir    int       [pk]
-  public_id   uuid      [note: 'gen_random_uuid()']
-  id_karyawan int       [note: 'unique - merujuk ke tabel karyawan']
-  shift       varchar   [note: 'Pagi | Siang | Malam']
+  id_kasir        int       [pk]
+  public_id       uuid      [note: 'gen_random_uuid()']
+  id_karyawan     int       [note: 'unique - merujuk ke tabel karyawan']
+  id_shift_kasir  int       [note: 'FK ke shift_kasir (Pagi | Siang | Malam)']
 }
 
 // Profil kurir internal. Dibuat dari data karyawan yang sudah ada
 Table kurir {
-  id_kurir    int       [pk]
-  public_id   uuid      [note: 'gen_random_uuid()']
-  id_karyawan int       [note: 'unique - merujuk ke tabel karyawan']
+  id_kurir       int       [pk]
+  public_id      uuid      [note: 'gen_random_uuid()']
+  id_karyawan    int       [note: 'unique - merujuk ke tabel karyawan']
 }
 
 
@@ -127,6 +127,7 @@ Table alamat {
   label_alamat     varchar   [note: 'Rumah | Kantor | Kos | Lainnya']
   no_telp_penerima varchar
   alamat_lengkap   text
+  kode_pos         varchar
   latitude         float
   longitude        float
   catatan_lokasi   text
@@ -159,7 +160,8 @@ Table diskon {
   id_diskon     int       [pk]
   public_id     uuid      [note: 'gen_random_uuid()']
   nama_diskon   varchar
-  besar_diskon  int       [note: 'Persentase: 0-100']
+  tipe_diskon   varchar   [note: 'persen | nominal']
+  besar_diskon  int       [note: 'Persentase atau nominal Rupiah']
   banner_diskon varchar
   tgl_mulai     date
   tgl_selesai   date
@@ -167,17 +169,21 @@ Table diskon {
 
 // Tabel master barang. Harga dan stok tidak disimpan di sini.
 // Harga & stok dikelola per varian di tabel spesifikasi_barang
+// Dimensi barang untuk perhitungan ongkos kirim (cm)
 Table barang {
-  id_barang     int       [pk]
-  public_id     uuid      [note: 'gen_random_uuid()']
-  id_diskon     int       [note: 'Nullable - barang bisa tidak punya diskon']
-  id_satuan     int
-  id_kategori   int
-  nama_barang   varchar
-  gambar_barang varchar
-  deskripsi     text
-  created_at    timestamp
-  updated_at    timestamp
+  id_barang      int       [pk]
+  public_id      uuid      [note: 'gen_random_uuid()']
+  id_diskon      int       [note: 'Nullable - barang bisa tidak punya diskon']
+  id_satuan      int
+  id_kategori    int
+  nama_barang    varchar
+  gambar_barang  varchar
+  panjang_barang int       [note: 'Dimensi dalam cm, default 0']
+  lebar_barang   int       [note: 'Dimensi dalam cm, default 0']
+  tinggi_barang  int       [note: 'Dimensi dalam cm, default 0']
+  deskripsi      text
+  created_at     timestamp
+  updated_at     timestamp
 }
 
 // Master tipe spesifikasi/varian (Warna, Ukuran, RAM, dll)
@@ -201,6 +207,7 @@ Table spesifikasi_barang {
   id_detail_spesifikasi int
   jumlah                int [note: 'Stok per varian']
   harga_barang          int [note: 'Harga per varian dalam Rupiah (integer)']
+  berat_barang          int [note: 'Berat per varian dalam gram, default 0']
 }
 
 // Pemetaan kode barcode ke varian spesifikasi_barang
@@ -209,6 +216,61 @@ Table barcode {
   id_spesifikasi_barang int
   kode_barcode          varchar
   kuantitas             int     [note: 'Jumlah per scan, misal 1 dus = 12 pcs']
+}
+
+
+// -----------------------------------------------------------------------------
+// ENUM TABLES (Lookup Tables)
+// -----------------------------------------------------------------------------
+
+// Master tipe pesanan (Online | Offline)
+Table tipe_pesanan {
+  id        int     [pk]
+  nama_tipe varchar [note: 'Online | Offline', unique]
+}
+
+// Master status pesanan
+Table status_pesanan {
+  id           int       [pk]
+  nama_status  varchar   [note: 'Draft | Menunggu Pembayaran | Diproses | Dikemas | Dikirim | Selesai | Dibatalkan', unique]
+  created_at   timestamp
+  updated_at   timestamp
+}
+
+// Master status transaksi pembayaran
+Table status_transaksi {
+  id           int       [pk]
+  nama_status  varchar   [note: 'pending | settlement | deny | cancel | expire', unique]
+}
+
+// Master fraud status dari Midtrans
+Table fraud_status {
+  id           int       [pk]
+  nama_status  varchar   [note: 'accept | challenge | deny', unique]
+}
+
+// Master tipe pembayaran
+Table tipe_pembayaran {
+  id           int       [pk]
+  nama_tipe    varchar   [note: 'cash | non-cash | qris | bank_transfer | gopay', unique]
+}
+
+// Master status karyawan
+Table status_karyawan {
+  id           int       [pk]
+  nama_status  varchar   [note: 'Aktif | Nonaktif | Probation', unique]
+}
+
+// Master shift kerja kasir
+Table shift_kasir {
+  id           int       [pk]
+  nama_shift   varchar   [note: 'Pagi | Siang | Malam', unique]
+}
+
+// Master status notifikasi
+Table status_notifikasi {
+  id           int       [pk]
+  nama_status  varchar   [note: 'unread | read', unique]
 }
 
 
@@ -228,9 +290,8 @@ Table pesanan {
   total_pembayaran     int
   ongkos_kirim         int       [note: 'default 0']
   catatan              text
+  nomor_resi           varchar   [note: 'Nomor resi untuk pengiriman eksternal (Biteship), nullable']
   tanggal_pesanan      timestamp
-  tipe_pesanan         varchar   [note: 'online | offline']
-  status_pesanan       varchar   [note: 'diproses | dikemas | dikirim | selesai | dibatalkan']
   updated_at           timestamp
 }
 
@@ -248,12 +309,12 @@ Table detail_pesanan {
 Table pembayaran {
   id_pembayaran         int       [pk]
   id_pesanan            int
-  id_metode_pembayaran  int       [note: 'Null jika legacy/pra-migrasi']
+  id_tipe_pembayaran    int       [note: 'FK ke tipe_pembayaran (cash | qris | va | ewallet | cod)']
+  id_metode_pembayaran  int       [note: 'Nullable - metode pembayaran terpilih']
+  id_status_transaksi   int       [note: 'FK ke status_transaksi']
+  id_fraud_status       int       [note: 'FK ke fraud_status']
   order_id_midtrans     varchar   [note: 'order_id dari Midtrans Snap']
   transaksi_midtrans_id varchar   [note: 'transaction_id dari Midtrans']
-  payment_type          varchar   [note: 'cash | qris | ewallet | va | midtrans']
-  status_transaksi      varchar   [note: 'pending | settlement | cancel | expire | deny']
-  fraud_status          varchar   [note: 'Dari Midtrans: accept | challenge | deny']
   total_dibayar         int       [note: 'Nilai yg dibayar, default 0']
   waktu_pembayaran      timestamp [note: 'Diisi saat settlement']
   created_at            timestamp
@@ -264,13 +325,13 @@ Table pembayaran {
 // Master metode pembayaran yang tersedia (cash, qris, va, ewallet, cod)
 Table metode_pembayaran {
   id_metode_pembayaran int     [pk]
-  public_id            uuid    [note: 'gen_random_uuid()']
-  nama_metode          varchar [note: 'Cash, QRIS, Virtual Account, E-Wallet, COD']
-  kode_metode          varchar [note: 'cash | qris | va | ewallet | cod']
-  penyedia             varchar [note: 'internal | midtrans']
-  icon                 varchar [note: 'URL icon metode pembayaran']
-  urutan               int     [note: 'Urutan tampilan, default 0']
-  is_active            bool    [note: 'default true']
+  public_id           uuid    [note: 'gen_random_uuid()']
+  nama_metode         varchar [note: 'Cash, QRIS, Virtual Account, E-Wallet, COD']
+  kode_metode         varchar [note: 'cash | qris | va | ewallet | cod']
+  penyedia            varchar [note: 'internal | midtrans']
+  icon                varchar [note: 'URL icon metode pembayaran']
+  urutan              int     [note: 'Urutan tampilan, default 0']
+  is_active           bool    [note: 'default true']
 }
 
 // Detail kanal pembayaran dari Midtrans (VA, QRIS, Convenience Store)
@@ -286,6 +347,7 @@ Table detail_pembayaran {
   merchant_id          varchar [note: 'Merchant ID dari Midtrans']
   qr_code_url          varchar [note: 'URL QR Code untuk pembayaran QRIS']
 }
+
 
 // -----------------------------------------------------------------------------
 // PENGANTARAN (DELIVERY)
@@ -327,7 +389,7 @@ Table pengantaran {
   public_id             uuid      [note: 'gen_random_uuid()']
   id_pesanan            int
   id_kurir              int       [note: 'Null jika pakai ekspedisi eksternal']
-  id_status_pengantaran int
+  id_status_pengantaran int       [note: 'FK ke status_pengantaran']
   id_ekspedisi          int       [note: 'Null jika pakai kurir internal']
   waktu_pickup          datetime
   waktu_sampai          datetime
@@ -346,7 +408,7 @@ Table stok_opname {
   id_stok_opname        int       [pk]
   id_spesifikasi_barang int
   harga_beli            int       [note: 'Harga beli/modal dalam Rupiah']
-  status                bool      [note: 'true = stok masuk, false = stok keluar']
+  tipe_pergerakan       varchar   [note: 'masuk | keluar | penyesuaian | retur']
   jumlah_stok           int       [note: 'Jumlah yg masuk/keluar (bukan total stok)']
   keterangan            text
   tanggal               timestamp
@@ -359,12 +421,12 @@ Table stok_opname {
 
 // Notifikasi untuk semua role, difilter berdasarkan id_user
 Table notifikasi {
-  id_notifikasi int       [pk]
-  id_user       int
-  judul         varchar
-  pesan         text
-  status        varchar   [note: 'unread | read']
-  created_at    timestamp
+  id_notifikasi       int       [pk]
+  id_user             int       [note: 'FK ke user']
+  id_status_notifikasi int      [note: 'FK ke status_notifikasi']
+  judul               varchar
+  pesan               text
+  created_at          timestamp
 }
 
 
@@ -395,21 +457,29 @@ Ref: refresh_token.id_user > user.id_user
 Ref: customer.id_user > user.id_user
 Ref: karyawan.id_user > user.id_user
 
+// Enum FK - Karyawan
+Ref: karyawan.id_status_karyawan > status_karyawan.id
+
 // Karyawan → Kasir/Kurir (one-to-one via id_karyawan unique)
 Ref: kasir.id_karyawan - karyawan.id_karyawan
+Ref: kasir.id_shift_kasir > shift_kasir.id
 Ref: kurir.id_karyawan - karyawan.id_karyawan
 
 // Alamat
 Ref: alamat.id_customer > customer.id_customer
 
 // Katalog & Produk
-Ref: barang.id_diskon > diskon.id_diskon
+Ref: barang.id_diskon ?> diskon.id_diskon
 Ref: barang.id_satuan > satuan.id_satuan
 Ref: barang.id_kategori > kategori.id_kategori
 Ref: detail_spesifikasi.id_spesifikasi > spesifikasi.id_spesifikasi
 Ref: spesifikasi_barang.id_barang > barang.id_barang
 Ref: spesifikasi_barang.id_detail_spesifikasi > detail_spesifikasi.id_detail_spesifikasi
 Ref: barcode.id_spesifikasi_barang - spesifikasi_barang.id_spesifikasi_barang
+
+// Enum FK - Pesanan
+Ref: pesanan.id_tipe_pesanan > tipe_pesanan.id
+Ref: pesanan.id_status_pesanan > status_pesanan.id
 
 // Transaksi & Pesanan
 Ref: pesanan.id_customer > customer.id_customer
@@ -420,7 +490,10 @@ Ref: pesanan.id_layanan_ekspedisi > ekspedisi_layanan.id_ekspedisi_layanan
 Ref: detail_pesanan.id_pesanan > pesanan.id_pesanan
 Ref: detail_pesanan.id_spesifikasi_barang > spesifikasi_barang.id_spesifikasi_barang
 Ref: pembayaran.id_pesanan > pesanan.id_pesanan
-Ref: pembayaran.id_metode_pembayaran > metode_pembayaran.id_metode_pembayaran
+Ref: pembayaran.id_tipe_pembayaran > tipe_pembayaran.id
+Ref: pembayaran.id_metode_pembayaran ?> metode_pembayaran.id_metode_pembayaran
+Ref: pembayaran.id_status_transaksi > status_transaksi.id
+Ref: pembayaran.id_fraud_status > fraud_status.id
 Ref: detail_pembayaran.id_pembayaran > pembayaran.id_pembayaran
 
 // Ekspedisi & Layanan
@@ -437,6 +510,7 @@ Ref: stok_opname.id_spesifikasi_barang > spesifikasi_barang.id_spesifikasi_baran
 
 // Notifikasi
 Ref: notifikasi.id_user > user.id_user
+Ref: notifikasi.id_status_notifikasi > status_notifikasi.id
 
 // Keranjang
 Ref: keranjang.id_customer > customer.id_customer

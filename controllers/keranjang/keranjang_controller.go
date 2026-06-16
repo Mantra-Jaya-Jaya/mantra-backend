@@ -313,10 +313,17 @@ func GetKeranjang(c *gin.Context) {
 		punyaDiskon := false
 		b := item.SpesifikasiBarang.Barang
 
-		if b.DiskonId != nil && b.Diskon.IdDiskon != 0 {
+		if b.DiskonID != nil && b.Diskon.IdDiskon != 0 {
 			if b.Diskon.TglMulai.Before(now) && b.Diskon.TglSelesai.After(now) {
 				punyaDiskon = true
-				hargaDiskon = hargaAsli - (hargaAsli * b.Diskon.BesarDiskon / 100)
+				if b.Diskon.TipeDiskon == "persen" {
+					hargaDiskon = hargaAsli - (hargaAsli * b.Diskon.BesarDiskon / 100)
+				} else if b.Diskon.TipeDiskon == "nominal" {
+					hargaDiskon = hargaAsli - b.Diskon.BesarDiskon
+					if hargaDiskon < 0 {
+						hargaDiskon = 0
+					}
+				}
 			}
 		}
 

@@ -4,7 +4,7 @@ Auth (Customer). Cek ongkos kirim via Biteship API.
 
 ---
 
-## POST /customer/ongkir/cek
+## POST /api/v1/customer/ongkir/cek
 
 Hitung ongkos kirim dari berbagai ekspedisi berdasarkan alamat tujuan dan berat barang.
 
