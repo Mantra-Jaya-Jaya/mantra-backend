@@ -2,8 +2,10 @@ package transaksi
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"os"
+	"strconv"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -163,4 +165,76 @@ func CekOngkir(c *gin.Context) {
 		"message": "Daftar ongkos kirim berhasil diambil",
 		"data":    data,
 	})
+}
+
+// CekRadius memeriksa apakah alamat customer dalam radius kurir internal.
+// Dipakai oleh: customer (POST /customer/ongkir/cek-radius)
+// Auth: Wajib login, role customer
+func CekRadius(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "User belum login"})
+		return
+	}
+
+	var result struct{ IdCustomer uint }
+	if err := config.DB.Raw("SELECT id_customer FROM customer WHERE id_user = ?", userID).Scan(&result).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengidentifikasi customer"})
+		return
+	}
+
+	var input struct {
+		IdAlamat string `json:"id_alamat" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Input tidak valid"})
+		return
+	}
+
+	var alamat models.Alamat
+	if err := config.DB.Where("public_id = ? AND id_customer = ?", input.IdAlamat, result.IdCustomer).First(&alamat).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Alamat tidak ditemukan"})
+		return
+	}
+
+	if alamat.Latitude == 0 && alamat.Longitude == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Alamat belum memiliki koordinat"})
+		return
+	}
+
+	storeLatStr := os.Getenv("BITESHIP_STORE_COORDINATE_LAT")
+	storeLngStr := os.Getenv("BITESHIP_STORE_COORDINATE_LONG")
+	storeLat, _ := strconv.ParseFloat(storeLatStr, 64)
+	storeLng, _ := strconv.ParseFloat(storeLngStr, 64)
+
+	distance := haversine(storeLat, storeLng, alamat.Latitude, alamat.Longitude)
+
+	var setting models.PengaturanToko
+	maxRadius := 5.0
+	if err := config.DB.Where("key = ?", "radius_kurir_internal").First(&setting).Error; err == nil {
+		if val, err := strconv.ParseFloat(setting.Value, 64); err == nil {
+			maxRadius = val
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Cek radius berhasil",
+		"data": gin.H{
+			"within_radius": distance <= maxRadius,
+			"distance_km":   math.Round(distance*100) / 100,
+			"max_radius_km": maxRadius,
+		},
+	})
+}
+
+func haversine(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 6371
+	dLat := (lat2 - lat1) * math.Pi / 180
+	dLon := (lon2 - lon1) * math.Pi / 180
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*math.Pi/180)*math.Cos(lat2*math.Pi/180)*
+			math.Sin(dLon/2)*math.Sin(dLon/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	return R * c
 }

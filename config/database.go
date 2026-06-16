@@ -83,6 +83,9 @@ func ConnectDatabase() {
 		&models.Pesanan{},
 		&models.DetailPesanan{},
 		&models.Pembayaran{},
+		// Master Data Baru
+		&models.TipeKurir{},
+		&models.PengaturanToko{},
 		// Metode Pembayaran (master data)
 		&models.MetodePembayaran{},
 		// Pengantaran (butuh Pesanan, Kurir, Ekspedisi)

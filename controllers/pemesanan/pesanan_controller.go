@@ -46,6 +46,7 @@ func GetPesananTerbaru(c *gin.Context) {
 	// 🚀 2. QUERY DATABASE
 	var pesanan models.Pesanan
 	dikemasID := utils.GetStatusPesananID("Dikemas")
+	internalID := utils.GetTipeKurirID("internal")
 	err := config.DB.
 		Preload("StatusPesanan").
 		Preload("Customer.User").
@@ -55,6 +56,7 @@ func GetPesananTerbaru(c *gin.Context) {
 		Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
 		Where("id_tipe_pesanan = ?", utils.GetTipePesananID("Online")).
 		Where("id_status_pesanan = ?", dikemasID).
+		Where("id_tipe_kurir = ?", internalID).
 		Order("tanggal_pesanan DESC").
 		Limit(1).
 		Find(&pesanan).Error
@@ -186,6 +188,7 @@ func GetAllPesananOnline(c *gin.Context) {
 	// 🚀 2. QUERY DATABASE (Tarik Semua Pesanan)
 	var daftarPesanan []models.Pesanan
 	dikemasID := utils.GetStatusPesananID("Dikemas")
+	internalID := utils.GetTipeKurirID("internal")
 	err := config.DB.
 		Preload("StatusPesanan").
 		Preload("Customer.User").
@@ -195,6 +198,7 @@ func GetAllPesananOnline(c *gin.Context) {
 		Preload("DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
 		Where("id_tipe_pesanan = ?", utils.GetTipePesananID("Online")).
 		Where("id_status_pesanan = ?", dikemasID). // Filter biar kurir cuma liat yang nganggur/siap antar
+		Where("id_tipe_kurir = ?", internalID).
 		Order("tanggal_pesanan DESC").
 		Find(&daftarPesanan).Error
 
@@ -536,7 +540,13 @@ func TerimaPesanan(c *gin.Context) {
 		return
 	}
 
-	// 🚀 3. CEK APAKAH PESANAN INI UDAH DIAMBIL KURIR LAIN?
+	// 🚀 3. CEK TIPE KURIR (Hanya internal yang bisa diklaim kurir toko)
+	if pesanan.TipeKurirID != utils.GetTipeKurirID("internal") {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Pesanan ini menggunakan ekspedisi eksternal, tidak bisa diklaim kurir toko!"})
+		return
+	}
+
+	// 🚀 4. CEK APAKAH PESANAN INI UDAH DIAMBIL KURIR LAIN?
 	var count int64
 	config.DB.Model(&models.Pengantaran{}).Where("id_pesanan = ?", pesanan.IdPesanan).Count(&count)
 	if count > 0 {
@@ -544,7 +554,7 @@ func TerimaPesanan(c *gin.Context) {
 		return
 	}
 
-	// 🚀 4. BIKIN DATA PENGANTARAN BARU (Sesuai Struct Lu)
+	// 🚀 5. BIKIN DATA PENGANTARAN BARU (Sesuai Struct Lu)
 	pengantaranBaru := models.Pengantaran{
 		PesananID:           pesanan.IdPesanan,
 		KurirID:             &kurir.IdKurir,
@@ -558,11 +568,11 @@ func TerimaPesanan(c *gin.Context) {
 		return
 	}
 
-	// 🚀 5. UPDATE STATUS PESANAN
+	// 🚀 6. UPDATE STATUS PESANAN
 	// Kita ubah status pesanan biar nggak nongol lagi di daftar "Cari Order" kurir lain
 	config.DB.Model(&pesanan).Update("id_status_pesanan", utils.GetStatusPesananID("Dikirim"))
 
-	// 🚀 6. KEMBALIKAN PUBLIC ID PENGANTARAN KE FLUTTER
+	// 🚀 7. KEMBALIKAN PUBLIC ID PENGANTARAN KE FLUTTER
 	// Tarik ulang datanya buat mastiin Public ID-nya ke-generate dari database
 	config.DB.Where("id_pengantaran = ?", pengantaranBaru.IdPengantaran).First(&pengantaranBaru)
 

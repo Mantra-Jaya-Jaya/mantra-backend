@@ -357,6 +357,7 @@ func CheckoutPesanan(c *gin.Context) {
 		IdEkspedisi        *uint          `json:"id_ekspedisi"`
 		IdLayananEkspedisi *uint          `json:"id_layanan_ekspedisi"`
 		OngkosKirim        int            `json:"ongkos_kirim"`
+		IdTipeKurir        *uint          `json:"id_tipe_kurir"`
 	}
 
 	var input CheckoutInput
@@ -489,9 +490,15 @@ func CheckoutPesanan(c *gin.Context) {
 	metodeInput := strings.ToLower(input.MetodePembayaran)
 	var initialStatusID uint
 	if metodeInput == "tunai" || metodeInput == "cash" {
-		initialStatusID = utils.GetStatusPesananID("Diproses")
+		initialStatusID = utils.GetStatusPesananID("Dikemas")
 	} else {
 		initialStatusID = utils.GetStatusPesananID("Menunggu Pembayaran")
+	}
+
+	// Tentukan tipe kurir (default internal)
+	tipeKurirID := utils.GetTipeKurirID("internal")
+	if input.IdTipeKurir != nil && *input.IdTipeKurir == utils.GetTipeKurirID("external") {
+		tipeKurirID = utils.GetTipeKurirID("external")
 	}
 
 	// Buat Pesanan
@@ -501,6 +508,7 @@ func CheckoutPesanan(c *gin.Context) {
 		TanggalPesanan:     now,
 		TipePesananID:      utils.GetTipePesananID("Online"),
 		StatusPesananID:    initialStatusID,
+		TipeKurirID:        tipeKurirID,
 		OngkosKirim:        ongkir,
 		Catatan:            input.Catatan,
 		EkspedisiID:        input.IdEkspedisi,
@@ -772,7 +780,7 @@ func BatalkanPesanan(c *gin.Context) {
 		statusName = pesanan.StatusPesanan.NamaStatus
 	}
 
-	if statusName != "Menunggu Pembayaran" && statusName != "Diproses" {
+	if statusName != "Menunggu Pembayaran" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak bisa dibatalkan karena status saat ini: " + statusName,
@@ -1343,5 +1351,51 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 				"total_akhir":   pesanan.TotalPembayaran,
 			},
 		},
+	})
+}
+
+// KirimPesanan digunakan untuk input nomor resi oleh kasir/admin untuk ekspedisi eksternal.
+// Dipakai oleh: kasir (PATCH /kasir/pesanan/:public_id/kirim)
+// Auth: Wajib login, role kasir
+func KirimPesanan(c *gin.Context) {
+	publicID := c.Param("public_id")
+
+	var input struct {
+		NomorResi string `json:"nomor_resi" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Nomor resi harus diisi"})
+		return
+	}
+
+	var pesanan models.Pesanan
+	if err := config.DB.Where("public_id = ?", publicID).First(&pesanan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pesanan tidak ditemukan"})
+		return
+	}
+
+	if pesanan.StatusPesananID != utils.GetStatusPesananID("Dikemas") {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Pesanan harus berstatus Dikemas untuk dikirim"})
+		return
+	}
+
+	if pesanan.TipeKurirID != utils.GetTipeKurirID("external") {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Pesanan ini bukan ekspedisi eksternal"})
+		return
+	}
+
+	dikirimID := utils.GetStatusPesananID("Dikirim")
+	updates := map[string]interface{}{
+		"nomor_resi":        input.NomorResi,
+		"id_status_pesanan": dikirimID,
+	}
+	if err := config.DB.Model(&pesanan).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengirim pesanan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Pesanan berhasil dikirim, resi: " + input.NomorResi,
 	})
 }

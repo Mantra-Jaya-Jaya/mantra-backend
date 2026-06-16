@@ -11,6 +11,9 @@ type SpesifikasiBarang struct {
 	Jumlah              int  `gorm:"column:jumlah" json:"jumlah"`
 	HargaBarang         int  `gorm:"column:harga_barang" json:"harga_barang"`
 	BeratBarang         int  `gorm:"column:berat_barang;default:0" json:"berat_barang"`
+	PanjangBarang       int  `gorm:"column:panjang_barang;default:0" json:"panjang_barang"`
+	LebarBarang         int  `gorm:"column:lebar_barang;default:0" json:"lebar_barang"`
+	TinggiBarang        int  `gorm:"column:tinggi_barang;default:0" json:"tinggi_barang"`
 
 	// Relasi ke Barang
 	BarangID uint   `gorm:"column:id_barang;not null" json:"id_barang"`

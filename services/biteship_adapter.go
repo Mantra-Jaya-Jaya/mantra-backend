@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -49,22 +50,22 @@ type biteshipItem struct {
 }
 
 type biteshipRateResponse struct {
-	Success bool                   `json:"success"`
-	Object  string                 `json:"object"`
-	Pricing []biteshipPricing      `json:"pricing"`
+	Success bool              `json:"success"`
+	Object  string            `json:"object"`
+	Pricing []biteshipPricing `json:"pricing"`
 }
 
 type biteshipPricing struct {
-	Company             string `json:"company"`
-	CourierName         string `json:"courier_name"`
-	CourierCode         string `json:"courier_code"`
-	CourierServiceName  string `json:"courier_service_name"`
-	CourierServiceCode  string `json:"courier_service_code"`
-	Description         string `json:"description"`
-	Duration            string `json:"duration"`
+	Company               string `json:"company"`
+	CourierName           string `json:"courier_name"`
+	CourierCode           string `json:"courier_code"`
+	CourierServiceName    string `json:"courier_service_name"`
+	CourierServiceCode    string `json:"courier_service_code"`
+	Description           string `json:"description"`
+	Duration              string `json:"duration"`
 	ShipmentDurationRange string `json:"shipment_duration_range"`
-	ShipmentDurationUnit string `json:"shipment_duration_unit"`
-	Price               int    `json:"price"`
+	ShipmentDurationUnit  string `json:"shipment_duration_unit"`
+	Price                 int    `json:"price"`
 }
 
 func (b *BiteshipAdapter) CekOngkir(req OngkirRequest) ([]OngkirResult, error) {
@@ -205,7 +206,6 @@ type BiteshipTrackingResponse struct {
 	History []BiteshipTrackingEvent `json:"history"`
 }
 
-// TrackShipment tracks a waybill code via Biteship API
 func (b *BiteshipAdapter) TrackShipment(waybill string, courierCode string) ([]BiteshipTrackingEvent, error) {
 	reqHttp, _ := http.NewRequest("GET", b.baseURL+fmt.Sprintf("/v1/trackings/%s/couriers/%s", waybill, courierCode), nil)
 	reqHttp.Header.Set("Authorization", b.apiKey)
@@ -245,7 +245,6 @@ type BiteshipCouriersResponse struct {
 	Couriers []BiteshipCourierItem `json:"couriers"`
 }
 
-// GetCouriers fetches all available couriers and services from Biteship API
 func (b *BiteshipAdapter) GetCouriers() ([]BiteshipCourierItem, error) {
 	reqHttp, _ := http.NewRequest("GET", b.baseURL+"/v1/couriers", nil)
 	reqHttp.Header.Set("Authorization", b.apiKey)
@@ -273,4 +272,122 @@ func (b *BiteshipAdapter) GetCouriers() ([]BiteshipCourierItem, error) {
 	return result.Couriers, nil
 }
 
+// CreateShipmentRequest is the request payload for creating a Biteship order
+type CreateShipmentRequest struct {
+	OriginAddress       string  `json:"origin_address"`
+	OriginCoordinate    string  `json:"origin_coordinate"`
+	DestinationAddress  string  `json:"destination_address"`
+	DestinationCoordinate string `json:"destination_coordinate"`
+	CourierCode         string  `json:"courier_code"`
+	CourierServiceCode  string  `json:"courier_service_code"`
+	Items               []CreateShipmentItem `json:"items"`
+}
 
+type CreateShipmentItem struct {
+	Name          string `json:"name"`
+	Weight        int    `json:"weight"`
+	Quantity      int    `json:"quantity"`
+	Value         int    `json:"value"`
+	Length        int    `json:"length,omitempty"`
+	Width         int    `json:"width,omitempty"`
+	Height        int    `json:"height,omitempty"`
+}
+
+type biteshipCreateOrderRequest struct {
+	Shipper struct {
+		Name    string `json:"name"`
+		Phone   string `json:"phone"`
+		Address string `json:"address"`
+		Coordinate string `json:"coordinate"`
+	} `json:"shipper"`
+	Destination struct {
+		Name         string `json:"name"`
+		Phone        string `json:"phone"`
+		Address      string `json:"address"`
+		Coordinate   string `json:"coordinate"`
+	} `json:"destination"`
+	Courier struct {
+		CourierCode string `json:"courier_code"`
+		ServiceCode string `json:"service_code"`
+	} `json:"courier"`
+	Items []struct {
+		Name     string `json:"name"`
+		Weight   int    `json:"weight"`
+		Quantity int    `json:"quantity"`
+		Value    int    `json:"value"`
+		Length   int    `json:"length,omitempty"`
+		Width    int    `json:"width,omitempty"`
+		Height   int    `json:"height,omitempty"`
+	} `json:"items"`
+}
+
+type biteshipCreateOrderResponse struct {
+	Success   bool   `json:"success"`
+	Message   string `json:"message"`
+	WaybillID string `json:"waybill_id"`
+	Courier   struct {
+		Company string `json:"company"`
+		Name    string `json:"name"`
+		Phone   string `json:"phone"`
+	} `json:"courier"`
+}
+
+// CreateShipment creates a shipment order on Biteship and returns waybill ID
+func (b *BiteshipAdapter) CreateShipment(req CreateShipmentRequest) (*biteshipCreateOrderResponse, error) {
+	orderReq := biteshipCreateOrderRequest{}
+	orderReq.Shipper.Name = os.Getenv("BITESHIP_STORE_NAME")
+	orderReq.Shipper.Phone = os.Getenv("BITESHIP_STORE_PHONE")
+	orderReq.Shipper.Address = req.OriginAddress
+	orderReq.Shipper.Coordinate = req.OriginCoordinate
+
+	orderReq.Destination.Name = ""
+	orderReq.Destination.Phone = ""
+	orderReq.Destination.Address = req.DestinationAddress
+	orderReq.Destination.Coordinate = req.DestinationCoordinate
+
+	orderReq.Courier.CourierCode = req.CourierCode
+	orderReq.Courier.ServiceCode = req.CourierServiceCode
+
+	for _, it := range req.Items {
+		orderReq.Items = append(orderReq.Items, struct {
+			Name     string `json:"name"`
+			Weight   int    `json:"weight"`
+			Quantity int    `json:"quantity"`
+			Value    int    `json:"value"`
+			Length   int    `json:"length,omitempty"`
+			Width    int    `json:"width,omitempty"`
+			Height   int    `json:"height,omitempty"`
+		}{
+			Name:     it.Name,
+			Weight:   it.Weight,
+			Quantity: it.Quantity,
+			Value:    it.Value,
+			Length:   it.Length,
+			Width:    it.Width,
+			Height:   it.Height,
+		})
+	}
+
+	bodyBytes, _ := json.Marshal(orderReq)
+	reqHttp, _ := http.NewRequest("POST", b.baseURL+"/v1/orders", bytes.NewReader(bodyBytes))
+	reqHttp.Header.Set("Content-Type", "application/json")
+	reqHttp.Header.Set("Authorization", b.apiKey)
+
+	resp, err := b.client.Do(reqHttp)
+	if err != nil {
+		return nil, fmt.Errorf("biteship create order request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("biteship create order error status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result biteshipCreateOrderResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("biteship create order parse error: %w", err)
+	}
+
+	return &result, nil
+}

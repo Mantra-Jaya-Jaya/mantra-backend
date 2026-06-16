@@ -114,11 +114,18 @@ func MidtransNotificationHandler(c *gin.Context) {
 	// 4. Update Database Pembayaran
 	config.DB.Model(&pembayaran).Updates(updatePembayaran)
 
-	// 5. Update Status Pesanan Jika Lunas
-	if isLunas {
-		if diprosesID := utils.GetStatusPesananIDSafe("Diproses"); diprosesID != 0 {
-			config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pembayaran.PesananID).Update("id_status_pesanan", diprosesID)
+	if notif.TransactionStatus == "settlement" || notif.TransactionStatus == "capture" {
+		dikemasID := utils.GetStatusPesananIDSafe("Dikemas")
+		if dikemasID != 0 {
+			err := config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pembayaran.PesananID).
+				Update("id_status_pesanan", dikemasID).Error
+			if err != nil {
+				fmt.Printf("❌ Webhook Error: Gagal update status pesanan: %s\n", err.Error())
+			} else {
+				fmt.Printf("✅ Webhook Success: Pesanan ID %d status berubah jadi 'Dikemas'\n", pembayaran.PesananID)
+			}
 		}
+		processExternalShipment(pembayaran.PesananID)
 	}
 
 	// 🚀 6. PANGGIL FUNGSI SAVE DETAIL BUAT INVOICE LUUU!!!
