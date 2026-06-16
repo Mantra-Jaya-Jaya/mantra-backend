@@ -69,9 +69,11 @@ func MidtransNotificationHandler(c *gin.Context) {
 
 	if !hmac.Equal([]byte(notif.SignatureKey), []byte(expectedSignature)) {
 		fmt.Printf("❌ Webhook Error: Signature tidak valid. Expected: %s, Got: %s\n", expectedSignature, notif.SignatureKey)
-		// Tetap lanjutkan untuk testing di local jika Signature bermasalah karena environment
-		// c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Signature tidak valid"})
-		// return
+		if os.Getenv("MIDTRANS_ENVIRONMENT") == "production" {
+			c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Signature tidak valid"})
+			return
+		}
+		fmt.Println("⚠️  MIDTRANS_ENVIRONMENT bukan 'production' — signature tetap diverifikasi tapi dilanjutkan (development mode)")
 	}
 
 	var pembayaran models.Pembayaran

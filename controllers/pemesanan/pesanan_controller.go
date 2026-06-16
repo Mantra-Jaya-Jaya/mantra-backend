@@ -56,13 +56,13 @@ func GetPesananTerbaru(c *gin.Context) {
 		Where("id_tipe_pesanan = ?", utils.GetTipePesananID("Online")).
 		Where("id_status_pesanan = ?", dikemasID).
 		Order("tanggal_pesanan DESC").
-		First(&pesanan).Error
+		Limit(1).
+		Find(&pesanan).Error
 
-	// 🚀 3. ERROR HANDLING: DATA TIDAK DITEMUKAN (404 Not Found)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Data pesanan tidak ditemukan (Belum ada pesanan baru)",
+	if err != nil || pesanan.IdPesanan == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"message": "Belum ada pesanan baru",
 			"data":    nil,
 		})
 		return
@@ -207,12 +207,11 @@ func GetAllPesananOnline(c *gin.Context) {
 		return
 	}
 
-	// 🚀 3. ERROR HANDLING: DATA KOSONG (404 Not Found)
 	if len(daftarPesanan) == 0 {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
 			"message": "Tidak ada pesanan online yang tersedia saat ini",
-			"data":    []interface{}{}, // Lempar array kosong biar UI Flutter lu gak jebol (null safety)
+			"data":    []interface{}{},
 		})
 		return
 	}

@@ -323,7 +323,12 @@ func GetDetailKaryawan(c *gin.Context) {
 				return "Aktif" // fallback ke kolom lama
 			}(),
 			"foto_profil":    karyawan.User.FotoProfil,
-			"dibuat_pada":    "Tidak tersedia", // TODO: Tambahkan field created_at di tabel
+			"dibuat_pada": func() string {
+				if !karyawan.User.CreatedAt.IsZero() {
+					return karyawan.User.CreatedAt.Format("02 Jan 2006, 15:04")
+				}
+				return "Tidak tersedia"
+			}(),
 			"login_terakhir": loginTerakhirStr,
 		},
 	})

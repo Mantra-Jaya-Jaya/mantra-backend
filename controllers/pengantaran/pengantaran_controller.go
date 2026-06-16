@@ -62,7 +62,18 @@ func GetDaftarPengantaran(c *gin.Context) {
 		query = query.Where("id_kurir = ?", result.IdKurir)
 	}
 
-	// 🚀 3. EKSEKUSI QUERY
+	// 🚀 3. FILTER STATUS — exclude Selesai by default, sertakan query param untuk lihat riwayat
+	filterStatus := c.DefaultQuery("status", "aktif")
+	selesaiID := utils.GetStatusPengantaranIDSafe("Selesai")
+	if filterStatus == "aktif" && selesaiID > 0 {
+		query = query.Where("id_status_pengantaran != ?", selesaiID)
+	} else if filterStatus == "selesai" && selesaiID > 0 {
+		query = query.Where("id_status_pengantaran = ?", selesaiID)
+	}
+
+	query = query.Order("created_at DESC")
+
+	// 🚀 4. EKSEKUSI QUERY
 	if err := query.Find(&pengantarans).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -72,7 +83,7 @@ func GetDaftarPengantaran(c *gin.Context) {
 		return
 	}
 
-	// 🚀 4. REFACTOR JSON (Bikin Cetakan DTO biar Langsing)
+	// 🚀 5. REFACTOR JSON (Bikin Cetakan DTO biar Langsing)
 	type PengantaranRingkas struct {
 		PublicID        string      `json:"public_id"`
 		Status          string      `json:"status"`
@@ -87,7 +98,7 @@ func GetDaftarPengantaran(c *gin.Context) {
 
 	var hasilAkhir []PengantaranRingkas
 
-	// 🚀 5. LOOPING DAN MAPPING DATA
+	// 🚀 6. LOOPING DAN MAPPING DATA
 	for _, p := range pengantarans {
 		// Fallback data alamat
 		namaCust := "Customer Offline"
@@ -124,7 +135,7 @@ func GetDaftarPengantaran(c *gin.Context) {
 			NamaCustomer:    namaCust,
 			NoTelp:          noTelp,
 			AlamatLengkap:   alamatLengkap,
-			TotalPendapatan: 35000,
+			TotalPendapatan: 0,
 		})
 	}
 
@@ -133,7 +144,7 @@ func GetDaftarPengantaran(c *gin.Context) {
 		hasilAkhir = []PengantaranRingkas{}
 	}
 
-	// 🚀 6. RESPONSE SUKSES
+	// 🚀 7. RESPONSE SUKSES
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Daftar pengantaran berhasil diambil",
@@ -142,7 +153,7 @@ func GetDaftarPengantaran(c *gin.Context) {
 }
 
 // UpdateLokasiKurir memperbarui koordinat lokasi kurir yang sedang bertugas.
-// Dipakai oleh: kurir (PATCH /kurir/pengantaran/:public_id/lokasi)
+// Dipakai oleh: kurir (PUT /kurir/pengantaran/:public_id/lokasi)
 // Auth: Wajib login, role kurir
 // Ownership: kurir hanya bisa update lokasi pengantaran yang ditugaskan kepadanya
 func UpdateLokasiKurir(c *gin.Context) {

@@ -11,6 +11,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// isSecureCookie returns true only in production (HTTPS), false for local dev (HTTP)
+func isSecureCookie() bool {
+	return os.Getenv("MIDTRANS_ENVIRONMENT") == "production"
+}
+
 // GenerateJWT generates a real JWT token for a user
 func GenerateJWT(userID uint, publicID string, role string) (string, error) {
 	secret := os.Getenv("JWT_SECRET")
@@ -35,10 +40,10 @@ func RespondWithSuccess(c *gin.Context, clientType string, user models.User, rol
 	lowerRole := strings.ToLower(roleName)
 
 	if clientType == "nextjs" {
-		// Set cookie sesuai kontrak: HttpOnly; Secure; SameSite=Strict
+		// Set cookie — secure=true hanya di production (HTTPS), false di local HTTP
 		// Gin SetCookie params: name, value string, maxAge int, path, domain string, secure, httpOnly bool
-		c.SetCookie("access_token", accessToken, 1800, "/", "", true, true)
-		c.SetCookie("refresh_token", refreshToken, 604800, "/", "", true, true)
+		c.SetCookie("access_token", accessToken, 1800, "/", "", isSecureCookie(), true)
+		c.SetCookie("refresh_token", refreshToken, 604800, "/", "", isSecureCookie(), true)
 
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",

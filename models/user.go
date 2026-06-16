@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -19,4 +21,7 @@ type User struct {
 
 	RoleID uint `gorm:"column:id_role;not null" json:"id_role"`
 	Role   Role `gorm:"foreignKey:RoleID;references:IdRole" json:"role"`
+
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
