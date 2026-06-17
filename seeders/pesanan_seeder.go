@@ -107,7 +107,7 @@ func SeedPesanan() {
 				}
 				// External yang Dikirim/Selesai set nomor resi
 				if statusName == "Dikirim" || statusName == "Selesai" {
-				nr := fmt.Sprintf("%s-%d-%d", ekspedisi.KodeApi, fake.IntRange(100000, 999999), fake.IntRange(1000, 9999))
+					nr := fmt.Sprintf("%s-%d-%d", ekspedisi.KodeApi, fake.IntRange(100000, 999999), fake.IntRange(1000, 9999))
 					nomorResi = &nr
 				}
 			} else {
@@ -132,18 +132,18 @@ func SeedPesanan() {
 		totalPembayaran := fake.IntRange(50000, 5000000)
 
 		pesanan := models.Pesanan{
-			TotalPembayaran: totalPembayaran,
-			TanggalPesanan:  tglPesanan,
-			TipePesananID:   utils.GetTipePesananID(tipePesanan),
-			StatusPesananID: utils.GetStatusPesananID(statusName),
-			TipeKurirID:     utils.GetTipeKurirID(tipeKurir),
-			CustomerID:      cId,
-			KasirID:         kasirIdPtr,
-			AlamatID:        alamatId,
-			EkspedisiID:     ekspedisiID,
+			TotalPembayaran:    totalPembayaran,
+			TanggalPesanan:     tglPesanan,
+			TipePesananID:      utils.GetTipePesananID(tipePesanan),
+			StatusPesananID:    utils.GetStatusPesananID(statusName),
+			TipeKurirID:        utils.GetTipeKurirID(tipeKurir),
+			CustomerID:         cId,
+			KasirID:            kasirIdPtr,
+			AlamatID:           alamatId,
+			EkspedisiID:        ekspedisiID,
 			LayananEkspedisiID: layananEkspedisiID,
-			OngkosKirim:     ongkir,
-			NomorResi:       nomorResi,
+			OngkosKirim:        ongkir,
+			NomorResi:          nomorResi,
 		}
 
 		if err := config.DB.Create(&pesanan).Error; err == nil {
