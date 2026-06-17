@@ -320,7 +320,7 @@ func GetDetailPesanan(c *gin.Context) {
 		"data": gin.H{
 			"no_pesanan":             pesanan.PublicId,
 			"id_status_pesanan":      pesanan.StatusPesananID,
-			"nama_status_pesanan":    pesanan.StatusPesanan.NamaStatus,
+			"nama_status_pesanan":    func() string { if pesanan.StatusPesanan != nil { return pesanan.StatusPesanan.NamaStatus }; return "Unknown" }(),
 			"tanggal_pesan":          pesanan.TanggalPesanan,
 			"items":              items,
 			"tujuan_pengantaran": tujuanPengantaran,
@@ -1444,13 +1444,13 @@ func GetDaftarPengantaranAdmin(c *gin.Context) {
 	rows, err := config.DB.Raw(`
 		SELECT
 			peng.public_id,
-			CONCAT('ORD-', DATE_FORMAT(pes.tanggal_pesanan, '%Y%m%d'), '-', pes.id_pesanan) AS no_pesanan,
-			COALESCE(cust.nama_lengkap, '-') AS customer_nama,
+			CONCAT('ORD-', TO_CHAR(pes.tanggal_pesanan, 'YYYYMMDD'), '-', pes.id_pesanan) AS no_pesanan,
+			COALESCE(u.nama_lengkap, '-') AS customer_nama,
 			COALESCE(eks.nama_ekspedisi, 'Kurir Toko') AS ekspedisi,
 			COALESCE(sp.nama_status, 'Menunggu Kurir') AS status_pengantaran,
-			DATE_FORMAT(peng.waktu_pickup, '%Y-%m-%d %H:%i:%s') AS waktu_pickup,
-			DATE_FORMAT(peng.waktu_sampai, '%Y-%m-%d %H:%i:%s') AS waktu_sampai,
-			COALESCE(CONCAT(kary.nama_lengkap), '-') AS kurir_nama,
+			TO_CHAR(peng.waktu_pickup, 'YYYY-MM-DD HH24:MI:SS') AS waktu_pickup,
+			TO_CHAR(peng.waktu_sampai, 'YYYY-MM-DD HH24:MI:SS') AS waktu_sampai,
+			COALESCE(uk.nama_lengkap, '-') AS kurir_nama,
 			COALESCE(alamat.alamat_lengkap, '-') AS alamat_tujuan,
 			COALESCE(peng.last_latitude, 0) AS last_latitude,
 			COALESCE(peng.last_longitude, 0) AS last_longitude,
@@ -1459,10 +1459,12 @@ func GetDaftarPengantaranAdmin(c *gin.Context) {
 		FROM pengantaran peng
 		JOIN pesanan pes ON pes.id_pesanan = peng.id_pesanan
 		JOIN customer cust ON cust.id_customer = pes.id_customer
-		JOIN tipe_kurir tk ON tk.id_tipe_kurir = pes.id_tipe_kurir
+		JOIN "user" u ON u.id_user = cust.id_user
+		JOIN tipe_kurir tk ON tk.id = pes.id_tipe_kurir
 		LEFT JOIN status_pengantaran sp ON sp.id_status_pengantaran = peng.id_status_pengantaran
 		LEFT JOIN kurir kr ON kr.id_kurir = peng.id_kurir
 		LEFT JOIN karyawan kary ON kary.id_karyawan = kr.id_karyawan
+		LEFT JOIN "user" uk ON uk.id_user = kary.id_user
 		LEFT JOIN alamat ON alamat.id_alamat = pes.id_alamat
 		LEFT JOIN ekspedisi eks ON eks.id_ekspedisi = peng.id_ekspedisi
 		ORDER BY peng.id_pengantaran DESC

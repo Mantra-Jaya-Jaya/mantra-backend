@@ -62,18 +62,6 @@ func SeedPesanan() {
 	alamatLen := len(alamats)
 
 	for idx, tglPesanan := range datesToGenerate {
-		randStatus := fake.IntRange(1, 100)
-		var statusName string
-		if randStatus <= 70 {
-			statusName = "Selesai"
-		} else if randStatus <= 80 {
-			statusName = "Dikirim"
-		} else if randStatus <= 90 {
-			statusName = "Dikemas"
-		} else {
-			statusName = "Dibatalkan"
-		}
-
 		randType := fake.IntRange(1, 100)
 		tipePesanan := "Offline"
 		var alamatId *uint = nil
