@@ -67,12 +67,12 @@ func GetDaftarPesanan(c *gin.Context) {
 	if statusFilter != "" && statusFilter != "Semua" {
 		statusNameMap := map[string]string{
 			"menunggu_pembayaran": "Menunggu Pembayaran",
-			"diproses":           "Diproses",
-			"dikemas":            "Dikemas",
-			"dikirim":            "Dikirim",
-			"selesai":            "Selesai",
-			"dibatalkan":         "Dibatalkan",
-			"draft":              "Draft",
+			"diproses":            "Diproses",
+			"dikemas":             "Dikemas",
+			"dikirim":             "Dikirim",
+			"selesai":             "Selesai",
+			"dibatalkan":          "Dibatalkan",
+			"draft":               "Draft",
 		}
 		if namaStatus, ok := statusNameMap[statusFilter]; ok {
 			statusID := utils.GetStatusPesananIDSafe(namaStatus)
@@ -318,13 +318,13 @@ func GetDetailPesanan(c *gin.Context) {
 		"status":  "success",
 		"message": "Detail pesanan berhasil diambil",
 		"data": gin.H{
-			"no_pesanan":             pesanan.PublicId,
-			"id_status_pesanan":      pesanan.StatusPesananID,
-			"nama_status_pesanan":    pesanan.StatusPesanan.NamaStatus,
-			"tanggal_pesan":          pesanan.TanggalPesanan,
-			"items":              items,
-			"tujuan_pengantaran": tujuanPengantaran,
-			"kurir":              kurirData,
+			"no_pesanan":          pesanan.PublicId,
+			"id_status_pesanan":   pesanan.StatusPesananID,
+			"nama_status_pesanan": pesanan.StatusPesanan.NamaStatus,
+			"tanggal_pesan":       pesanan.TanggalPesanan,
+			"items":               items,
+			"tujuan_pengantaran":  tujuanPengantaran,
+			"kurir":               kurirData,
 			"rincian_pembayaran": gin.H{
 				"subtotal_items": subtotalItems,
 				"ongkir":         pesanan.OngkosKirim,
@@ -667,7 +667,7 @@ func CheckoutPesanan(c *gin.Context) {
 		}
 		if qrUrl != "" {
 			detailPembayaran.QrCode = qrUrl
-		} 
+		}
 		if vaNumber != "" {
 			detailPembayaran.NomorVA = vaNumber
 			detailPembayaran.NamaBank = strings.ToUpper(cleanMetode)
@@ -1421,19 +1421,19 @@ func KirimPesanan(c *gin.Context) {
 }
 
 type PengantaranListResponse struct {
-	PublicID           string  `json:"public_id"`
-	NoPesanan          string  `json:"no_pesanan"`
-	CustomerNama       string  `json:"customer_nama"`
-	Ekspedisi          string  `json:"ekspedisi"`
-	StatusPengantaran  string  `json:"status_pengantaran"`
-	WaktuPickup        *string `json:"waktu_pickup,omitempty"`
-	WaktuSampai        *string `json:"waktu_sampai,omitempty"`
-	KurirNama          string  `json:"kurir_nama"`
-	AlamatTujuan       string  `json:"alamat_tujuan"`
-	LastLatitude       float64 `json:"last_latitude"`
-	LastLongitude      float64 `json:"last_longitude"`
-	IsExternal         bool    `json:"is_external"`
-	NomorResi          string  `json:"nomor_resi,omitempty"`
+	PublicID          string  `json:"public_id"`
+	NoPesanan         string  `json:"no_pesanan"`
+	CustomerNama      string  `json:"customer_nama"`
+	Ekspedisi         string  `json:"ekspedisi"`
+	StatusPengantaran string  `json:"status_pengantaran"`
+	WaktuPickup       *string `json:"waktu_pickup,omitempty"`
+	WaktuSampai       *string `json:"waktu_sampai,omitempty"`
+	KurirNama         string  `json:"kurir_nama"`
+	AlamatTujuan      string  `json:"alamat_tujuan"`
+	LastLatitude      float64 `json:"last_latitude"`
+	LastLongitude     float64 `json:"last_longitude"`
+	IsExternal        bool    `json:"is_external"`
+	NomorResi         string  `json:"nomor_resi,omitempty"`
 }
 
 // GetDaftarPengantaranAdmin daftar pengantaran untuk admin monitoring.
