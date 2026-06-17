@@ -21,6 +21,14 @@ func GetKategori(c *gin.Context) {
 	query := config.DB.
 		Order("id_kategori ASC")
 
+	// Admin lihat semua kategori; customer/kasir lihat hanya yang punya barang
+	role, _ := c.Get("role")
+	if roleStr, ok := role.(string); !ok || roleStr != "Admin" {
+		query = query.Where("id_kategori IN (?)",
+			config.DB.Table("barang").Select("DISTINCT id_kategori"),
+		)
+	}
+
 	limitStr := c.Query("limit")
 	if limitStr != "" {
 		limit, err := strconv.Atoi(limitStr)
