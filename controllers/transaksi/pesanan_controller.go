@@ -686,6 +686,13 @@ func CheckoutPesanan(c *gin.Context) {
 
 	tx.Commit()
 
+	// 🚚 TRIGGER SHIPMENT UNTUK EXTERNAL + CASH (BUG FIX)
+	isExternal := pesanan.TipeKurirID == utils.GetTipeKurirID("external")
+	isCash := metodeInput == "tunai" || metodeInput == "cash"
+	if isExternal && isCash {
+		go processExternalShipment(pesanan.IdPesanan)
+	}
+
 	// Notifikasi ke semua kasir bahwa ada pesanan online baru
 	go func() {
 		var kasirUsers []models.User
