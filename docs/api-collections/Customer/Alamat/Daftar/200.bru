@@ -6,15 +6,16 @@ meta {
 
 get {
   url: {{baseUrl}}/customer/alamat
+  body: none
   auth: bearer
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 headers {
   X-Client-Type: flutter
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODE2MjMxNjEsImlhdCI6MTc4MTYyMTM2MSwicHVibGljX2lkIjoiMjYwOWQyMjYtMzYwOC00YzM2LWIxMjktNzYwYTc3NTI3ZjlhIiwicm9sZSI6IkN1c3RvbWVyIiwidXNlcl9pZCI6Mn0.y6pFlOZMsMgSMGTo5XZurQWR_xSRvewe7m0qT1-f8jk
 }
 
 script:post-response {

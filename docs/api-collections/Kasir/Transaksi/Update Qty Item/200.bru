@@ -10,17 +10,18 @@ patch {
   auth: bearer
 }
 
-auth:bearer {
-  token: {{accessToken}}
-}
-
 headers {
   Content-Type: application/json
 }
 
+auth:bearer {
+  token: {{accessToken}}
+}
+
 body:json {
   {
-    "id_detail_pesanan": 1,
-    "jumlah": 3
+    "id_pesanan": 0,
+    "id_spesifikasi_barang": 1,
+    "jumlah": 1
   }
 }

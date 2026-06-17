@@ -25,7 +25,7 @@ func GetTipeKurirIDSafe(namaTipe string) uint {
 
 func GetNamaTipeKurir(id uint) string {
 	var tipe models.TipeKurir
-	result := config.DB.Where("id_tipe_kurir = ?", id).Take(&tipe)
+	result := config.DB.Where("id = ?", id).Take(&tipe)
 	if result.Error != nil {
 		return ""
 	}

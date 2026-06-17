@@ -67,12 +67,12 @@ func GetDaftarPesanan(c *gin.Context) {
 	if statusFilter != "" && statusFilter != "Semua" {
 		statusNameMap := map[string]string{
 			"menunggu_pembayaran": "Menunggu Pembayaran",
-			"diproses":           "Diproses",
-			"dikemas":            "Dikemas",
-			"dikirim":            "Dikirim",
-			"selesai":            "Selesai",
-			"dibatalkan":         "Dibatalkan",
-			"draft":              "Draft",
+			"diproses":            "Diproses",
+			"dikemas":             "Dikemas",
+			"dikirim":             "Dikirim",
+			"selesai":             "Selesai",
+			"dibatalkan":          "Dibatalkan",
+			"draft":               "Draft",
 		}
 		if namaStatus, ok := statusNameMap[statusFilter]; ok {
 			statusID := utils.GetStatusPesananIDSafe(namaStatus)
@@ -322,9 +322,9 @@ func GetDetailPesanan(c *gin.Context) {
 			"id_status_pesanan":      pesanan.StatusPesananID,
 			"nama_status_pesanan":    func() string { if pesanan.StatusPesanan != nil { return pesanan.StatusPesanan.NamaStatus }; return "Unknown" }(),
 			"tanggal_pesan":          pesanan.TanggalPesanan,
-			"items":              items,
-			"tujuan_pengantaran": tujuanPengantaran,
-			"kurir":              kurirData,
+			"items":                  items,
+			"tujuan_pengantaran":     tujuanPengantaran,
+			"kurir":                  kurirData,
 			"rincian_pembayaran": gin.H{
 				"subtotal_items": subtotalItems,
 				"ongkir":         pesanan.OngkosKirim,
@@ -667,7 +667,7 @@ func CheckoutPesanan(c *gin.Context) {
 		}
 		if qrUrl != "" {
 			detailPembayaran.QrCode = qrUrl
-		} 
+		}
 		if vaNumber != "" {
 			detailPembayaran.NomorVA = vaNumber
 			detailPembayaran.NamaBank = strings.ToUpper(cleanMetode)
