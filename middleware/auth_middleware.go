@@ -57,7 +57,12 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		secret := os.Getenv("JWT_SECRET")
 		if secret == "" {
-			secret = "rahasia_dapur_mantra"
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Konfigurasi server tidak lengkap: JWT_SECRET tidak di-set",
+			})
+			c.Abort()
+			return
 		}
 
 		claims := &JWTClaims{}

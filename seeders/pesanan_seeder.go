@@ -62,18 +62,6 @@ func SeedPesanan() {
 	alamatLen := len(alamats)
 
 	for idx, tglPesanan := range datesToGenerate {
-		randStatus := fake.IntRange(1, 100)
-		var statusName string
-		if randStatus <= 70 {
-			statusName = "Selesai"
-		} else if randStatus <= 80 {
-			statusName = "Dikirim"
-		} else if randStatus <= 90 {
-			statusName = "Dikemas"
-		} else {
-			statusName = "Dibatalkan"
-		}
-
 		randType := fake.IntRange(1, 100)
 		tipePesanan := "Offline"
 		var alamatId *uint = nil
@@ -83,6 +71,31 @@ func SeedPesanan() {
 			if alamatLen > 0 {
 				alID := alamats[idx%alamatLen].IdAlamat
 				alamatId = &alID
+			}
+		}
+
+		// Pilih status berdasarkan tipe pesanan
+		randStatus := fake.IntRange(1, 100)
+		var statusName string
+		if tipePesanan == "Offline" {
+			switch {
+			case randStatus <= 80:
+				statusName = "Selesai"
+			case randStatus <= 93:
+				statusName = "Dikemas"
+			default:
+				statusName = "Dibatalkan"
+			}
+		} else {
+			switch {
+			case randStatus <= 65:
+				statusName = "Selesai"
+			case randStatus <= 77:
+				statusName = "Dikirim"
+			case randStatus <= 90:
+				statusName = "Dikemas"
+			default:
+				statusName = "Dibatalkan"
 			}
 		}
 
@@ -114,7 +127,6 @@ func SeedPesanan() {
 				tipeKurir = "internal"
 			}
 		}
-
 		// Tentukan kasir
 		var kasirIdPtr *uint = nil
 		setButuhKasir := map[string]bool{
