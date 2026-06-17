@@ -86,31 +86,6 @@ func SeedPesanan() {
 			}
 		}
 
-		// Pilih status berdasarkan tipe pesanan
-		randStatus := fake.IntRange(1, 100)
-		var statusName string
-		if tipePesanan == "Offline" {
-			switch {
-			case randStatus <= 80:
-				statusName = "Selesai"
-			case randStatus <= 93:
-				statusName = "Dikemas"
-			default:
-				statusName = "Dibatalkan"
-			}
-		} else {
-			switch {
-			case randStatus <= 65:
-				statusName = "Selesai"
-			case randStatus <= 77:
-				statusName = "Dikirim"
-			case randStatus <= 90:
-				statusName = "Dikemas"
-			default:
-				statusName = "Dibatalkan"
-			}
-		}
-
 		// Tentukan tipe kurir
 		tipeKurir := "internal"
 		var ekspedisiID *uint = nil

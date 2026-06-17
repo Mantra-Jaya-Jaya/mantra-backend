@@ -604,6 +604,7 @@ func CekStatusPembayaran(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Status pembayaran berhasil dicek",
+		"is_lunas":            isLunas,
 		"data": gin.H{
 			"is_lunas":            isLunas,
 			"id_status_transaksi": pembayaran.StatusTransaksiID,
