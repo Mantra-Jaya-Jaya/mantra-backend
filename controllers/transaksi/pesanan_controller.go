@@ -86,7 +86,7 @@ func GetDaftarPesanan(c *gin.Context) {
 	case "customer":
 		query = query.Where("id_customer = (SELECT id_customer FROM customer WHERE id_user = ?)", userID)
 	case "kasir":
-		query = query.Where("id_kasir = (SELECT id_kasir FROM kasir k JOIN karyawan kw ON kw.id_karyawan = k.id_karyawan WHERE kw.id_user = ?)", userID)
+		query = query.Where("(id_kasir = (SELECT id_kasir FROM kasir k JOIN karyawan kw ON kw.id_karyawan = k.id_karyawan WHERE kw.id_user = ?) OR id_kasir IS NULL)", userID)
 	case "admin":
 	}
 
