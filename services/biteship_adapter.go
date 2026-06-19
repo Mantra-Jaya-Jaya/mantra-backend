@@ -342,6 +342,7 @@ type biteshipCreateOrderRequest struct {
 type biteshipCreateOrderResponse struct {
 	Success   bool   `json:"success"`
 	Message   string `json:"message"`
+	ID        string `json:"id"`
 	WaybillID string `json:"waybill_id"`
 	Courier   struct {
 		Company string `json:"company"`

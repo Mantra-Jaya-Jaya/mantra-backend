@@ -72,8 +72,9 @@ func processExternalShipment(pesananID uint) {
 	}
 
 	updates := map[string]interface{}{
-		"nomor_resi":        result.WaybillID,
-		"id_status_pesanan": utils.GetStatusPesananID("Dikirim"),
+		"nomor_resi":         result.WaybillID,
+		"biteship_order_id":  result.ID,
+		"id_status_pesanan":  utils.GetStatusPesananID("Dikirim"),
 	}
 	if err := config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pesananID).Updates(updates).Error; err != nil {
 		fmt.Printf("❌ Shipment Error: Gagal update status pesanan %d: %s\n", pesananID, err.Error())
