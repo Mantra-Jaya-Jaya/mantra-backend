@@ -35,6 +35,7 @@ func SetupRoutes(r *gin.Engine) {
 
 		// Public Webhook (tanpa auth)
 		v1.POST("/payment/notification", transaksi.MidtransNotificationHandler)
+		v1.POST("/webhook/biteship", transaksi.BiteshipWebhookHandler)
 
 		// Customer Routes
 		customerGroup := v1.Group("/customer")
