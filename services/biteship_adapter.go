@@ -344,6 +344,7 @@ type biteshipCreateOrderResponse struct {
 	Message   string `json:"message"`
 	ID        string `json:"id"`
 	WaybillID string `json:"waybill_id"`
+	Status    string `json:"status"`
 	Courier   struct {
 		Company string `json:"company"`
 		Name    string `json:"name"`
@@ -409,6 +410,51 @@ func (b *BiteshipAdapter) CreateShipment(req CreateShipmentRequest) (*biteshipCr
 	}
 
 	return &result, nil
+}
+
+// GetOrderStatus mengambil status order Biteship berdasarkan order ID.
+// Dipakai untuk verifikasi / polling status kalau webhook gagal.
+func (b *BiteshipAdapter) GetOrderStatus(orderID string) (*biteshipCreateOrderResponse, error) {
+	reqHttp, _ := http.NewRequest("GET", b.baseURL+fmt.Sprintf("/v1/orders/%s", orderID), nil)
+	reqHttp.Header.Set("Authorization", b.apiKey)
+
+	resp, err := b.client.Do(reqHttp)
+	if err != nil {
+		return nil, fmt.Errorf("biteship get order failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("biteship order error status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result biteshipCreateOrderResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("biteship order parse error: %w", err)
+	}
+
+	return &result, nil
+}
+
+// CancelOrder membatalkan order Biteship.
+// Dipakai jika shipment perlu dibatalkan sebelum dikirim.
+func (b *BiteshipAdapter) CancelOrder(orderID string) error {
+	reqHttp, _ := http.NewRequest("POST", b.baseURL+fmt.Sprintf("/v1/orders/%s/cancel", orderID), nil)
+	reqHttp.Header.Set("Authorization", b.apiKey)
+
+	resp, err := b.client.Do(reqHttp)
+	if err != nil {
+		return fmt.Errorf("biteship cancel order failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("biteship cancel order error status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil
 }
 
 func getMockOngkir(req OngkirRequest) []OngkirResult {

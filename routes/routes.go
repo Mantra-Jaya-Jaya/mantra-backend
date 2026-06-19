@@ -55,6 +55,8 @@ func SetupRoutes(r *gin.Engine) {
 			customerGroup.PATCH("/pesanan/:public_id/batal", transaksi.BatalkanPesanan)
 			customerGroup.GET("/pesanan/:public_id", transaksi.GetDetailPesanan)
 			customerGroup.GET("/pesanan/:public_id/lacak", transaksi.LacakPesanan)
+			customerGroup.GET("/pesanan/:public_id/status-biteship", transaksi.GetBiteshipOrderStatus)
+			customerGroup.POST("/pesanan/:public_id/cancel-shipment", transaksi.CancelBiteshipOrder)
 			customerGroup.POST("/ongkir/cek", transaksi.CekOngkir)
 			customerGroup.POST("/ongkir/cek-radius", transaksi.CekRadius)
 			customerGroup.GET("/metode-pembayaran", transaksi.GetMetodePembayaranAktif)
