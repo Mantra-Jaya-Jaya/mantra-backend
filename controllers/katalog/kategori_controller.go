@@ -3,6 +3,7 @@ package katalog
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -16,14 +17,55 @@ import (
 // Dipakai oleh: customer (GET /customer/katalog/kategori), kasir (GET /kasir/katalog/kategori), admin (GET /admin/katalog/kategori)
 // Auth: Wajib login, semua role boleh akses (dikontrol di route)
 func GetKategori(c *gin.Context) {
+	// 🚀 1. PENJINAK TOKEN (Ambil user_id dengan aman)
+	val, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "User belum login"})
+		return
+	}
+
+	var userID int64
+	switch v := val.(type) {
+	case float64:
+		userID = int64(v)
+	case int64:
+		userID = v
+	case int:
+		userID = int64(v)
+	case uint:
+		userID = int64(v)
+	default:
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Format token tidak valid"})
+		return
+	}
+
+	// 🚀 2. INTELIJEN DATABASE: Cari Role User Langsung dari Tabel Master!
+	var namaRole string
+	// Asumsi tabel user lu namanya 'user' atau 'users', sesuaikan kalau beda ya bosku!
+	errRole := config.DB.Raw("SELECT role.nama_role FROM user JOIN role ON role.id_role = user.id_role WHERE user.id_user = ?", userID).Scan(&namaRole).Error
+	
+	if errRole != nil || namaRole == "" {
+		// Fallback (Jaga-jaga kalau query gagal, kita tetep coba ambil dari token JWT)
+		namaRole = c.GetString("role")
+	}
+
 	kategori := []models.Kategori{}
 
-	query := config.DB.
-		Where("id_kategori IN (?)",
-			config.DB.Table("barang").Select("DISTINCT id_kategori"),
-		).
-		Order("id_kategori ASC")
+	// 🚀 3. BIKIN KANTONG QUERY DASAR
+	query := config.DB.Model(&models.Kategori{})
 
+	// 🚀 4. LOGIC PENGKONDISIAN (ADMIN VS RAKYAT BIASA)
+	// Kita pakai strings.ToLower biar aman misal di database lu nulisnya "Admin" atau "ADMIN"
+	if strings.ToLower(namaRole) != "admin" {
+		// Kalau dia Customer atau Kasir, cuma bisa lihat kategori yang ADA barangnya!
+		query = query.Where("id_kategori IN (?)", config.DB.Table("barang").Select("DISTINCT id_kategori"))
+	}
+	// Kalau dia Admin, kondisi di atas dilewatin aja, jadi otomatis narik SEMUA kategori!
+
+	// 5. URUTKAN DATA
+	query = query.Order("id_kategori ASC")
+
+	// 6. FILTER LIMIT JIKA ADA
 	limitStr := c.Query("limit")
 	if limitStr != "" {
 		limit, err := strconv.Atoi(limitStr)
@@ -32,6 +74,7 @@ func GetKategori(c *gin.Context) {
 		}
 	}
 
+	// 7. EKSEKUSI QUERY
 	if err := query.Find(&kategori).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -40,6 +83,7 @@ func GetKategori(c *gin.Context) {
 		return
 	}
 
+	// 8. BUNGKUS DAN KIRIM!
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Berhasil mengambil daftar kategori",
