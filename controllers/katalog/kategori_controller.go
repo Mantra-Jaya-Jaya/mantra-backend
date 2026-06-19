@@ -3,7 +3,6 @@ package katalog
 import (
 	"net/http"
 	"strconv"
-	"strings"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -51,21 +50,17 @@ func GetKategori(c *gin.Context) {
 
 	kategori := []models.Kategori{}
 
-	// 🚀 3. BIKIN KANTONG QUERY DASAR
-	query := config.DB.Model(&models.Kategori{})
+	query := config.DB.
+		Order("id_kategori ASC")
 
-	// 🚀 4. LOGIC PENGKONDISIAN (ADMIN VS RAKYAT BIASA)
-	// Kita pakai strings.ToLower biar aman misal di database lu nulisnya "Admin" atau "ADMIN"
-	if strings.ToLower(namaRole) != "admin" {
-		// Kalau dia Customer atau Kasir, cuma bisa lihat kategori yang ADA barangnya!
-		query = query.Where("id_kategori IN (?)", config.DB.Table("barang").Select("DISTINCT id_kategori"))
+	// Admin lihat semua kategori; customer/kasir lihat hanya yang punya barang
+	role, _ := c.Get("role")
+	if roleStr, ok := role.(string); !ok || roleStr != "Admin" {
+		query = query.Where("id_kategori IN (?)",
+			config.DB.Table("barang").Select("DISTINCT id_kategori"),
+		)
 	}
-	// Kalau dia Admin, kondisi di atas dilewatin aja, jadi otomatis narik SEMUA kategori!
 
-	// 5. URUTKAN DATA
-	query = query.Order("id_kategori ASC")
-
-	// 6. FILTER LIMIT JIKA ADA
 	limitStr := c.Query("limit")
 	if limitStr != "" {
 		limit, err := strconv.Atoi(limitStr)

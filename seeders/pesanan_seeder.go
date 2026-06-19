@@ -62,18 +62,6 @@ func SeedPesanan() {
 	alamatLen := len(alamats)
 
 	for idx, tglPesanan := range datesToGenerate {
-		randStatus := fake.IntRange(1, 100)
-		var statusName string
-		if randStatus <= 70 {
-			statusName = "Selesai"
-		} else if randStatus <= 80 {
-			statusName = "Dikirim"
-		} else if randStatus <= 90 {
-			statusName = "Dikemas"
-		} else {
-			statusName = "Dibatalkan"
-		}
-
 		randType := fake.IntRange(1, 100)
 		tipePesanan := "Offline"
 		var alamatId *uint = nil
@@ -83,6 +71,31 @@ func SeedPesanan() {
 			if alamatLen > 0 {
 				alID := alamats[idx%alamatLen].IdAlamat
 				alamatId = &alID
+			}
+		}
+
+		// Pilih status berdasarkan tipe pesanan
+		randStatus := fake.IntRange(1, 100)
+		var statusName string
+		if tipePesanan == "Offline" {
+			switch {
+			case randStatus <= 80:
+				statusName = "Selesai"
+			case randStatus <= 93:
+				statusName = "Dikemas"
+			default:
+				statusName = "Dibatalkan"
+			}
+		} else {
+			switch {
+			case randStatus <= 65:
+				statusName = "Selesai"
+			case randStatus <= 77:
+				statusName = "Dikirim"
+			case randStatus <= 90:
+				statusName = "Dikemas"
+			default:
+				statusName = "Dibatalkan"
 			}
 		}
 
@@ -107,14 +120,13 @@ func SeedPesanan() {
 				}
 				// External yang Dikirim/Selesai set nomor resi
 				if statusName == "Dikirim" || statusName == "Selesai" {
-				nr := fmt.Sprintf("%s-%d-%d", ekspedisi.KodeApi, fake.IntRange(100000, 999999), fake.IntRange(1000, 9999))
+					nr := fmt.Sprintf("%s-%d-%d", ekspedisi.KodeApi, fake.IntRange(100000, 999999), fake.IntRange(1000, 9999))
 					nomorResi = &nr
 				}
 			} else {
 				tipeKurir = "internal"
 			}
 		}
-
 		// Tentukan kasir
 		var kasirIdPtr *uint = nil
 		setButuhKasir := map[string]bool{
@@ -132,18 +144,18 @@ func SeedPesanan() {
 		totalPembayaran := fake.IntRange(50000, 5000000)
 
 		pesanan := models.Pesanan{
-			TotalPembayaran: totalPembayaran,
-			TanggalPesanan:  tglPesanan,
-			TipePesananID:   utils.GetTipePesananID(tipePesanan),
-			StatusPesananID: utils.GetStatusPesananID(statusName),
-			TipeKurirID:     utils.GetTipeKurirID(tipeKurir),
-			CustomerID:      cId,
-			KasirID:         kasirIdPtr,
-			AlamatID:        alamatId,
-			EkspedisiID:     ekspedisiID,
+			TotalPembayaran:    totalPembayaran,
+			TanggalPesanan:     tglPesanan,
+			TipePesananID:      utils.GetTipePesananID(tipePesanan),
+			StatusPesananID:    utils.GetStatusPesananID(statusName),
+			TipeKurirID:        utils.GetTipeKurirID(tipeKurir),
+			CustomerID:         cId,
+			KasirID:            kasirIdPtr,
+			AlamatID:           alamatId,
+			EkspedisiID:        ekspedisiID,
 			LayananEkspedisiID: layananEkspedisiID,
-			OngkosKirim:     ongkir,
-			NomorResi:       nomorResi,
+			OngkosKirim:        ongkir,
+			NomorResi:          nomorResi,
 		}
 
 		if err := config.DB.Create(&pesanan).Error; err == nil {

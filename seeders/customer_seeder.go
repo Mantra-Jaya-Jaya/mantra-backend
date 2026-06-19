@@ -70,7 +70,8 @@ func SeedCustomer() {
 		}
 		totalCustomer++
 
-		// Hapus alamat lama (dari seed sebelumnya), biar bisa di-create ulang
+		// Lepas FK dulu, baru hapus alamat lama biar bisa di-create ulang
+		config.DB.Exec("UPDATE pesanan SET id_alamat = NULL WHERE id_customer = ?", customerProfil.IdCustomer)
 		config.DB.Where("id_customer = ?", customerProfil.IdCustomer).Delete(&models.Alamat{})
 
 		numAlamat := 1

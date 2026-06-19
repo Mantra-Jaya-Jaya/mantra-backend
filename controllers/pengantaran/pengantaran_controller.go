@@ -71,7 +71,7 @@ func GetDaftarPengantaran(c *gin.Context) {
 		query = query.Where("id_status_pengantaran = ?", selesaiID)
 	}
 
-	query = query.Order("created_at DESC")
+	query = query.Order("id_pengantaran DESC")
 
 	// 🚀 4. EKSEKUSI QUERY
 	if err := query.Find(&pengantarans).Error; err != nil {
@@ -171,6 +171,15 @@ func UpdateLokasiKurir(c *gin.Context) {
 			"status":  "error",
 			"message": "Format inputan salah, pastikan latitude dan longitude diisi dengan benar",
 		})
+		return
+	}
+
+	if input.Latitude < -90 || input.Latitude > 90 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Latitude harus antara -90 dan 90"})
+		return
+	}
+	if input.Longitude < -180 || input.Longitude > 180 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Longitude harus antara -180 dan 180"})
 		return
 	}
 
@@ -284,7 +293,7 @@ func GetLaporanHariIni(c *gin.Context) {
 		// Asumsi ID tipe Online itu 1 atau 2 (kalau Utils-nya belum support tipe pesanan safe)
 		// Kalau temen lu belum bikin GetTipePesananIDSafe, tembak manual ke relasi string:
 		config.DB.Model(&models.Pesanan{}).
-			Joins("JOIN tipe_pesanan ON pesanan.id_tipe_pesanan = tipe_pesanan.id_tipe_pesanan").
+			Joins("JOIN tipe_pesanan ON pesanan.id_tipe_pesanan = tipe_pesanan.id").
 			Where("tipe_pesanan.nama_tipe = ?", "Online").
 			Where("id_status_pesanan = ?", statusDikemasID).
 			Count(&pesananBaruCount)
@@ -524,23 +533,29 @@ func UploadBuktiPengiriman(c *gin.Context) {
 		return
 	}
 
-	// 🚀 4. UPDATE DATA DI DATABASE (TABEL PENGANTARAN)
+	// 🚀 4. CEK ID STATUS DARI DATABASE (Versi Safe!)
+	selesaiPengID := utils.GetStatusPengantaranIDSafe("Selesai")
+	selesaiPesananID := utils.GetStatusPesananIDSafe("Selesai")
+	if selesaiPengID == 0 || selesaiPesananID == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Setup status Selesai di database belum lengkap"})
+		return
+	}
+
 	waktuSekarang := time.Now()
 
-	pengantaran.FotoBuktiPengiriman = fileUrl // Simpan URL dari MinIO
-	pengantaran.StatusPengantaranID = utils.GetStatusPengantaranID("Selesai")
-	pengantaran.WaktuSampai = &waktuSekarang // Catat waktu selesai realtime
+	pengantaran.FotoBuktiPengiriman = fileUrl
+	pengantaran.StatusPengantaranID = selesaiPengID
+	pengantaran.WaktuSampai = &waktuSekarang
 
 	if err := config.DB.Save(&pengantaran).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gambar berhasil diupload, tapi gagal update database"})
 		return
 	}
 
-	// 🚀 5. UPDATE STATUS DI TABEL PESANAN (Biar sinkron!)
 	if pengantaran.Pesanan != nil {
 		config.DB.Model(&models.Pesanan{}).
 			Where("id_pesanan = ?", pengantaran.PesananID).
-			Update("id_status_pesanan", utils.GetStatusPesananID("Selesai"))
+			Update("id_status_pesanan", selesaiPesananID)
 	}
 
 	var listBarang []gin.H
@@ -634,8 +649,8 @@ func AmbilPesanan(c *gin.Context) {
 		return
 	}
 
-	// 🚀 5. VALIDASI STATUS: Kurir cuma bisa ambil kalau statusnya "Dikemas"
-	if pesanan.StatusPesanan == nil || pesanan.StatusPesanan.NamaStatus != "Dikemas" {
+	// 🚀 5. VALIDASI STATUS: Kurir cuma bisa ambil kalau statusnya "Dikemas" atau "Dikirim"
+	if pesanan.StatusPesanan == nil || (pesanan.StatusPesanan.NamaStatus != "Dikemas" && pesanan.StatusPesanan.NamaStatus != "Dikirim") {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
 			"message": "Pesanan tidak dapat diambil karena statusnya belum selesai dikemas",

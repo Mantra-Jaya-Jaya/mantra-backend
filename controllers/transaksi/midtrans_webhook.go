@@ -189,4 +189,3 @@ func parseGrossAmount(amount string, result *int) error {
 	*result = int(math.Round(val))
 	return nil
 }
-
