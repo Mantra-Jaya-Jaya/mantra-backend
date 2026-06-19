@@ -711,6 +711,17 @@ func CheckoutPesanan(c *gin.Context) {
 		}
 	}()
 
+	// Notifikasi ke customer bahwa pesanan berhasil dibuat
+	go func() {
+		notif := models.Notifikasi{
+			UserID:             userID,
+			Judul:              "Pesanan Dibuat",
+			Pesan:              "Pesanan Anda berhasil dibuat dan sedang diproses.",
+			StatusNotifikasiID: utils.GetStatusNotifikasiID("unread"),
+		}
+		config.DB.Create(&notif)
+	}()
+
 	c.JSON(http.StatusCreated, gin.H{
 		"status":  "success",
 		"message": "Pesanan berhasil dibuat",
@@ -805,6 +816,17 @@ func BatalkanPesanan(c *gin.Context) {
 		})
 		return
 	}
+
+	// Notifikasi ke customer bahwa pesanan dibatalkan
+	go func() {
+		notif := models.Notifikasi{
+			UserID:             userID,
+			Judul:              "Pesanan Dibatalkan",
+			Pesan:              "Pesanan Anda telah dibatalkan.",
+			StatusNotifikasiID: utils.GetStatusNotifikasiID("unread"),
+		}
+		config.DB.Create(&notif)
+	}()
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -1420,6 +1442,21 @@ func KirimPesanan(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengirim pesanan"})
 		return
 	}
+
+	// Notifikasi ke customer bahwa pesanan telah dikirim
+	go func() {
+		var p models.Pesanan
+		config.DB.Preload("Customer.User").Where("id_pesanan = ?", pesanan.IdPesanan).First(&p)
+		if p.Customer.User.IdUser != 0 {
+			notif := models.Notifikasi{
+				UserID:             p.Customer.User.IdUser,
+				Judul:              "Pesanan Dikirim",
+				Pesan:              "Pesanan Anda telah dikirim dengan nomor resi: " + input.NomorResi,
+				StatusNotifikasiID: utils.GetStatusNotifikasiID("unread"),
+			}
+			config.DB.Create(&notif)
+		}
+	}()
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",

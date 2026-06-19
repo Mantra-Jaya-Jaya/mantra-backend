@@ -858,6 +858,23 @@ func UpdateStatusPengantaran(c *gin.Context) {
 	// 🚀 9. BUNGKUS TRANSAKSINYA
 	tx.Commit()
 
+	// Notifikasi ke customer jika pengantaran selesai
+	if statusInput == "Selesai" {
+		go func() {
+			var p models.Pesanan
+			config.DB.Preload("Customer.User").Where("id_pesanan = ?", pengantaran.PesananID).First(&p)
+			if p.Customer.User.IdUser != 0 {
+				notif := models.Notifikasi{
+					UserID:             p.Customer.User.IdUser,
+					Judul:              "Pesanan Selesai",
+					Pesan:              "Pesanan Anda telah selesai. Terima kasih telah berbelanja!",
+					StatusNotifikasiID: utils.GetStatusNotifikasiID("unread"),
+				}
+				config.DB.Create(&notif)
+			}
+		}()
+	}
+
 	// Ambil foto kalau tadi berhasil ke-upload buat dimunculin di response
 	fotoOutput := ""
 	if val, ok := updatePengantaran["foto_bukti_pengiriman"]; ok {

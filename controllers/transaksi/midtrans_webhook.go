@@ -131,6 +131,23 @@ func MidtransNotificationHandler(c *gin.Context) {
 	// 🚀 6. PANGGIL FUNGSI SAVE DETAIL BUAT INVOICE LUUU!!!
 	savePaymentDetails(&pembayaran, &notif)
 
+	// 🚀 7. NOTIFIKASI KE CUSTOMER BAHWA PEMBAYARAN BERHASIL
+	if isLunas {
+		go func() {
+			var pesanan models.Pesanan
+			config.DB.Preload("Customer.User").Where("id_pesanan = ?", pembayaran.PesananID).First(&pesanan)
+			if pesanan.Customer.User.IdUser != 0 {
+				notif := models.Notifikasi{
+					UserID:             pesanan.Customer.User.IdUser,
+					Judul:              "Pembayaran Berhasil",
+					Pesan:              "Pembayaran Anda telah diterima. Pesanan sedang dikemas.",
+					StatusNotifikasiID: utils.GetStatusNotifikasiID("unread"),
+				}
+				config.DB.Create(&notif)
+			}
+		}()
+	}
+
 	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Notifikasi diproses"})
 }
 
