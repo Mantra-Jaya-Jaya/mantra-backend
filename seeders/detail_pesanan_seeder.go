@@ -24,10 +24,18 @@ func SeedDetailPesanan() {
 	}
 
 	totalDetailDibuat := 0
+	var detailList []models.DetailPesanan
+
+	// Pre-fetch which pesanan already have details
+	var existingPesananIDs []uint
+	config.DB.Model(&models.DetailPesanan{}).Distinct("id_pesanan").Pluck("id_pesanan", &existingPesananIDs)
+	existingMap := make(map[uint]bool)
+	for _, id := range existingPesananIDs {
+		existingMap[id] = true
+	}
+
 	for _, pesanan := range daftarPesanan {
-		var count int64
-		config.DB.Model(&models.DetailPesanan{}).Where("id_pesanan = ?", pesanan.IdPesanan).Count(&count)
-		if count > 0 {
+		if existingMap[pesanan.IdPesanan] {
 			continue // Lewati jika pesanan sudah memiliki detail
 		}
 
@@ -47,14 +55,19 @@ func SeedDetailPesanan() {
 				PesananID:           pesanan.IdPesanan,
 				SpesifikasiBarangID: varian.IdSpesifikasiBarang,
 			}
-
-			if err := config.DB.Where("id_pesanan = ? AND id_spesifikasi_barang = ?", detail.PesananID, detail.SpesifikasiBarangID).FirstOrCreate(&detail).Error; err == nil {
-				totalDetailDibuat++
-			}
+			detailList = append(detailList, detail)
 		}
 
 		// Update total_pembayaran pesanan dari akumulasi subtotal
-		config.DB.Model(&pesanan).Update("total_pembayaran", subtotalPesanan)
+		config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pesanan.IdPesanan).Update("total_pembayaran", subtotalPesanan)
+	}
+
+	if len(detailList) > 0 {
+		if err := config.DB.CreateInBatches(detailList, 100).Error; err == nil {
+			totalDetailDibuat = len(detailList)
+		} else {
+			fmt.Println("Error batch insert detail pesanan:", err)
+		}
 	}
 
 	fmt.Printf("Yeyy, Berhasil seed %d detail pesanan!\n", totalDetailDibuat)

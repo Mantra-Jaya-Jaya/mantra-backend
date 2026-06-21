@@ -1,0 +1,26 @@
+meta {
+  name: Track Shipment
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customer/pesanan/{{customerPublicId}}/lacak
+  body: none
+  auth: bearer
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const tipe = res.body?.data?.tipe_ekspedisi || "unknown";
+  const resi = res.body?.data?.nomor_resi || "";
+  bru.log(`Tipe ekspedisi: ${tipe}`);
+  bru.log(`Resi: ${resi}`);
+}

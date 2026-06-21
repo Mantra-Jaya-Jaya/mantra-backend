@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"backend-mantra/config"
+	"backend-mantra/controllers/auth"
 	"backend-mantra/models"
 	"backend-mantra/services"
 	"backend-mantra/utils"
@@ -15,23 +16,37 @@ import (
 // Route: GET /api/v1/customer/pesanan/:public_id/status-biteship
 func GetBiteshipOrderStatus(c *gin.Context) {
 	publicID := c.Param("public_id")
-	userID := c.GetInt64("user_id")
+	role := auth.NormalizeRoleName(c.GetString("role"))
 
-	var pesanan models.Pesanan
-	if err := config.DB.Preload("Ekspedisi").Where("public_id = ?", publicID).First(&pesanan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pesanan tidak ditemukan"})
-		return
-	}
+	if role != "admin" {
+		userIDInterface, exists := c.Get("user_id")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"status":  "error",
+				"message": "User ID tidak ditemukan di session/token",
+			})
+			return
+		}
 
-	// Ownership check: customer hanya bisa akses pesanan miliknya sendiri
-	if pesanan.CustomerID != uint(userID) {
-		var count int64
-		config.DB.Raw(`
-			SELECT COUNT(*) FROM pesanan p
-			JOIN customer c ON c.id_customer = p.id_customer
-			WHERE p.public_id = ? AND c.id_user = ?
-		`, publicID, userID).Scan(&count)
-		if count == 0 {
+		userIDInt64, ok := userIDInterface.(int64)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Terjadi kesalahan sistem: tipe data User ID tidak valid",
+			})
+			return
+		}
+
+		owned, err := isCustomerPesananOwner(publicID, uint(userIDInt64))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Gagal memverifikasi kepemilikan pesanan",
+			})
+			return
+		}
+
+		if !owned {
 			c.JSON(http.StatusForbidden, gin.H{
 				"status":  "error",
 				"message": "Anda tidak memiliki akses ke resource ini",
@@ -44,6 +59,12 @@ func GetBiteshipOrderStatus(c *gin.Context) {
 		}
 	}
 
+	var pesanan models.Pesanan
+	if err := config.DB.Preload("Ekspedisi").Where("public_id = ?", publicID).First(&pesanan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pesanan tidak ditemukan"})
+		return
+	}
+
 	// Hanya berlaku untuk pesanan eksternal
 	if pesanan.BiteshipOrderID == nil || *pesanan.BiteshipOrderID == "" {
 		if pesanan.TipeKurirID != utils.GetTipeKurirID("external") {
@@ -54,10 +75,10 @@ func GetBiteshipOrderStatus(c *gin.Context) {
 			"status":  "success",
 			"message": "Order Biteship belum dibuat atau waybill belum terbit",
 			"data": gin.H{
-				"order_id":    nil,
-				"waybill_id":  pesanan.NomorResi,
-				"status":      "pending",
-				"ekspedisi":   "",
+				"order_id":   nil,
+				"waybill_id": pesanan.NomorResi,
+				"status":     "pending",
+				"ekspedisi":  "",
 			},
 		})
 		return
@@ -82,47 +103,25 @@ func GetBiteshipOrderStatus(c *gin.Context) {
 		"status":  "success",
 		"message": "Status order berhasil diambil",
 		"data": gin.H{
-			"order_id":    order.ID,
-			"waybill_id":  order.WaybillID,
-			"status":      order.Status,
-			"ekspedisi":   namaEkspedisi,
-			"courier":     order.Courier,
-			"nomor_resi":  pesanan.NomorResi,
+			"order_id":   order.ID,
+			"waybill_id": order.WaybillID,
+			"status":     order.Status,
+			"ekspedisi":  namaEkspedisi,
+			"courier":    order.Courier,
+			"nomor_resi": pesanan.NomorResi,
 		},
 	})
 }
 
-// CancelBiteshipOrder membatalkan order Biteship untuk pesanan customer.
-// Route: POST /api/v1/customer/pesanan/:public_id/cancel-shipment
+// CancelBiteshipOrder membatalkan order Biteship (hanya untuk admin).
+// Route: POST /api/v1/admin/pesanan/:public_id/cancel-shipment
 func CancelBiteshipOrder(c *gin.Context) {
 	publicID := c.Param("public_id")
-	userID := c.GetInt64("user_id")
 
 	var pesanan models.Pesanan
 	if err := config.DB.Preload("Ekspedisi").Where("public_id = ?", publicID).First(&pesanan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pesanan tidak ditemukan"})
 		return
-	}
-
-	// Ownership check
-	if pesanan.CustomerID != uint(userID) {
-		var count int64
-		config.DB.Raw(`
-			SELECT COUNT(*) FROM pesanan p
-			JOIN customer c ON c.id_customer = p.id_customer
-			WHERE p.public_id = ? AND c.id_user = ?
-		`, publicID, userID).Scan(&count)
-		if count == 0 {
-			c.JSON(http.StatusForbidden, gin.H{
-				"status":  "error",
-				"message": "Anda tidak memiliki akses ke resource ini",
-				"error": gin.H{
-					"code":   "AUTH_002",
-					"detail": "Pesanan ini bukan milik Anda",
-				},
-			})
-			return
-		}
 	}
 
 	// Validasi tipe pesanan
@@ -160,7 +159,7 @@ func CancelBiteshipOrder(c *gin.Context) {
 	// Update status pesanan jadi Dibatalkan
 	dibatalkanID := utils.GetStatusPesananIDSafe("Dibatalkan")
 	if dibatalkanID > 0 {
-		config.DB.Model(&pesanan).Updates(map[string]interface{}{
+		config.DB.Model(&pesanan).Updates(map[string]any{
 			"id_status_pesanan": dibatalkanID,
 		})
 	}

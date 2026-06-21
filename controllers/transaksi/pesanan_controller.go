@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"backend-mantra/config"
+	"backend-mantra/controllers/auth"
 	"backend-mantra/models"
 	"backend-mantra/services"
 	"backend-mantra/utils"
@@ -19,6 +20,19 @@ import (
 	"github.com/midtrans/midtrans-go/coreapi"
 	"github.com/midtrans/midtrans-go/snap"
 )
+
+func isCustomerPesananOwner(publicID string, userID uint) (bool, error) {
+	var count int64
+	if err := config.DB.Raw(`
+		SELECT COUNT(*) FROM pesanan p
+		JOIN customer c ON c.id_customer = p.id_customer
+		WHERE p.public_id = ? AND c.id_user = ?
+	`, publicID, userID).Scan(&count).Error; err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
 
 // GetDaftarPesanan mengambil daftar pesanan.
 // Customer: hanya pesanan milik sendiri.
@@ -33,7 +47,7 @@ func GetDaftarPesanan(c *gin.Context) {
 	limit, _ := strconv.Atoi(limitStr)
 	offset := (page - 1) * limit
 
-	role := c.GetString("role")
+	role := auth.NormalizeRoleName(c.GetString("role"))
 	statusFilter := c.Query("status") // Ambil filter status dari query param
 
 	// 1. Ambil data dari context dengan aman
@@ -181,7 +195,7 @@ func GetDaftarPesanan(c *gin.Context) {
 // Auth: Wajib login
 func GetDetailPesanan(c *gin.Context) {
 	idPesanan := c.Param("public_id")
-	role := c.GetString("role")
+	role := auth.NormalizeRoleName(c.GetString("role"))
 	// 1. Ambil data dari context dengan aman
 	userIDInterface, exists := c.Get("user_id")
 	if !exists {
@@ -210,14 +224,16 @@ func GetDetailPesanan(c *gin.Context) {
 
 	if role == "customer" {
 		// Ownership check: pesanan harus milik customer yang login
-		var count int64
-		config.DB.Raw(`
-			SELECT COUNT(*) FROM pesanan p
-			JOIN customer c ON c.id_customer = p.id_customer
-			WHERE p.public_id = ? AND c.id_user = ?
-		`, idPesanan, userID).Scan(&count)
+		owned, err := isCustomerPesananOwner(idPesanan, uint(userID))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Gagal memverifikasi kepemilikan pesanan",
+			})
+			return
+		}
 
-		if count == 0 {
+		if !owned {
 			// Selalu 403, bukan 404 — jangan bocorkan bahwa ID ada
 			c.JSON(http.StatusForbidden, gin.H{
 				"status":  "error",
@@ -491,7 +507,7 @@ func CheckoutPesanan(c *gin.Context) {
 	// Tentukan status awal pesanan berdasarkan metode pembayaran
 	metodeInput := strings.ToLower(input.MetodePembayaran)
 	var initialStatusID uint
-	if metodeInput == "tunai" || metodeInput == "cash" {
+	if metodeInput == "tunai" || metodeInput == "cash" || metodeInput == "cod" {
 		initialStatusID = utils.GetStatusPesananID("Dikemas")
 	} else {
 		initialStatusID = utils.GetStatusPesananID("Menunggu Pembayaran")
@@ -559,7 +575,7 @@ func CheckoutPesanan(c *gin.Context) {
 		cleanMetode = strings.Replace(metodeInput, "va_", "", 1)
 	}
 
-	if metodeInput != "tunai" && metodeInput != "cash" {
+	if metodeInput != "tunai" && metodeInput != "cash" && metodeInput != "cod" {
 		// Cari ID Metode Pembayaran dari database
 		kodeMetodeDb := "qris" // Default ke QRIS
 		if cleanMetode == "bca" || cleanMetode == "bni" || cleanMetode == "bri" || cleanMetode == "mandiri" || cleanMetode == "permata" {
@@ -684,11 +700,53 @@ func CheckoutPesanan(c *gin.Context) {
 		}
 	}
 
+	if metodeInput == "cod" {
+		var metodeDb models.MetodePembayaran
+		if err := tx.Where("kode_metode = ?", "cod").First(&metodeDb).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Metode COD belum disetup",
+			})
+			return
+		}
+
+		pembayaran := models.Pembayaran{
+			PesananID:          pesanan.IdPesanan,
+			TipePembayaranID:   utils.GetTipePembayaranID("cash"),
+			StatusTransaksiID:  utils.GetStatusTransaksiID("pending"),
+			FraudStatusID:      utils.GetFraudStatusID("accept"),
+			MetodePembayaranID: &metodeDb.IdMetodePembayaran,
+			TotalDibayar:       pesanan.TotalPembayaran,
+		}
+		if err := tx.Create(&pembayaran).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Gagal membuat record pembayaran COD",
+			})
+			return
+		}
+
+		detailPembayaran := models.DetailPembayaran{
+			PembayaranID:    pembayaran.IdPembayaran,
+			KanalPembayaran: "cod",
+		}
+		if err := tx.Create(&detailPembayaran).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Gagal menyimpan detail pembayaran COD",
+			})
+			return
+		}
+	}
+
 	tx.Commit()
 
-	// 🚚 TRIGGER SHIPMENT UNTUK EXTERNAL + CASH (BUG FIX)
+	// 🚚 TRIGGER SHIPMENT UNTUK EXTERNAL + CASH + COD (BUG FIX)
 	isExternal := pesanan.TipeKurirID == utils.GetTipeKurirID("external")
-	isCash := metodeInput == "tunai" || metodeInput == "cash"
+	isCash := metodeInput == "tunai" || metodeInput == "cash" || metodeInput == "cod"
 	if isExternal && isCash {
 		go processExternalShipment(pesanan.IdPesanan)
 	}
@@ -696,7 +754,7 @@ func CheckoutPesanan(c *gin.Context) {
 	// Notifikasi ke semua kasir bahwa ada pesanan online baru
 	go func() {
 		var kasirUsers []models.User
-		config.DB.Joins("JOIN role ON role.id_role = users.id_role").
+		config.DB.Joins("JOIN role ON role.id_role = \"user\".id_role").
 			Where("role.nama_role = ?", "Kasir").
 			Find(&kasirUsers)
 
@@ -767,14 +825,16 @@ func BatalkanPesanan(c *gin.Context) {
 	userID := uint(userIDInt64)
 
 	// Ownership check
-	var count int64
-	config.DB.Raw(`
-		SELECT COUNT(*) FROM pesanan p
-		JOIN customer c ON c.id_customer = p.id_customer
-		WHERE p.public_id = ? AND c.id_user = ?
-	`, idPesanan, userID).Scan(&count)
+	owned, err := isCustomerPesananOwner(idPesanan, uint(userID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal memverifikasi kepemilikan pesanan",
+		})
+		return
+	}
 
-	if count == 0 {
+	if !owned {
 		c.JSON(http.StatusForbidden, gin.H{
 			"status":  "error",
 			"message": "Anda tidak memiliki akses ke resource ini",
@@ -842,14 +902,16 @@ func LacakPesanan(c *gin.Context) {
 	userID := c.GetInt64("user_id")
 
 	// Ownership check
-	var count int64
-	config.DB.Raw(`
-		SELECT COUNT(*) FROM pesanan p
-		JOIN customer c ON c.id_customer = p.id_customer
-		WHERE p.public_id = ? AND c.id_user = ?
-	`, idPesanan, userID).Scan(&count)
+	owned, err := isCustomerPesananOwner(idPesanan, uint(userID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal memverifikasi kepemilikan pesanan",
+		})
+		return
+	}
 
-	if count == 0 {
+	if !owned {
 		c.JSON(http.StatusForbidden, gin.H{
 			"status":  "error",
 			"message": "Anda tidak memiliki akses ke resource ini",
@@ -1052,7 +1114,7 @@ func GetDashboardKasir(c *gin.Context) {
 
 	var aktivitasRaw []AktivitasResult
 	config.DB.Table("pesanan").
-		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(tipe_pembayaran.nama_tipe, 'tunai') as raw_payment_type").
+		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(tipe_pembayaran.nama_tipe, '-') as raw_payment_type").
 		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
 		Joins("LEFT JOIN tipe_pembayaran ON tipe_pembayaran.id = pembayaran.id_tipe_pembayaran").
 		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ? AND pesanan.id_kasir = ?", startOfDay, endOfDay, kasir.IdKasir).
@@ -1111,7 +1173,7 @@ func GetSemuaAktivitasHariIni(c *gin.Context) {
 
 	var aktivitasRaw []AktivitasResult
 	config.DB.Table("pesanan").
-		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(tipe_pembayaran.nama_tipe, 'tunai') as raw_payment_type").
+		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(tipe_pembayaran.nama_tipe, '-') as raw_payment_type").
 		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
 		Joins("LEFT JOIN tipe_pembayaran ON tipe_pembayaran.id = pembayaran.id_tipe_pembayaran").
 		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
@@ -1365,7 +1427,7 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 
 	var pembayaran models.Pembayaran
 	config.DB.Where("id_pesanan = ?", pesanan.IdPesanan).Preload("TipePembayaranRel").First(&pembayaran)
-	metodePembayaran := "tunai"
+	metodePembayaran := "-"
 	if pembayaran.TipePembayaranRel != nil {
 		metodePembayaran = pembayaran.TipePembayaranRel.NamaTipe
 	}

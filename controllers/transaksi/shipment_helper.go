@@ -1,6 +1,8 @@
 package transaksi
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"os"
 
@@ -11,6 +13,24 @@ import (
 )
 
 func processExternalShipment(pesananID uint) {
+	session, err := shipmentProcessingConn()
+	if err != nil {
+		fmt.Printf("❌ Shipment Error: Gagal menyiapkan lock untuk pesanan %d: %s\n", pesananID, err.Error())
+		return
+	}
+	defer session.Close()
+
+	locked, err := tryLockShipmentProcessing(session, pesananID)
+	if err != nil {
+		fmt.Printf("❌ Shipment Error: Gagal mengamankan proses pesanan %d: %s\n", pesananID, err.Error())
+		return
+	}
+	if !locked {
+		fmt.Printf("ℹ️ Shipment: Pesanan %d sedang diproses oleh worker lain, skip duplikat\n", pesananID)
+		return
+	}
+	defer releaseShipmentProcessingLock(session, pesananID)
+
 	var pesanan models.Pesanan
 	if err := config.DB.
 		Preload("TipeKurir").
@@ -38,9 +58,16 @@ func processExternalShipment(pesananID uint) {
 		fmt.Printf("ℹ️ Shipment: Pesanan %d sudah punya resi, skip\n", pesananID)
 		return
 	}
+	if pesanan.BiteshipOrderID != nil && *pesanan.BiteshipOrderID != "" {
+		fmt.Printf("ℹ️ Shipment: Pesanan %d sudah punya biteship order, skip\n", pesananID)
+		return
+	}
 
 	var items []services.CreateShipmentItem
 	for _, d := range pesanan.DetailPesanan {
+		if d.SpesifikasiBarang.Barang.IdBarang == 0 {
+			continue
+		}
 		items = append(items, services.CreateShipmentItem{
 			Name:     d.SpesifikasiBarang.Barang.NamaBarang,
 			Weight:   d.SpesifikasiBarang.BeratBarang,
@@ -52,29 +79,34 @@ func processExternalShipment(pesananID uint) {
 		})
 	}
 
+	if len(items) == 0 {
+		fmt.Printf("❌ Shipment Error: Pesanan %d tidak memiliki detail barang valid untuk shipment\n", pesananID)
+		return
+	}
+
 	adapter := services.NewBiteshipAdapter()
 	result, err := adapter.CreateShipment(services.CreateShipmentRequest{
-		OriginAddress:        os.Getenv("BITESHIP_STORE_ADDRESS"),
-		OriginCoordinate:     os.Getenv("BITESHIP_STORE_COORDINATE_LAT") + "," + os.Getenv("BITESHIP_STORE_COORDINATE_LONG"),
-		DestinationAddress:   pesanan.Alamat.AlamatLengkap,
+		OriginAddress:         os.Getenv("BITESHIP_STORE_ADDRESS"),
+		OriginCoordinate:      os.Getenv("BITESHIP_STORE_COORDINATE_LAT") + "," + os.Getenv("BITESHIP_STORE_COORDINATE_LONG"),
+		DestinationAddress:    pesanan.Alamat.AlamatLengkap,
 		DestinationCoordinate: fmt.Sprintf("%f,%f", pesanan.Alamat.Latitude, pesanan.Alamat.Longitude),
-		CourierCode:          pesanan.Ekspedisi.KodeApi,
-		CourierServiceCode:   pesanan.LayananEkspedisi.NamaLayanan,
-		Items:                items,
+		CourierCode:           pesanan.Ekspedisi.KodeApi,
+		CourierServiceCode:    pesanan.LayananEkspedisi.NamaLayanan,
+		Items:                 items,
 	})
 	if err != nil {
 		fmt.Printf("❌ Shipment Error: Gagal create shipment pesanan %d: %s\n", pesananID, err.Error())
 		return
 	}
-	if result == nil || result.WaybillID == "" {
-		fmt.Printf("❌ Shipment Error: Response kosong untuk pesanan %d\n", pesananID)
+	if result == nil || result.WaybillID == "" || result.ID == "" {
+		fmt.Printf("❌ Shipment Error: Response shipment tidak lengkap untuk pesanan %d\n", pesananID)
 		return
 	}
 
-	updates := map[string]interface{}{
-		"nomor_resi":         result.WaybillID,
-		"biteship_order_id":  result.ID,
-		"id_status_pesanan":  utils.GetStatusPesananID("Dikirim"),
+	updates := map[string]any{
+		"nomor_resi":        result.WaybillID,
+		"biteship_order_id": result.ID,
+		"id_status_pesanan": utils.GetStatusPesananID("Dikirim"),
 	}
 	if err := config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pesananID).Updates(updates).Error; err != nil {
 		fmt.Printf("❌ Shipment Error: Gagal update status pesanan %d: %s\n", pesananID, err.Error())
@@ -82,4 +114,27 @@ func processExternalShipment(pesananID uint) {
 	}
 
 	fmt.Printf("✅ Shipment Success: Pesanan %d → waybill %s → status Dikirim\n", pesananID, result.WaybillID)
+}
+
+func shipmentProcessingConn() (*sql.Conn, error) {
+	db, err := config.DB.DB()
+	if err != nil {
+		return nil, err
+	}
+
+	return db.Conn(context.Background())
+}
+
+func tryLockShipmentProcessing(conn *sql.Conn, pesananID uint) (bool, error) {
+	var locked bool
+	if err := conn.QueryRowContext(context.Background(), "SELECT pg_try_advisory_lock($1)", int64(pesananID)).Scan(&locked); err != nil {
+		return false, err
+	}
+	return locked, nil
+}
+
+func releaseShipmentProcessingLock(conn *sql.Conn, pesananID uint) {
+	if _, err := conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", int64(pesananID)); err != nil {
+		fmt.Printf("⚠️ Shipment Warning: Gagal melepas lock pesanan %d: %s\n", pesananID, err.Error())
+	}
 }

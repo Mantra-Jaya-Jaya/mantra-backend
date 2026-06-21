@@ -11,6 +11,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// NormalizeRoleName membuat representasi role yang konsisten untuk JWT, context, dan handler.
+func NormalizeRoleName(role string) string {
+	return strings.ToLower(strings.TrimSpace(role))
+}
+
 // isSecureCookie returns true only in production (HTTPS), false for local dev (HTTP)
 func isSecureCookie() bool {
 	return os.Getenv("MIDTRANS_ENVIRONMENT") == "production"
@@ -23,10 +28,12 @@ func GenerateJWT(userID uint, publicID string, role string) (string, error) {
 		secret = "rahasia_dapur_mantra" // Fallback
 	}
 
+	normalizedRole := NormalizeRoleName(role)
+
 	claims := jwt.MapClaims{
 		"user_id":   userID,
 		"public_id": publicID,
-		"role":      role,
+		"role":      normalizedRole,
 		"exp":       time.Now().Add(30 * time.Minute).Unix(), // 30 menit
 		"iat":       time.Now().Unix(),
 	}
@@ -37,7 +44,7 @@ func GenerateJWT(userID uint, publicID string, role string) (string, error) {
 
 // RespondWithSuccess handles the different response formats for Flutter and Next.js
 func RespondWithSuccess(c *gin.Context, clientType string, user models.User, roleName string, profileID uint, accessToken string, refreshToken string) {
-	lowerRole := strings.ToLower(roleName)
+	lowerRole := NormalizeRoleName(roleName)
 
 	if clientType == "nextjs" {
 		// Set cookie — secure=true hanya di production (HTTPS), false di local HTTP

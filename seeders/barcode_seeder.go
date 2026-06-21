@@ -20,36 +20,20 @@ func SeedBarcode() {
 		return
 	}
 
-	totalBarcodeDibuat := 0
-
-	// 2. Looping ke setiap spesifikasi barang buat dikasih barcode
+	var batch []models.Barcode
 	for _, spek := range daftarSpesifikasi {
-		// Bikin 2 barcode untuk setiap spesifikasi (misal: qty 1 buat eceran, qty 12 buat lusinan)
-		kuantitasList := []uint{1, 12}
-
-		for _, qty := range kuantitasList {
-
-			// Bikin Kode Barcode beneran (Format String/Varchar)
-			// Pakai %012d biar kalau angkanya kurang, otomatis ditambahin 0 di depannya
-			kodeBarcodeString := fmt.Sprintf("%012d", gofakeit.Number(100000000000, 999999999999))
-
-			barcode := models.Barcode{
-				// 🚀 IdBarcode KITA HAPUS! Biarin Postgres yang ngasih nomor urut otomatis
-				KodeBarcode:         kodeBarcodeString,
+		for _, qty := range []uint{1, 12} {
+			batch = append(batch, models.Barcode{
+				KodeBarcode:         fmt.Sprintf("%012d", gofakeit.Number(100000000000, 999999999999)),
 				Kuantitas:           qty,
-				SpesifikasiBarangID: spek.IdSpesifikasiBarang, // Pastikan ini pakai 'ID' besar di ujung sesuai model lu
-				// 🚀 SatuanId KITA HAPUS! Karena emang gak ada di ERD tabel barcode
-			}
-
-			// Simpan ke database
-			if err := config.DB.Create(&barcode).Error; err != nil {
-				fmt.Printf("Gagal buat barcode untuk Spek ID %d: %v\n", spek.IdSpesifikasiBarang, err)
-				continue
-			}
-
-			totalBarcodeDibuat++
+				SpesifikasiBarangID: spek.IdSpesifikasiBarang,
+			})
 		}
 	}
 
-	fmt.Printf("Yeyy, Berhasil seed %d barcode!\n", totalBarcodeDibuat)
+	if err := config.DB.Create(&batch).Error; err != nil {
+		fmt.Printf("Gagal batch insert barcode: %v\n", err)
+	} else {
+		fmt.Printf("Yeyy, Berhasil seed %d barcode!\n", len(batch))
+	}
 }
