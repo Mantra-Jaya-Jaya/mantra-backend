@@ -49,6 +49,7 @@ func SetupRoutes(r *gin.Engine) {
 			customerGroup.PATCH("/keranjang/:public_id", keranjang.UpdateKeranjang)
 			customerGroup.DELETE("/keranjang/:public_id", keranjang.HapusItemKeranjang)
 			customerGroup.GET("/notifikasi", notifikasi.GetNotifikasi)
+			customerGroup.PATCH("/notifikasi/:id/baca", notifikasi.BacaNotifikasi)
 			customerGroup.GET("/pesanan", transaksi.GetDaftarPesanan)
 			customerGroup.POST("/pesanan/checkout", transaksi.CheckoutPesanan)
 			customerGroup.PATCH("/pesanan/:public_id/batal", transaksi.BatalkanPesanan)
