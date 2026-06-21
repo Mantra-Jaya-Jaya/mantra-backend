@@ -12,16 +12,19 @@ Dua file berikut adalah representasi visual dari 28 tabel:
 ## Konvensi Penamaan
 
 ### Tabel
+
 - Snake case, jamak: `role`, `user`, `refresh_token`, `spesifikasi_barang`, `stok_opname`, `ekspedisi_layanan`, `metode_pembayaran`, `detail_pembayaran`
 - Nama tabel di struct GORM via method `TableName()`
 
 ### Kolom
+
 - Snake case: `id_role`, `nama_barang`, `tanggal_pesanan`
 - Primary key: `id_{tabel}` (contoh: `id_user`, `id_kategori`)
 - Foreign key: `id_{tabel_referensi}` (contoh: `id_role` di tabel `user`)
 - Timestamps: `created_at`, `updated_at`
 
 ### Tipe Data
+
 - **Integer** untuk ID dan nilai uang (Rupiah). Tidak pernah pakai float untuk uang.
 - **UUID** untuk `public_id` — digenerate otomatis via `gen_random_uuid()`.
 - **Varchar** untuk string pendek, **text** untuk string panjang (deskripsi, alamat).

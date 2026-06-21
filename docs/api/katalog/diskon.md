@@ -7,6 +7,7 @@
 Auth. Mendapatkan daftar promo/diskon yang aktif.
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -36,6 +37,7 @@ Auth (Admin). Mendapatkan semua data diskon (tidak difilter tanggal).
 Auth (Admin). Menambah diskon baru.
 
 **Request:**
+
 ```json
 {
   "nama_diskon": "Diskon Akhir Tahun",

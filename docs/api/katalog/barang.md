@@ -7,6 +7,7 @@
 Auth (Customer). Mendapatkan daftar barang untuk customer.
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -36,6 +37,7 @@ Auth (Admin). Mendapatkan daftar semua barang.
 Auth (Admin). Menambah barang baru.
 
 **Request:**
+
 ```json
 {
   "nama_barang": "Produk Baru",
@@ -79,6 +81,7 @@ Auth (Admin). Upload gambar barang ke MinIO.
 Public. Mendapatkan detail barang berdasarkan kode barcode.
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -97,6 +100,7 @@ Public. Mendapatkan detail barang berdasarkan kode barcode.
 Auth (Kasir). Mencari produk untuk transaksi POS.
 
 **Request:**
+
 ```json
 {
   "keyword": "nama atau barcode"

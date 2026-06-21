@@ -9,6 +9,7 @@ Auth (Admin). Semua endpoint CRUD ekspedisi dan layanan pengiriman.
 Daftar semua ekspedisi.
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -40,6 +41,7 @@ Daftar semua ekspedisi.
 Tambah ekspedisi baru.
 
 **Request:**
+
 ```json
 {
   "nama_ekspedisi": "Ninja Xpress",
@@ -69,6 +71,7 @@ Hapus ekspedisi (cascade menghapus layanan terkait).
 Tambah layanan baru untuk ekspedisi.
 
 **Request:**
+
 ```json
 {
   "id_ekspedisi": 1,

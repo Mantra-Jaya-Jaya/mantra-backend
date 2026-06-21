@@ -9,6 +9,7 @@ Auth (Customer). Semua endpoint keranjang untuk customer.
 Tambah item ke keranjang.
 
 **Request:**
+
 ```json
 {
   "id_spesifikasi_barang": 1,
@@ -17,6 +18,7 @@ Tambah item ke keranjang.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -31,6 +33,7 @@ Tambah item ke keranjang.
 Update quantity item di keranjang.
 
 **Request:**
+
 ```json
 {
   "quantity": 5
@@ -38,6 +41,7 @@ Update quantity item di keranjang.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -52,6 +56,7 @@ Update quantity item di keranjang.
 Hapus item dari keranjang.
 
 **Response:**
+
 ```json
 {
   "status": "success",

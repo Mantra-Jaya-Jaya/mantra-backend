@@ -7,6 +7,7 @@
 Auth. Mendapatkan daftar notifikasi milik user (customer, kasir, atau kurir) yang login.
 
 **Response:**
+
 ```json
 {
   "status": "success",

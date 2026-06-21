@@ -9,6 +9,7 @@ Auth (Customer & Admin). Kelola dan lihat metode pembayaran yang tersedia.
 Customer — daftar metode pembayaran aktif (urut berdasarkan `urutan`).
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -38,6 +39,7 @@ Admin — daftar semua metode (aktif dan non-aktif).
 Tambah metode pembayaran baru.
 
 **Request:**
+
 ```json
 {
   "nama_metode": "QRIS",

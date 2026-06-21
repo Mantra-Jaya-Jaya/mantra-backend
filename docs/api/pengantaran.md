@@ -11,6 +11,7 @@ Melacak status pengiriman pesanan (Customer).
 **Auth:** Wajib Login (Customer)
 
 **Response (Ekspedisi Eksternal - Biteship):**
+
 ```json
 {
   "status": "success",
@@ -33,6 +34,7 @@ Melacak status pengiriman pesanan (Customer).
 ```
 
 **Response (Ekspedisi Internal - Kurir Toko):**
+
 ```json
 {
   "status": "success",
@@ -64,6 +66,7 @@ Memperbarui koordinat GPS lokasi kurir secara berkala selama pengantaran.
 **Auth:** Wajib Login (Kurir)
 
 **Request:**
+
 ```json
 {
   "latitude": -7.02561,
@@ -72,6 +75,7 @@ Memperbarui koordinat GPS lokasi kurir secara berkala selama pengantaran.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -88,6 +92,7 @@ Mengambil (claim) tugas pengantaran pesanan yang statusnya "Dikemas".
 **Auth:** Wajib Login (Kurir)
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -103,16 +108,18 @@ Mengambil (claim) tugas pengantaran pesanan yang statusnya "Dikemas".
 
 ## POST /api/v1/kurir/pengantaran/:public_id/status
 
-Memperbarui status pengantaran (misal: "Tiba di Tujuan", "Selesai"). 
+Memperbarui status pengantaran (misal: "Tiba di Tujuan", "Selesai").
 Jika status diubah ke **Selesai**, kurir wajib menyertakan foto bukti pengiriman sebagai `multipart/form-data` dengan field name `"foto"`.
 
 **Auth:** Wajib Login (Kurir)
 
 **Request (Multipart/Form-Data untuk Selesai):**
+
 - `status`: "Selesai" (Text)
 - `foto`: [File Image] (Binary)
 
 **Response:**
+
 ```json
 {
   "status": "success",
