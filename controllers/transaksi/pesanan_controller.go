@@ -979,7 +979,25 @@ func LacakPesanan(c *gin.Context) {
 
 	// 1. Ekspedisi Eksternal (Biteship) - punya BiteshipOrderID atau NomorResi
 	if isExternalBiteship && pesanan.Ekspedisi != nil {
-		// Jika nomor resi belum ada (waybill pending / sandbox), kembalikan status awal
+		biteship := services.NewBiteshipAdapter()
+
+		// Opsi A: Lazy-fetch waybill via GetOrderStatus jika NomorResi masih kosong.
+		// Ini sebagai fallback saat webhook belum terpicu (misal: sandbox mode).
+		// Webhook Biteship (Opsi B) tetap menjadi mekanisme utama di produksi.
+		if (pesanan.NomorResi == nil || *pesanan.NomorResi == "") && pesanan.BiteshipOrderID != nil && *pesanan.BiteshipOrderID != "" {
+			orderStatus, errFetch := biteship.GetOrderStatus(*pesanan.BiteshipOrderID)
+			if errFetch == nil && orderStatus != nil && orderStatus.WaybillID != "" {
+				// Waybill sudah tersedia — simpan ke DB (self-healing)
+				config.DB.Model(&models.Pesanan{}).
+					Where("id_pesanan = ?", pesanan.IdPesanan).
+					Update("nomor_resi", orderStatus.WaybillID)
+				fmt.Printf("✅ Lazy-fetch waybill: Pesanan %s → resi=%s\n", idPesanan, orderStatus.WaybillID)
+				// Update struct lokal agar bisa dipakai di bawah
+				pesanan.NomorResi = &orderStatus.WaybillID
+			}
+		}
+
+		// Jika setelah lazy-fetch waybill masih kosong, kembalikan status pending
 		if pesanan.NomorResi == nil || *pesanan.NomorResi == "" {
 			c.JSON(http.StatusOK, gin.H{
 				"status":  "success",
@@ -995,7 +1013,7 @@ func LacakPesanan(c *gin.Context) {
 			return
 		}
 
-		biteship := services.NewBiteshipAdapter()
+		// Nomor resi tersedia — ambil history tracking dari Biteship
 		history, err := biteship.TrackShipment(*pesanan.NomorResi, pesanan.Ekspedisi.KodeApi)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
