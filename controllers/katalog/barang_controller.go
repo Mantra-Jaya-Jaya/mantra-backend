@@ -799,6 +799,7 @@ func CariProdukTransaksi(c *gin.Context) {
 					harga = v.HargaBarang - (v.HargaBarang * b.Diskon.BesarDiskon / 100)
 				}
 			}
+
 			varianList = append(varianList, gin.H{
 				"id_spesifikasi_barang": v.IdSpesifikasiBarang,
 				"label":                 v.DetailSpesifikasi.Spesifikasi.NamaSpesifikasi + " " + v.DetailSpesifikasi.NamaDetailSpesifikasi,
@@ -820,6 +821,113 @@ func CariProdukTransaksi(c *gin.Context) {
 		"status":  "success",
 		"message": "Produk berhasil ditemukan",
 		"data":    responseData,
+	})
+}
+
+// GetBarangByDiskon mengambil daftar barang berdasarkan public_id diskon.
+// Dipakai oleh: customer (GET /customer/promo/:public_id/barang)
+// Auth: Wajib login, role customer
+func GetBarangByDiskon(c *gin.Context) {
+	publicIdStr := c.Param("public_id")
+
+	var diskon models.Diskon
+	if err := config.DB.Where("public_id = ?", publicIdStr).First(&diskon).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Diskon tidak ditemukan",
+		})
+		return
+	}
+
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "50")
+
+	page, _ := strconv.Atoi(pageStr)
+	limit, _ := strconv.Atoi(limitStr)
+	offset := (page - 1) * limit
+
+	type ProductResult struct {
+		IdBarang       uint       `gorm:"column:id_barang"`
+		PublicId       string     `gorm:"column:public_id"`
+		NamaBarang     string     `gorm:"column:nama_barang"`
+		GambarBarang   *string    `gorm:"column:gambar_barang"`
+		HargaTerendah  int        `gorm:"column:harga_terendah"`
+		HargaTertinggi int        `gorm:"column:harga_tertinggi"`
+		BesarDiskon    int        `gorm:"column:besar_diskon"`
+		TglMulai       *time.Time `gorm:"column:tgl_mulai"`
+		TglSelesai     *time.Time `gorm:"column:tgl_selesai"`
+		NamaKategori   string     `gorm:"column:nama_kategori"`
+		TotalStok      int        `gorm:"column:total_stok"`
+	}
+
+	var results []ProductResult
+	var total int64
+
+	queryCount := config.DB.Model(&models.Barang{}).Where("id_diskon = ?", diskon.IdDiskon)
+	querySelect := config.DB.Table("barang").Where("barang.id_diskon = ?", diskon.IdDiskon)
+
+	queryCount.Count(&total)
+
+	querySelect.
+		Select("barang.id_barang, barang.public_id, barang.nama_barang, barang.gambar_barang, MIN(spesifikasi_barang.harga_barang) as harga_terendah, MAX(spesifikasi_barang.harga_barang) as harga_tertinggi, SUM(spesifikasi_barang.jumlah) as total_stok, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
+		Joins("LEFT JOIN spesifikasi_barang ON spesifikasi_barang.id_barang = barang.id_barang").
+		Joins("LEFT JOIN diskon ON diskon.id_diskon = barang.id_diskon").
+		Joins("LEFT JOIN kategori ON kategori.id_kategori = barang.id_kategori").
+		Group("barang.id_barang, barang.public_id, barang.nama_barang, barang.gambar_barang, diskon.besar_diskon, diskon.tgl_mulai, diskon.tgl_selesai, kategori.nama_kategori").
+		Limit(limit).Offset(offset).
+		Scan(&results)
+
+	var responseData []gin.H
+	now := time.Now()
+	for _, r := range results {
+		punyaDiskon := false
+		hargaDiskon := r.HargaTerendah
+
+		if r.BesarDiskon > 0 && r.TglMulai != nil && r.TglSelesai != nil {
+			if r.TglMulai.Before(now) && r.TglSelesai.After(now) {
+				punyaDiskon = true
+				hargaDiskon = r.HargaTerendah - (r.HargaTerendah * r.BesarDiskon / 100)
+			}
+		}
+
+		gambarValid := ""
+		if r.GambarBarang != nil {
+			gambarValid = *r.GambarBarang
+		}
+
+		responseData = append(responseData, gin.H{
+			"id_barang":       r.IdBarang,
+			"public_id":       r.PublicId,
+			"nama_barang":     r.NamaBarang,
+			"harga_terendah":  r.HargaTerendah,
+			"harga_tertinggi": r.HargaTertinggi,
+			"harga_diskon":    hargaDiskon,
+			"punya_diskon":    punyaDiskon,
+			"gambar_barang":   gambarValid,
+			"kategori":        r.NamaKategori,
+			"stok":            r.TotalStok,
+		})
+	}
+
+	if responseData == nil {
+		responseData = []gin.H{}
+	}
+
+	totalPages := int(total) / limit
+	if int(total)%limit != 0 {
+		totalPages++
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Berhasil mengambil daftar barang berdasarkan diskon",
+		"data":    responseData,
+		"meta": gin.H{
+			"page":        page,
+			"limit":       limit,
+			"total":       total,
+			"total_pages": totalPages,
+		},
 	})
 }
 
