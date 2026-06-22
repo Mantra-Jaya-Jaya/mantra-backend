@@ -522,6 +522,33 @@ func CheckoutPesanan(c *gin.Context) {
 	if input.IdTipeKurir != nil && *input.IdTipeKurir == utils.GetTipeKurirID("external") {
 		tipeKurirID = utils.GetTipeKurirID("external")
 	}
+	// Auto-detect: kalau ada ekspedisi & layanan → otomatis external
+	if input.IdEkspedisi != nil && *input.IdEkspedisi != 0 &&
+		input.IdLayananEkspedisi != nil && *input.IdLayananEkspedisi != 0 {
+		tipeKurirID = utils.GetTipeKurirID("external")
+	}
+
+	// Sanitize: treat pointer-to-0 sebagai nil (Flutter kadang kirim 0 bukan null)
+	var ekspedisiID *uint
+	var layananEkspedisiID *uint
+	if input.IdEkspedisi != nil && *input.IdEkspedisi != 0 {
+		ekspedisiID = input.IdEkspedisi
+	}
+	if input.IdLayananEkspedisi != nil && *input.IdLayananEkspedisi != 0 {
+		layananEkspedisiID = input.IdLayananEkspedisi
+	}
+
+	// Validasi: kurir external wajib punya ekspedisi dan layanan
+	if tipeKurirID == utils.GetTipeKurirID("external") {
+		if ekspedisiID == nil || layananEkspedisiID == nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "error",
+				"message": "Kurir external harus menyertakan id_ekspedisi dan id_layanan_ekspedisi yang valid",
+			})
+			return
+		}
+	}
 
 	// Buat Pesanan
 	pesanan := models.Pesanan{
@@ -533,8 +560,8 @@ func CheckoutPesanan(c *gin.Context) {
 		TipeKurirID:        tipeKurirID,
 		OngkosKirim:        ongkir,
 		Catatan:            input.Catatan,
-		EkspedisiID:        input.IdEkspedisi,
-		LayananEkspedisiID: input.IdLayananEkspedisi,
+		EkspedisiID:        ekspedisiID,
+		LayananEkspedisiID: layananEkspedisiID,
 	}
 	if alamat.IdAlamat != 0 {
 		pesanan.AlamatID = &alamat.IdAlamat
@@ -945,8 +972,29 @@ func LacakPesanan(c *gin.Context) {
 		return
 	}
 
-	// 1. Ekspedisi Eksternal (Biteship) - memiliki NomorResi dan Ekspedisi
-	if pesanan.NomorResi != nil && *pesanan.NomorResi != "" && pesanan.Ekspedisi != nil && pesanan.Ekspedisi.KodeApi != "" {
+	// Deteksi apakah pesanan ini menggunakan ekspedisi eksternal (Biteship)
+	// Cek BiteshipOrderID sebagai indikator utama — waybill bisa saja kosong di sandbox/mode awal
+	isExternalBiteship := (pesanan.BiteshipOrderID != nil && *pesanan.BiteshipOrderID != "") ||
+		(pesanan.NomorResi != nil && *pesanan.NomorResi != "")
+
+	// 1. Ekspedisi Eksternal (Biteship) - punya BiteshipOrderID atau NomorResi
+	if isExternalBiteship && pesanan.Ekspedisi != nil {
+		// Jika nomor resi belum ada (waybill pending / sandbox), kembalikan status awal
+		if pesanan.NomorResi == nil || *pesanan.NomorResi == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"status":  "success",
+				"message": "Pesanan sedang diproses oleh ekspedisi, nomor resi belum tersedia",
+				"data": gin.H{
+					"id_pesanan":     idPesanan,
+					"nomor_resi":     "",
+					"ekspedisi":      pesanan.Ekspedisi.NamaEkspedisi,
+					"tipe_ekspedisi": "eksternal",
+					"history":        []interface{}{},
+				},
+			})
+			return
+		}
+
 		biteship := services.NewBiteshipAdapter()
 		history, err := biteship.TrackShipment(*pesanan.NomorResi, pesanan.Ekspedisi.KodeApi)
 		if err != nil {
