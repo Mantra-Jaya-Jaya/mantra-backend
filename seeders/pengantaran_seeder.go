@@ -6,6 +6,8 @@ import (
 	"backend-mantra/utils"
 	"fmt"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 func SeedPengantaran() {
@@ -49,6 +51,13 @@ func SeedPengantaran() {
 	adaEkspedisi := config.DB.First(&ekspedisi).Error == nil
 
 	now := time.Now()
+	var pengantaranList []models.Pengantaran
+
+	type pesananStatusUpdate struct {
+		id     uint
+		status uint
+	}
+	var statusUpdates []pesananStatusUpdate
 
 	for i, pesanan := range daftarPesanan {
 		roll := i % 10
@@ -104,13 +113,30 @@ func SeedPengantaran() {
 			EkspedisiID:         idEkspedisi,
 		}
 
-		if err := config.DB.Create(&pengantaran).Error; err != nil {
-			fmt.Println("Error insert pengantaran:", err)
-			continue
-		}
+		pengantaranList = append(pengantaranList, pengantaran)
 
 		if pesanan.StatusPesananID != updateStatus {
-			config.DB.Model(&pesanan).Update("id_status_pesanan", updateStatus)
+			statusUpdates = append(statusUpdates, pesananStatusUpdate{id: pesanan.IdPesanan, status: updateStatus})
+		}
+	}
+
+	if len(pengantaranList) > 0 {
+		if err := config.DB.CreateInBatches(pengantaranList, 100).Error; err != nil {
+			fmt.Println("Error batch insert pengantaran:", err)
+		}
+	}
+
+	if len(statusUpdates) > 0 {
+		err := config.DB.Transaction(func(tx *gorm.DB) error {
+			for _, upd := range statusUpdates {
+				if err := tx.Model(&models.Pesanan{}).Where("id_pesanan = ?", upd.id).Update("id_status_pesanan", upd.status).Error; err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			fmt.Println("Error executing batch transaction updates for pesanan status:", err)
 		}
 	}
 

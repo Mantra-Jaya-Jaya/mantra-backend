@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -37,6 +38,7 @@ func processExternalShipment(pesananID uint) {
 		Preload("Ekspedisi").
 		Preload("LayananEkspedisi").
 		Preload("Alamat").
+		Preload("Customer.User").
 		Preload("DetailPesanan.SpesifikasiBarang.Barang").
 		First(&pesanan, pesananID).Error; err != nil {
 		fmt.Printf("❌ Shipment Error: Gagal load pesanan %d: %s\n", pesananID, err.Error())
@@ -84,36 +86,65 @@ func processExternalShipment(pesananID uint) {
 		return
 	}
 
+	// Parse postal code toko dari env
+	originPostal, _ := strconv.Atoi(os.Getenv("BITESHIP_STORE_POSTAL_CODE"))
+	originLat, _ := strconv.ParseFloat(os.Getenv("BITESHIP_STORE_COORDINATE_LAT"), 64)
+	originLng, _ := strconv.ParseFloat(os.Getenv("BITESHIP_STORE_COORDINATE_LONG"), 64)
+
+	// Parse postal code tujuan
+	destPostal, _ := strconv.Atoi(pesanan.Alamat.KodePos)
+
 	adapter := services.NewBiteshipAdapter()
 	result, err := adapter.CreateShipment(services.CreateShipmentRequest{
-		OriginAddress:         os.Getenv("BITESHIP_STORE_ADDRESS"),
-		OriginCoordinate:      os.Getenv("BITESHIP_STORE_COORDINATE_LAT") + "," + os.Getenv("BITESHIP_STORE_COORDINATE_LONG"),
-		DestinationAddress:    pesanan.Alamat.AlamatLengkap,
-		DestinationCoordinate: fmt.Sprintf("%f,%f", pesanan.Alamat.Latitude, pesanan.Alamat.Longitude),
-		CourierCode:           pesanan.Ekspedisi.KodeApi,
-		CourierServiceCode:    pesanan.LayananEkspedisi.NamaLayanan,
-		Items:                 items,
+		OriginAddress:           os.Getenv("BITESHIP_STORE_ADDRESS"),
+		OriginLat:               originLat,
+		OriginLng:               originLng,
+		OriginPostalCode:        originPostal,
+		DestinationAddress:      pesanan.Alamat.AlamatLengkap,
+		DestinationLat:          pesanan.Alamat.Latitude,
+		DestinationLng:          pesanan.Alamat.Longitude,
+		DestinationPostalCode:   destPostal,
+		DestinationContactName:  pesanan.Alamat.NamaPenerima,
+		DestinationContactPhone: pesanan.Alamat.NoTelpPenerima,
+		DestinationNote:         pesanan.Alamat.CatatanLokasi,
+		CourierCode:             pesanan.Ekspedisi.KodeApi,
+		CourierServiceCode:      pesanan.LayananEkspedisi.KodeLayanan,
+		OrderNote:               pesanan.Catatan,
+		Items:                   items,
 	})
 	if err != nil {
 		fmt.Printf("❌ Shipment Error: Gagal create shipment pesanan %d: %s\n", pesananID, err.Error())
 		return
 	}
-	if result == nil || result.WaybillID == "" || result.ID == "" {
-		fmt.Printf("❌ Shipment Error: Response shipment tidak lengkap untuk pesanan %d\n", pesananID)
+	if result == nil {
+		fmt.Printf("❌ Shipment Error: Response shipment nil untuk pesanan %d\n", pesananID)
+		return
+	}
+
+	// Debug log response Biteship
+	fmt.Printf("📦 Biteship Response pesanan %d: success=%v id=%s waybill=%s status=%s\n",
+		pesananID, result.Success, result.ID, result.WaybillID, result.Status)
+
+	if result.ID == "" {
+		fmt.Printf("❌ Shipment Error: Biteship tidak mengembalikan order ID untuk pesanan %d\n", pesananID)
 		return
 	}
 
 	updates := map[string]any{
-		"nomor_resi":        result.WaybillID,
 		"biteship_order_id": result.ID,
 		"id_status_pesanan": utils.GetStatusPesananID("Dikirim"),
+	}
+	// Waybill bisa kosong di sandbox mode, simpan jika ada
+	if result.WaybillID != "" {
+		updates["nomor_resi"] = result.WaybillID
 	}
 	if err := config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pesananID).Updates(updates).Error; err != nil {
 		fmt.Printf("❌ Shipment Error: Gagal update status pesanan %d: %s\n", pesananID, err.Error())
 		return
 	}
 
-	fmt.Printf("✅ Shipment Success: Pesanan %d → waybill %s → status Dikirim\n", pesananID, result.WaybillID)
+	fmt.Printf("✅ Shipment Success: Pesanan %d → order_id=%s waybill=%s → status Dikirim\n",
+		pesananID, result.ID, result.WaybillID)
 }
 
 func shipmentProcessingConn() (*sql.Conn, error) {

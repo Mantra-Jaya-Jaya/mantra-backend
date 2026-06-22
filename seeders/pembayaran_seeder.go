@@ -26,13 +26,20 @@ func SeedPembayaran() {
 		return
 	}
 
+	// Pre-fetch which pesanan already have pembayaran records
+	var existingPesananIDs []uint
+	config.DB.Model(&models.Pembayaran{}).Distinct("id_pesanan").Pluck("id_pesanan", &existingPesananIDs)
+	existingMap := make(map[uint]bool)
+	for _, id := range existingPesananIDs {
+		existingMap[id] = true
+	}
+
 	onlinePaymentTypes := []string{"qris", "bank_transfer", "gopay"}
 	totalCreated := 0
+	var pembayaranList []models.Pembayaran
 
 	for _, pesanan := range daftarPesanan {
-		var countItem int64
-		config.DB.Model(&models.Pembayaran{}).Where("id_pesanan = ?", pesanan.IdPesanan).Count(&countItem)
-		if countItem > 0 {
+		if existingMap[pesanan.IdPesanan] {
 			continue
 		}
 
@@ -72,8 +79,14 @@ func SeedPembayaran() {
 			PesananID:         pesanan.IdPesanan,
 		}
 
-		if err := config.DB.Create(&pembayaran).Error; err == nil {
-			totalCreated++
+		pembayaranList = append(pembayaranList, pembayaran)
+	}
+
+	if len(pembayaranList) > 0 {
+		if err := config.DB.CreateInBatches(pembayaranList, 100).Error; err == nil {
+			totalCreated = len(pembayaranList)
+		} else {
+			fmt.Println("Error batch insert pembayaran:", err)
 		}
 	}
 

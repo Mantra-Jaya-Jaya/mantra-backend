@@ -264,73 +264,12 @@ func HapusLayanan(c *gin.Context) {
 }
 
 func SyncBiteshipCouriers(c *gin.Context) {
-	adapter := services.NewBiteshipAdapter()
-	biteshipCouriers, err := adapter.GetCouriers()
-	if err != nil {
+	if err := services.SyncCouriersFromBiteship(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
-			"message": "Gagal mengambil data dari Biteship: " + err.Error(),
+			"message": "Gagal sinkronisasi dari Biteship: " + err.Error(),
 		})
 		return
-	}
-
-	// Loop over Biteship couriers and upsert into DB
-	for _, bc := range biteshipCouriers {
-		var eks models.Ekspedisi
-		// 1. Upsert Ekspedisi (Courier)
-		err := config.DB.Where("kode_api = ?", bc.CourierCode).First(&eks).Error
-		if err != nil {
-			// Not found, create new
-			eks = models.Ekspedisi{
-				NamaEkspedisi: bc.CourierName,
-				KodeApi:       bc.CourierCode,
-				Logo:          "", // Biteship API /v1/couriers doesn't return logo, keep empty or let client render default
-				Deskripsi:     bc.CourierName + " Shipping Service",
-				IsActive:      true,
-			}
-			if err := config.DB.Create(&eks).Error; err != nil {
-				continue
-			}
-		} else {
-			// Found, update description/name if empty/changed
-			updated := false
-			if eks.NamaEkspedisi == "" {
-				eks.NamaEkspedisi = bc.CourierName
-				updated = true
-			}
-			if eks.Deskripsi == "" {
-				eks.Deskripsi = bc.CourierName + " Shipping Service"
-				updated = true
-			}
-			if updated {
-				config.DB.Save(&eks)
-			}
-		}
-
-		// 2. Upsert Layanan
-		var lay models.EkspedisiLayanan
-		err = config.DB.Where("id_ekspedisi = ? AND nama_layanan = ?", eks.IdEkspedisi, bc.CourierServiceName).First(&lay).Error
-		if err != nil {
-			// Not found, create new
-			// Use standard defaults for estimasi min/max based on description if possible
-			estimasiMin := 1
-			estimasiMax := 3
-			lay = models.EkspedisiLayanan{
-				EkspedisiID: eks.IdEkspedisi,
-				NamaLayanan: bc.CourierServiceName,
-				Deskripsi:   bc.Description,
-				EstimasiMin: estimasiMin,
-				EstimasiMax: estimasiMax,
-				IsActive:    true,
-			}
-			config.DB.Create(&lay)
-		} else {
-			// Found, update description if it changed or is empty
-			if lay.Deskripsi != bc.Description && bc.Description != "" {
-				lay.Deskripsi = bc.Description
-				config.DB.Save(&lay)
-			}
-		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
