@@ -2,7 +2,7 @@
 
 ## Chain Execution
 
-```
+```text
 Request → AuthMiddleware → RoleMiddleware → OwnershipMiddleware → Controller
 ```
 
@@ -13,6 +13,7 @@ Request → AuthMiddleware → RoleMiddleware → OwnershipMiddleware → Contro
 Berlaku untuk semua endpoint yang membutuhkan autentikasi.
 
 ### Proses
+
 1. Extract token dari:
    - `Authorization: Bearer <token>` (prioritas utama — Flutter)
    - Cookie `access_token` (fallback — Next.js)
@@ -24,6 +25,7 @@ Berlaku untuk semua endpoint yang membutuhkan autentikasi.
 5. Jika tidak valid → `401 Unauthorized` dengan kode `AUTH_001`
 
 ### Error Response
+
 ```json
 {
   "status": "error",
@@ -42,12 +44,14 @@ Berlaku untuk semua endpoint yang membutuhkan autentikasi.
 Cek apakah role user termasuk dalam daftar yang diizinkan.
 
 ### Penggunaan
+
 ```go
 middleware.RoleMiddleware("admin")
 middleware.RoleMiddleware("customer", "kasir")
 ```
 
 ### Error Codes
+
 | Kode | Kondisi | HTTP |
 |------|---------|------|
 | `AUTH_002` | Role tidak ditemukan di token | 403 |
@@ -60,6 +64,7 @@ middleware.RoleMiddleware("customer", "kasir")
 Cek kepemilikan resource berdasarkan `public_id` di URL parameter.
 
 ### Alur
+
 1. Ambil `public_id` dari JWT claims (context)
 2. Ambil `public_id` dari URL parameter (contoh: `:public_id`)
 3. Jika role **admin** → bypass (selalu diizinkan)
@@ -67,6 +72,7 @@ Cek kepemilikan resource berdasarkan `public_id` di URL parameter.
 5. Jika tidak cocok → `403 Forbidden` dengan kode `AUTH_004`
 
 ### Penggunaan
+
 ```go
 middleware.OwnershipMiddleware("public_id")
 ```

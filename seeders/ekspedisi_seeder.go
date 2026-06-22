@@ -3,67 +3,99 @@ package seeders
 import (
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/services"
 	"fmt"
 )
 
+// SeedEkspedisi menyinkronkan data ekspedisi dan layanan langsung dari Biteship.
 func SeedEkspedisi() {
-	fmt.Println("⏳ Menyiapkan data ekspedisi...")
+	fmt.Println("⏳ Sinkronisasi data ekspedisi dari Biteship...")
 
-	daftarEkspedisi := []models.Ekspedisi{
-		{NamaEkspedisi: "SPEX Express", KodeApi: "spex"},
-		{NamaEkspedisi: "JNE", KodeApi: "jne"},
-		{NamaEkspedisi: "J&T Express", KodeApi: "jnt"},
-		{NamaEkspedisi: "SiCepat", KodeApi: "sicepat"},
-		{NamaEkspedisi: "Anteraja", KodeApi: "anteraja"},
-		{NamaEkspedisi: "Ninja Xpress", KodeApi: "ninja"},
+	adapter := services.NewBiteshipAdapter()
+	biteshipCouriers, err := adapter.GetCouriers()
+	if err != nil {
+		fmt.Printf("⚠️ Gagal sinkronisasi ekspedisi dari Biteship: %s\n", err.Error())
+		return
 	}
 
-	for _, eks := range daftarEkspedisi {
-		if err := config.DB.Where("kode_api = ?", eks.KodeApi).FirstOrCreate(&eks).Error; err != nil {
-			fmt.Println("Error insert ekspedisi", eks.NamaEkspedisi, ":", err)
-			continue
+	totalCourierCreated := 0
+	totalCourierUpdated := 0
+	totalServiceCreated := 0
+	totalServiceUpdated := 0
+
+	for _, bc := range biteshipCouriers {
+		var eks models.Ekspedisi
+		if err := config.DB.Where("kode_api = ?", bc.CourierCode).First(&eks).Error; err != nil {
+			eks = models.Ekspedisi{
+				NamaEkspedisi: bc.CourierName,
+				KodeApi:       bc.CourierCode,
+				Deskripsi:     bc.CourierName + " Shipping Service",
+				IsActive:      true,
+			}
+
+			if err := config.DB.Create(&eks).Error; err != nil {
+				fmt.Printf("Error insert ekspedisi %s: %v\n", bc.CourierName, err)
+				continue
+			}
+			totalCourierCreated++
+		} else {
+			updates := map[string]any{}
+			if bc.CourierName != "" && eks.NamaEkspedisi != bc.CourierName {
+				updates["nama_ekspedisi"] = bc.CourierName
+			}
+			if eks.Deskripsi == "" && bc.CourierName != "" {
+				updates["deskripsi"] = bc.CourierName + " Shipping Service"
+			}
+			if !eks.IsActive {
+				updates["is_active"] = true
+			}
+			if len(updates) > 0 {
+				if err := config.DB.Model(&eks).Updates(updates).Error; err != nil {
+					fmt.Printf("Error update ekspedisi %s: %v\n", bc.CourierName, err)
+					continue
+				}
+				totalCourierUpdated++
+			}
 		}
 
-		// Seed layanan default untuk setiap ekspedisi
-		seedLayananEkspedisi(eks)
-	}
-
-	fmt.Println("Yeyy, berhasil seed ekspedisi!")
-}
-
-func seedLayananEkspedisi(eks models.Ekspedisi) {
-	daftarLayanan := map[string][]models.EkspedisiLayanan{
-		"jne": {
-			{NamaLayanan: "REG", Deskripsi: "Reguler", EstimasiMin: 2, EstimasiMax: 3},
-			{NamaLayanan: "YES", Deskripsi: "Yakin Esok Sampai", EstimasiMin: 1, EstimasiMax: 1},
-			{NamaLayanan: "OKE", Deskripsi: "Ongkos Kirim Ekonomis", EstimasiMin: 3, EstimasiMax: 5},
-		},
-		"jnt": {
-			{NamaLayanan: "EZ", Deskripsi: "Economy", EstimasiMin: 2, EstimasiMax: 4},
-			{NamaLayanan: "REG", Deskripsi: "Reguler", EstimasiMin: 2, EstimasiMax: 3},
-		},
-		"sicepat": {
-			{NamaLayanan: "REG", Deskripsi: "Reguler", EstimasiMin: 1, EstimasiMax: 2},
-			{NamaLayanan: "BEST", Deskripsi: "Besok Sampai Tujuan", EstimasiMin: 1, EstimasiMax: 1},
-		},
-		"anteraja": {
-			{NamaLayanan: "REG", Deskripsi: "Reguler", EstimasiMin: 2, EstimasiMax: 4},
-			{NamaLayanan: "ND", Deskripsi: "Next Day", EstimasiMin: 1, EstimasiMax: 1},
-		},
-		"spex": {
-			{NamaLayanan: "REG", Deskripsi: "Reguler", EstimasiMin: 2, EstimasiMax: 4},
-		},
-		"ninja": {
-			{NamaLayanan: "REG", Deskripsi: "Reguler", EstimasiMin: 2, EstimasiMax: 4},
-		},
-	}
-
-	if layanan, exists := daftarLayanan[eks.KodeApi]; exists {
-		for _, l := range layanan {
-			l.EkspedisiID = eks.IdEkspedisi
-			if err := config.DB.Where("id_ekspedisi = ? AND nama_layanan = ?", eks.IdEkspedisi, l.NamaLayanan).FirstOrCreate(&l).Error; err != nil {
-				fmt.Println("Error insert layanan", l.NamaLayanan, "untuk", eks.NamaEkspedisi, ":", err)
+		var lay models.EkspedisiLayanan
+		if err := config.DB.Where("id_ekspedisi = ? AND nama_layanan = ?", eks.IdEkspedisi, bc.CourierServiceName).First(&lay).Error; err != nil {
+			lay = models.EkspedisiLayanan{
+				EkspedisiID: eks.IdEkspedisi,
+				NamaLayanan: bc.CourierServiceName,
+				Deskripsi:   bc.Description,
+				EstimasiMin: 1,
+				EstimasiMax: 3,
+				IsActive:    true,
+			}
+			if err := config.DB.Create(&lay).Error; err != nil {
+				fmt.Printf("Error insert layanan %s untuk %s: %v\n", bc.CourierServiceName, bc.CourierName, err)
+				continue
+			}
+			totalServiceCreated++
+		} else {
+			updates := map[string]any{}
+			if bc.Description != "" && lay.Deskripsi != bc.Description {
+				updates["deskripsi"] = bc.Description
+			}
+			if !lay.IsActive {
+				updates["is_active"] = true
+			}
+			if len(updates) > 0 {
+				if err := config.DB.Model(&lay).Updates(updates).Error; err != nil {
+					fmt.Printf("Error update layanan %s untuk %s: %v\n", bc.CourierServiceName, bc.CourierName, err)
+					continue
+				}
+				totalServiceUpdated++
 			}
 		}
 	}
+
+	fmt.Printf(
+		"✅ Sinkronisasi ekspedisi selesai: %d courier baru, %d courier update, %d layanan baru, %d layanan update\n",
+		totalCourierCreated,
+		totalCourierUpdated,
+		totalServiceCreated,
+		totalServiceUpdated,
+	)
 }

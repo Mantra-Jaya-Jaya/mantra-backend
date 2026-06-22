@@ -7,6 +7,7 @@
 Auth. Mendapatkan daftar semua kategori.
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -27,6 +28,7 @@ Auth. Mendapatkan daftar semua kategori.
 Auth (Admin). Menambah kategori baru.
 
 **Request:**
+
 ```json
 {
   "nama_kategori": "Minuman"

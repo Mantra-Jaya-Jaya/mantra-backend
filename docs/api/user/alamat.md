@@ -9,6 +9,7 @@ Auth (Customer). CRUD alamat pengiriman.
 Mendapatkan daftar alamat customer yang login.
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -33,6 +34,7 @@ Mendapatkan daftar alamat customer yang login.
 Tambah alamat baru.
 
 **Request:**
+
 ```json
 {
   "nama_penerima": "John Doe",

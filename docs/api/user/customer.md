@@ -9,6 +9,7 @@ Auth (Customer). Profil dan manajemen akun customer.
 Mendapatkan profil customer yang login.
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -31,6 +32,7 @@ Mendapatkan profil customer yang login.
 Mengupdate data akun customer.
 
 **Request:**
+
 ```json
 {
   "nama_lengkap": "John Updated",

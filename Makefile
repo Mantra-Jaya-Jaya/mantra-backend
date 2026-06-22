@@ -2,6 +2,25 @@
 include .env
 export
 
+# Cross-platform detection (Linux / Git Bash / cmd / PowerShell)
+BINARY := bin/mantra-backend
+RM     := rm -rf bin
+PSQL   := PGPASSWORD="$(DB_PASSWORD)" psql -h "$(DB_HOST)" -p "$(DB_PORT)" -U "$(DB_USER)" -d "$(DB_NAME)"
+
+ifeq ($(OS),Windows_NT)
+    BINARY := bin\mantra-backend.exe
+    ifeq ($(findstring bash,$(SHELL)),bash)
+        # Git Bash — syntax sama kayak Linux
+    else ifeq ($(findstring powershell,$(SHELL)),powershell)
+        RM   := powershell -Command "Remove-Item -Recurse -Force 'bin'"
+        PSQL := powershell -Command "$$env:PGPASSWORD='$(DB_PASSWORD)'; psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME)"
+    else
+        # cmd.exe
+        RM   := cmd /c rmdir /s /q bin
+        PSQL := cmd /c set PGPASSWORD=$(DB_PASSWORD) && psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME)
+    endif
+endif
+
 # ==========================================
 # DATABASE & MIGRATION (ATLAS)
 # ==========================================
@@ -30,11 +49,11 @@ db-ui:
 # PERINGATAN: Hanya gunakan ini di environment lokal saat butuh reset total!
 db-clean:
 	atlas schema clean --env local --auto-approve
-	PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -c "CREATE SCHEMA IF NOT EXISTS public; CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";"
+	$(PSQL) -c "CREATE SCHEMA IF NOT EXISTS public; CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";"
 
 db-clean-dev:
 	atlas schema clean --url "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable" --auto-approve
-	PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -c "CREATE SCHEMA IF NOT EXISTS public; CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";"
+	$(PSQL) -c "CREATE SCHEMA IF NOT EXISTS public; CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";"
 # Membersihkan skema dari database utama dan sandbox sekaligus
 db-clean-all: db-clean db-clean-dev
 
@@ -54,7 +73,7 @@ run:
 
 # Melakukan kompilasi binary backend (disimpan di folder bin/)
 build:
-	go build -o bin/mantra-backend main.go
+	go build -o $(BINARY) main.go
 
 # Menjalankan seluruh unit test di dalam project
 test:
@@ -62,5 +81,5 @@ test:
 
 # Membersihkan file binary hasil build dan cache testing
 clean:
-	rm -rf bin/
+	$(RM)
 	go clean -testcache

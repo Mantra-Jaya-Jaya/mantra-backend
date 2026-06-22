@@ -7,6 +7,7 @@
 Auth. Mendapatkan daftar pesanan online/offline.
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -30,6 +31,7 @@ Auth. Mendapatkan daftar pesanan online/offline.
 Auth (Customer). Membuat pesanan online baru dari isi keranjang.
 
 **Request:**
+
 ```json
 {
   "id_alamat": "9e3c8162-...",
@@ -42,6 +44,7 @@ Auth (Customer). Membuat pesanan online baru dari isi keranjang.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -64,6 +67,7 @@ Auth (Customer). Membuat pesanan online baru dari isi keranjang.
 Auth. Mendapatkan detail pesanan lengkap beserta info pengiriman dan rincian item.
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -109,6 +113,7 @@ Auth. Mendapatkan detail pesanan lengkap beserta info pengiriman dan rincian ite
 Auth (Customer). Membatalkan pesanan.
 
 **Response:**
+
 ```json
 {
   "status": "success",

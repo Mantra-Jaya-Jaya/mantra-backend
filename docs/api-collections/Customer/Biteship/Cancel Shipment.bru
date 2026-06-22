@@ -1,0 +1,24 @@
+meta {
+  name: Cancel Shipment
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/customer/pesanan/{{customerPublicId}}/cancel-shipment
+  body: json
+  auth: bearer
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  bru.log(`Cancel response: ${res.body?.status || "unknown"} - ${res.body?.message || ""}`);
+}

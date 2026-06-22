@@ -9,8 +9,9 @@ func (EkspedisiLayanan) TableName() string {
 type EkspedisiLayanan struct {
 	IdEkspedisiLayanan uint      `gorm:"primaryKey;column:id_ekspedisi_layanan" json:"id_ekspedisi_layanan"`
 	PublicId           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
-	EkspedisiID        uint      `gorm:"column:id_ekspedisi;not null" json:"id_ekspedisi"`
+	EkspedisiID        uint      `gorm:"column:id_ekspedisi;not null;index" json:"id_ekspedisi"`
 	NamaLayanan        string    `gorm:"column:nama_layanan" json:"nama_layanan"`
+	KodeLayanan        string    `gorm:"column:kode_layanan" json:"kode_layanan"`
 	Deskripsi          string    `gorm:"column:deskripsi" json:"deskripsi"`
 	EstimasiMin        int       `gorm:"column:estimasi_min" json:"estimasi_min"`
 	EstimasiMax        int       `gorm:"column:estimasi_max" json:"estimasi_max"`

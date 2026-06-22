@@ -9,6 +9,7 @@ Endpoint autentikasi — public dan protected.
 Public. Login dengan username atau email.
 
 **Request:**
+
 ```json
 {
   "username": "johndoe",
@@ -17,6 +18,7 @@ Public. Login dengan username atau email.
 ```
 
 **Response (Flutter):**
+
 ```json
 {
   "status": "success",
@@ -47,6 +49,7 @@ Public. Login dengan username atau email.
 Public. Registrasi customer baru.
 
 **Request:**
+
 ```json
 {
   "username": "johndoe",
@@ -59,6 +62,7 @@ Public. Registrasi customer baru.
 ```
 
 **Response:** `201 Created`
+
 ```json
 {
   "status": "success",
@@ -75,6 +79,7 @@ Public. Registrasi customer baru.
 ```
 
 **Validasi:**
+
 - Password minimal 8 karakter
 - Konfirmasi password harus cocok
 - Email format valid
@@ -87,6 +92,7 @@ Public. Registrasi customer baru.
 Public. Mendapatkan access token baru menggunakan refresh token.
 
 **Request (Flutter):**
+
 ```json
 {
   "refresh_token": "a1b2c3d4..."
@@ -96,6 +102,7 @@ Public. Mendapatkan access token baru menggunakan refresh token.
 **Request (Next.js):** Kirim cookie `refresh_token` otomatis.
 
 **Response (Flutter):**
+
 ```json
 {
   "status": "success",
@@ -116,6 +123,7 @@ Public. Mendapatkan access token baru menggunakan refresh token.
 Auth required. Menonaktifkan refresh token.
 
 **Request (Flutter):**
+
 ```json
 {
   "refresh_token": "a1b2c3d4..."
@@ -125,6 +133,7 @@ Auth required. Menonaktifkan refresh token.
 **Request (Next.js):** Cukup panggil endpoint, cookie akan dihapus otomatis.
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -139,6 +148,7 @@ Auth required. Menonaktifkan refresh token.
 Auth required. Mengubah password (semua session di-revoke).
 
 **Request:**
+
 ```json
 {
   "password_lama": "oldpass123",
@@ -148,6 +158,7 @@ Auth required. Mengubah password (semua session di-revoke).
 ```
 
 **Response:**
+
 ```json
 {
   "status": "success",

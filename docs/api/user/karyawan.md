@@ -15,6 +15,7 @@ Mendapatkan daftar semua karyawan.
 Menambah karyawan baru (sekaligus membuat akun user + profil kasir/kurir).
 
 **Request:**
+
 ```json
 {
   "nama_lengkap": "Karyawan Baru",

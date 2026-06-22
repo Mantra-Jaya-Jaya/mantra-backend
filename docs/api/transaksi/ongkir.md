@@ -9,6 +9,7 @@ Auth (Customer). Cek ongkos kirim via Biteship API.
 Hitung ongkos kirim dari berbagai ekspedisi berdasarkan alamat tujuan dan berat barang.
 
 **Request:**
+
 ```json
 {
   "id_alamat": "uuid-...",
@@ -22,6 +23,7 @@ Hitung ongkos kirim dari berbagai ekspedisi berdasarkan alamat tujuan dan berat 
 ```
 
 **Response:**
+
 ```json
 {
   "status": "success",

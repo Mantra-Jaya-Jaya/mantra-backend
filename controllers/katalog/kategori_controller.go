@@ -53,14 +53,6 @@ func GetKategori(c *gin.Context) {
 	query := config.DB.
 		Order("id_kategori ASC")
 
-	// Admin lihat semua kategori; customer/kasir lihat hanya yang punya barang
-	role, _ := c.Get("role")
-	if roleStr, ok := role.(string); !ok || roleStr != "Admin" {
-		query = query.Where("id_kategori IN (?)",
-			config.DB.Table("barang").Select("DISTINCT id_kategori"),
-		)
-	}
-
 	limitStr := c.Query("limit")
 	if limitStr != "" {
 		limit, err := strconv.Atoi(limitStr)
@@ -78,13 +70,26 @@ func GetKategori(c *gin.Context) {
 		return
 	}
 
-	// 8. BUNGKUS DAN KIRIM!
+	type KategoriWithCount struct {
+		models.Kategori
+		JumlahBarang int64 `json:"jumlah_barang"`
+	}
+
+	result := make([]KategoriWithCount, len(kategori))
+	for i, k := range kategori {
+		var count int64
+		config.DB.Model(&models.Barang{}).Where("id_kategori = ?", k.IdKategori).Count(&count)
+		result[i] = KategoriWithCount{Kategori: k, JumlahBarang: count}
+	}
+
+	// Bungkus dan kirim
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Berhasil mengambil daftar kategori",
-		"data":    kategori,
+		"data":    result,
 	})
 }
+
 
 // TambahKategori menambahkan kategori baru.
 // Dipakai oleh: admin (POST /admin/katalog/kategori)

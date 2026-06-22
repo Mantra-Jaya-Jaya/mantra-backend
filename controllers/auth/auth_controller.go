@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/mail"
-	"os"
 	"time"
 
 	"backend-mantra/config"
@@ -164,7 +163,7 @@ func RefreshToken(c *gin.Context) {
 	}
 
 	if clientType == "nextjs" {
-		isSecure := os.Getenv("MIDTRANS_ENVIRONMENT") == "production"
+		isSecure := IsSecureCookie(c)
 		c.SetCookie("access_token", newAccessToken, 1800, "/", "", isSecure, true)
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
@@ -245,7 +244,7 @@ func Logout(c *gin.Context) {
 	}
 
 	if clientType == "nextjs" {
-		isSecure := os.Getenv("MIDTRANS_ENVIRONMENT") == "production"
+		isSecure := IsSecureCookie(c)
 		c.SetCookie("access_token", "", -1, "/", "", isSecure, true)
 		c.SetCookie("refresh_token", "", -1, "/", "", isSecure, true)
 		// Juga bersihkan path lama jika user masih menyimpannya

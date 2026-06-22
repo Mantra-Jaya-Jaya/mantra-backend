@@ -15,6 +15,7 @@ Mendapatkan ringkasan checkout pesanan offline.
 Memproses pembayaran tunai.
 
 **Request:**
+
 ```json
 {
   "total_bayar": 200000,
@@ -23,6 +24,7 @@ Memproses pembayaran tunai.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -40,6 +42,7 @@ Memproses pembayaran tunai.
 Memproses pembayaran non-tunai (QRIS, E-Wallet, VA, Kartu).
 
 **Request:**
+
 ```json
 {
   "payment_type": "qris",
@@ -48,6 +51,7 @@ Memproses pembayaran non-tunai (QRIS, E-Wallet, VA, Kartu).
 ```
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -67,6 +71,7 @@ Memproses pembayaran non-tunai (QRIS, E-Wallet, VA, Kartu).
 Mengupdate quantity item di pesanan offline sebelum checkout.
 
 **Request:**
+
 ```json
 {
   "id_detail_pesanan": 1,

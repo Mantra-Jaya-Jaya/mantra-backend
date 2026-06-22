@@ -1,0 +1,29 @@
+meta {
+  name: Get Status Biteship
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customer/pesanan/{{customerPublicId}}/status-biteship
+  body: none
+  auth: bearer
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const status = res.body?.data?.status || "pending";
+  const waybill = res.body?.data?.waybill_id || null;
+  const orderId = res.body?.data?.order_id || null;
+
+  bru.log(`Status Biteship: ${status}`);
+  bru.log(`Waybill: ${waybill}`);
+  bru.log(`Order ID: ${orderId}`);
+}

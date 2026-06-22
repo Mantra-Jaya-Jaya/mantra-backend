@@ -21,27 +21,33 @@ Atlas membandingkan **GORM Structs** (Single Source of Truth) dengan **database 
 ## Workflow Harian
 
 ### 1. Buat / ubah struct di `models/`
+
 Buat file baru atau edit struct yang sudah ada. Pastikan:
+
 - Nama struct Capital (exported)
 - Tag `gorm:"column:nama_kolom"` snake_case
 - Method `TableName() string` mengembalikan nama tabel
 
 ### 2. Cek perubahan
+
 ```bash
 make db-diff
 ```
 
 ### 3. Lihat SQL yang akan dijalankan (dry run)
+
 ```bash
 make db-plan
 ```
 
 ### 4. Apply ke database utama
+
 ```bash
 make db-apply
 ```
 
 ### 5. Update DBML
+
 Setelah apply, update file `docs/mantra.dbml` agar sinkron dengan kode.
 
 ## Perintah Lengkap
@@ -60,6 +66,7 @@ Setelah apply, update file `docs/mantra.dbml` agar sinkron dengan kode.
 ## Cara Tambah Tabel Baru
 
 1. Buat file `models/baru.go`:
+
    ```go
    package models
 
@@ -79,6 +86,7 @@ Setelah apply, update file `docs/mantra.dbml` agar sinkron dengan kode.
 2. Daftarkan di `config/database.go` → `AutoMigrate()`
 
 3. Jalankan:
+
    ```bash
    make db-diff
    make db-apply

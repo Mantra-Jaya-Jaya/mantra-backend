@@ -13,6 +13,7 @@ Hasil: `bin/mantra-backend` — binary statis, siap di-copy ke server.
 Semua konfigurasi via environment variables (file `.env` di root proyek):
 
 ### Database
+
 ```env
 DB_HOST=localhost
 DB_PORT=5432
@@ -22,12 +23,14 @@ DB_NAME=mantra_db
 ```
 
 ### JWT
+
 ```env
 JWT_SECRET=generate_random_secret_here
 JWT_REFRESH_SECRET=generate_different_secret_here
 ```
 
 ### Midtrans (Payment Gateway)
+
 ```env
 MIDTRANS_SERVER_KEY=your_server_key
 MIDTRANS_CLIENT_KEY=your_client_key
@@ -35,6 +38,7 @@ MIDTRANS_MERCHANT_ID=your_merchant_id
 ```
 
 ### Biteship (Shipping)
+
 ```env
 BITESHIP_API_KEY=your_biteship_api_key
 BITESHIP_MODE=sandbox
@@ -49,6 +53,7 @@ BITESHIP_STORE_COORDINATE_LONG=110.438333
 ```
 
 ### MinIO (File Storage)
+
 ```env
 MINIO_ENDPOINT=localhost:9000
 MINIO_ACCESS_KEY=your_access_key
@@ -57,6 +62,7 @@ MINIO_BUCKET=mantra-storage
 ```
 
 ### CORS
+
 ```env
 ALLOWED_ORIGIN=https://admin.mantra.web.id
 ```

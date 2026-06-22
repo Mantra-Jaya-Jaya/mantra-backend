@@ -14,17 +14,21 @@ Base URL dan format komunikasi untuk seluruh endpoint MANTRA.
 Dua metode autentikasi tergantung client:
 
 ### Flutter (Customer & Kasir Apps)
-```
+
+```http
 Authorization: Bearer <access_token>
 ```
 
 ### Next.js (Admin Web)
+
 Token dikirim via `httpOnly Cookie`:
-```
+
+```http
 Cookie: access_token=<token>; refresh_token=<token>
 ```
 
 Deteksi client dilakukan otomatis via header `X-Client-Type`:
+
 - `X-Client-Type: flutter` → response JSON dengan `access_token`
 - `X-Client-Type: nextjs` → response JSON + set cookie
 

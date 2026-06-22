@@ -292,13 +292,21 @@ func (b *BiteshipAdapter) GetCouriers() ([]BiteshipCourierItem, error) {
 
 // CreateShipmentRequest is the request payload for creating a Biteship order
 type CreateShipmentRequest struct {
-	OriginAddress       string  `json:"origin_address"`
-	OriginCoordinate    string  `json:"origin_coordinate"`
-	DestinationAddress  string  `json:"destination_address"`
-	DestinationCoordinate string `json:"destination_coordinate"`
-	CourierCode         string  `json:"courier_code"`
-	CourierServiceCode  string  `json:"courier_service_code"`
-	Items               []CreateShipmentItem `json:"items"`
+	OriginAddress            string
+	OriginLat                float64
+	OriginLng                float64
+	OriginPostalCode         int
+	DestinationAddress       string
+	DestinationLat           float64
+	DestinationLng           float64
+	DestinationPostalCode    int
+	DestinationContactName   string
+	DestinationContactPhone  string
+	DestinationNote          string
+	CourierCode              string
+	CourierServiceCode       string
+	OrderNote                string
+	Items                    []CreateShipmentItem
 }
 
 type CreateShipmentItem struct {
@@ -311,23 +319,28 @@ type CreateShipmentItem struct {
 	Height        int    `json:"height,omitempty"`
 }
 
+type biteshipCoordinate struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}
+
 type biteshipCreateOrderRequest struct {
-	Shipper struct {
-		Name    string `json:"name"`
-		Phone   string `json:"phone"`
-		Address string `json:"address"`
-		Coordinate string `json:"coordinate"`
-	} `json:"shipper"`
-	Destination struct {
-		Name         string `json:"name"`
-		Phone        string `json:"phone"`
-		Address      string `json:"address"`
-		Coordinate   string `json:"coordinate"`
-	} `json:"destination"`
-	Courier struct {
-		CourierCode string `json:"courier_code"`
-		ServiceCode string `json:"service_code"`
-	} `json:"courier"`
+	OriginContactName       string              `json:"origin_contact_name"`
+	OriginContactPhone      string              `json:"origin_contact_phone"`
+	OriginAddress           string              `json:"origin_address"`
+	OriginCoordinate        *biteshipCoordinate `json:"origin_coordinate,omitempty"`
+	OriginPostalCode        int                 `json:"origin_postal_code,omitempty"`
+	DestinationContactName  string              `json:"destination_contact_name"`
+	DestinationContactPhone string              `json:"destination_contact_phone"`
+	DestinationAddress      string              `json:"destination_address"`
+	DestinationCoordinate   *biteshipCoordinate `json:"destination_coordinate,omitempty"`
+	DestinationPostalCode   int                 `json:"destination_postal_code,omitempty"`
+	DestinationNote         string              `json:"destination_note,omitempty"`
+	CourierCompany          string              `json:"courier_company"`
+	CourierType             string              `json:"courier_type"`
+	CourierInsurance        int                 `json:"courier_insurance,omitempty"`
+	DeliveryType            string              `json:"delivery_type"`
+	OrderNote               string              `json:"order_note,omitempty"`
 	Items []struct {
 		Name     string `json:"name"`
 		Weight   int    `json:"weight"`
@@ -342,7 +355,9 @@ type biteshipCreateOrderRequest struct {
 type biteshipCreateOrderResponse struct {
 	Success   bool   `json:"success"`
 	Message   string `json:"message"`
+	ID        string `json:"id"`
 	WaybillID string `json:"waybill_id"`
+	Status    string `json:"status"`
 	Courier   struct {
 		Company string `json:"company"`
 		Name    string `json:"name"`
@@ -353,18 +368,41 @@ type biteshipCreateOrderResponse struct {
 // CreateShipment creates a shipment order on Biteship and returns waybill ID
 func (b *BiteshipAdapter) CreateShipment(req CreateShipmentRequest) (*biteshipCreateOrderResponse, error) {
 	orderReq := biteshipCreateOrderRequest{}
-	orderReq.Shipper.Name = os.Getenv("BITESHIP_STORE_NAME")
-	orderReq.Shipper.Phone = os.Getenv("BITESHIP_STORE_PHONE")
-	orderReq.Shipper.Address = req.OriginAddress
-	orderReq.Shipper.Coordinate = req.OriginCoordinate
 
-	orderReq.Destination.Name = ""
-	orderReq.Destination.Phone = ""
-	orderReq.Destination.Address = req.DestinationAddress
-	orderReq.Destination.Coordinate = req.DestinationCoordinate
+	// Origin (toko)
+	orderReq.OriginContactName = os.Getenv("BITESHIP_STORE_NAME")
+	orderReq.OriginContactPhone = os.Getenv("BITESHIP_STORE_PHONE")
+	orderReq.OriginAddress = req.OriginAddress
+	if req.OriginLat != 0 && req.OriginLng != 0 {
+		orderReq.OriginCoordinate = &biteshipCoordinate{
+			Latitude:  req.OriginLat,
+			Longitude: req.OriginLng,
+		}
+	}
+	if req.OriginPostalCode != 0 {
+		orderReq.OriginPostalCode = req.OriginPostalCode
+	}
 
-	orderReq.Courier.CourierCode = req.CourierCode
-	orderReq.Courier.ServiceCode = req.CourierServiceCode
+	// Destination (customer)
+	orderReq.DestinationContactName = req.DestinationContactName
+	orderReq.DestinationContactPhone = req.DestinationContactPhone
+	orderReq.DestinationAddress = req.DestinationAddress
+	orderReq.DestinationNote = req.DestinationNote
+	if req.DestinationLat != 0 && req.DestinationLng != 0 {
+		orderReq.DestinationCoordinate = &biteshipCoordinate{
+			Latitude:  req.DestinationLat,
+			Longitude: req.DestinationLng,
+		}
+	}
+	if req.DestinationPostalCode != 0 {
+		orderReq.DestinationPostalCode = req.DestinationPostalCode
+	}
+
+	// Courier
+	orderReq.CourierCompany = req.CourierCode
+	orderReq.CourierType = req.CourierServiceCode
+	orderReq.DeliveryType = "now"
+	orderReq.OrderNote = req.OrderNote
 
 	for _, it := range req.Items {
 		orderReq.Items = append(orderReq.Items, struct {
@@ -387,6 +425,8 @@ func (b *BiteshipAdapter) CreateShipment(req CreateShipmentRequest) (*biteshipCr
 	}
 
 	bodyBytes, _ := json.Marshal(orderReq)
+	fmt.Printf("📤 Biteship Request: %s\n", string(bodyBytes))
+
 	reqHttp, _ := http.NewRequest("POST", b.baseURL+"/v1/orders", bytes.NewReader(bodyBytes))
 	reqHttp.Header.Set("Content-Type", "application/json")
 	reqHttp.Header.Set("Authorization", b.apiKey)
@@ -398,6 +438,8 @@ func (b *BiteshipAdapter) CreateShipment(req CreateShipmentRequest) (*biteshipCr
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
+	fmt.Printf("📥 Biteship Response [%d]: %s\n", resp.StatusCode, string(respBody))
+
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("biteship create order error status %d: %s", resp.StatusCode, string(respBody))
 	}
@@ -408,6 +450,51 @@ func (b *BiteshipAdapter) CreateShipment(req CreateShipmentRequest) (*biteshipCr
 	}
 
 	return &result, nil
+}
+
+// GetOrderStatus mengambil status order Biteship berdasarkan order ID.
+// Dipakai untuk verifikasi / polling status kalau webhook gagal.
+func (b *BiteshipAdapter) GetOrderStatus(orderID string) (*biteshipCreateOrderResponse, error) {
+	reqHttp, _ := http.NewRequest("GET", b.baseURL+fmt.Sprintf("/v1/orders/%s", orderID), nil)
+	reqHttp.Header.Set("Authorization", b.apiKey)
+
+	resp, err := b.client.Do(reqHttp)
+	if err != nil {
+		return nil, fmt.Errorf("biteship get order failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("biteship order error status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result biteshipCreateOrderResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("biteship order parse error: %w", err)
+	}
+
+	return &result, nil
+}
+
+// CancelOrder membatalkan order Biteship.
+// Dipakai jika shipment perlu dibatalkan sebelum dikirim.
+func (b *BiteshipAdapter) CancelOrder(orderID string) error {
+	reqHttp, _ := http.NewRequest("POST", b.baseURL+fmt.Sprintf("/v1/orders/%s/cancel", orderID), nil)
+	reqHttp.Header.Set("Authorization", b.apiKey)
+
+	resp, err := b.client.Do(reqHttp)
+	if err != nil {
+		return fmt.Errorf("biteship cancel order failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("biteship cancel order error status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil
 }
 
 func getMockOngkir(req OngkirRequest) []OngkirResult {
