@@ -91,7 +91,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			if timeRemaining > 0 && timeRemaining < 15*time.Minute {
 				newToken, errGenerate := auth.GenerateJWT(claims.UserID, claims.PublicID, normalizedRole)
 				if errGenerate == nil && newToken != "" {
-					isSecure := os.Getenv("MIDTRANS_ENVIRONMENT") == "production"
+					isSecure := auth.IsSecureCookie(c)
 					c.SetCookie("access_token", newToken, 1800, "/", "", isSecure, true)
 					c.Header("X-New-Access-Token", newToken)
 					c.Header("Access-Control-Expose-Headers", "X-New-Access-Token")

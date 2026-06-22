@@ -16,8 +16,12 @@ func NormalizeRoleName(role string) string {
 	return strings.ToLower(strings.TrimSpace(role))
 }
 
-// isSecureCookie returns true only in production (HTTPS), false for local dev (HTTP)
-func isSecureCookie() bool {
+// IsSecureCookie returns true only in production (HTTPS), false for local dev (HTTP)
+func IsSecureCookie(c *gin.Context) bool {
+	host := c.Request.Host
+	if strings.HasPrefix(host, "localhost:") || strings.HasPrefix(host, "127.0.0.1:") || host == "localhost" || host == "127.0.0.1" {
+		return false
+	}
 	return os.Getenv("MIDTRANS_ENVIRONMENT") == "production"
 }
 
@@ -47,10 +51,9 @@ func RespondWithSuccess(c *gin.Context, clientType string, user models.User, rol
 	lowerRole := NormalizeRoleName(roleName)
 
 	if clientType == "nextjs" {
-		// Set cookie — secure=true hanya di production (HTTPS), false di local HTTP
-		// Gin SetCookie params: name, value string, maxAge int, path, domain string, secure, httpOnly bool
-		c.SetCookie("access_token", accessToken, 1800, "/", "", isSecureCookie(), true)
-		c.SetCookie("refresh_token", refreshToken, 604800, "/", "", isSecureCookie(), true)
+		isSecure := IsSecureCookie(c)
+		c.SetCookie("access_token", accessToken, 1800, "/", "", isSecure, true)
+		c.SetCookie("refresh_token", refreshToken, 604800, "/", "", isSecure, true)
 
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
