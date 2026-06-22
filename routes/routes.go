@@ -42,6 +42,7 @@ func SetupRoutes(r *gin.Engine) {
 		customerGroup.Use(middleware.AuthMiddleware(), middleware.RoleMiddleware("Customer"))
 		{
 			customerGroup.GET("/promo", katalog.GetPromo)
+			customerGroup.GET("/promo/:public_id/barang", katalog.GetBarangByDiskon)
 			customerGroup.GET("/kategori", katalog.GetKategori)
 			customerGroup.GET("/barang", katalog.GetDaftarBarang)
 			customerGroup.GET("/barang/detail/:public_id", katalog.GetDetailBarang)

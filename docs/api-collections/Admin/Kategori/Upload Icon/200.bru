@@ -10,10 +10,10 @@ post {
   auth: bearer
 }
 
-body:multipart-form {
-  icon: @file(../../dummy.jpg)
-}
-
 auth:bearer {
   token: {{accessToken}}
+}
+
+body:multipart-form {
+  icon: @file(/home/rajaba/Downloads/Adata-XPG-Lancer-Black-RGB-KIT-3.png)
 }

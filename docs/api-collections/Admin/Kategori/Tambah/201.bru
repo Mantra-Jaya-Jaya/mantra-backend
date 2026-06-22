@@ -10,16 +10,16 @@ post {
   auth: bearer
 }
 
-auth:bearer {
-  token: {{accessToken}}
-}
-
 headers {
   Content-Type: application/json
 }
 
+auth:bearer {
+  token: {{accessToken}}
+}
+
 body:json {
   {
-    "nama_kategori": "Minuman"
+    "nama_kategori": "Jomok"
   }
 }
