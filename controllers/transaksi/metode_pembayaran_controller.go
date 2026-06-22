@@ -2,12 +2,32 @@ package transaksi
 
 import (
 	"net/http"
+	"strings"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
 
 	"github.com/gin-gonic/gin"
 )
+
+func sanitizeIcon(kodeMetode, icon string) string {
+	ic := strings.ToLower(strings.TrimSpace(icon))
+	switch kodeMetode {
+	case "cash":
+		if ic == "" || ic == "payments_outlined" {
+			return "payments_outlined"
+		}
+	case "cod":
+		if ic == "" || strings.Contains(ic, "xendit") || strings.Contains(ic, "iconcod") {
+			return "package_outlined"
+		}
+	case "qris":
+		if ic == "" || strings.Contains(ic, "xendit") || strings.Contains(ic, "iconqris") {
+			return "qr_code_scanner"
+		}
+	}
+	return icon
+}
 
 func GetMetodePembayaran(c *gin.Context) {
 	var metode []models.MetodePembayaran
@@ -17,6 +37,9 @@ func GetMetodePembayaran(c *gin.Context) {
 	}
 	if metode == nil {
 		metode = []models.MetodePembayaran{}
+	}
+	for i := range metode {
+		metode[i].Icon = sanitizeIcon(metode[i].KodeMetode, metode[i].Icon)
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -33,6 +56,9 @@ func GetMetodePembayaranAktif(c *gin.Context) {
 	}
 	if metode == nil {
 		metode = []models.MetodePembayaran{}
+	}
+	for i := range metode {
+		metode[i].Icon = sanitizeIcon(metode[i].KodeMetode, metode[i].Icon)
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
