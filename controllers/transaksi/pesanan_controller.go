@@ -293,10 +293,11 @@ func GetDetailPesanan(c *gin.Context) {
 			ekspedisi = pengantaran.Ekspedisi.NamaEkspedisi
 		}
 		kurirData = gin.H{
-			"nama_kurir": pengantaran.Kurir.Karyawan.User.NamaLengkap,
-			"plat_nomor": "",
-			"ekspedisi":  ekspedisi,
-			"foto_kurir": pengantaran.Kurir.Karyawan.User.FotoProfil,
+			"nama_kurir":            pengantaran.Kurir.Karyawan.User.NamaLengkap,
+			"plat_nomor":            "",
+			"ekspedisi":             ekspedisi,
+			"foto_kurir":            pengantaran.Kurir.Karyawan.User.FotoProfil,
+			"foto_bukti_pengiriman": pengantaran.FotoBuktiPengiriman,
 		}
 	}
 
@@ -326,16 +327,19 @@ func GetDetailPesanan(c *gin.Context) {
 			"tujuan_pengantaran":     tujuanPengantaran,
 			"kurir":                  kurirData,
 			"rincian_pembayaran": gin.H{
-				"subtotal_items": subtotalItems,
-				"ongkir":         pesanan.OngkosKirim,
-				"biaya_proteksi": 0,
-				"total":          pesanan.TotalPembayaran,
-				"metode":         metodePembayaran,
-				"va_number":      payDetail.NomorVA,
-				"qr_url":         payDetail.QrCode,
-				"bill_key":       payDetail.BillKey,
-				"bill_code":      payDetail.BillCode,
-				"order_id":       pembayaran.OrderIdMidtrans,
+				"subtotal_items":   subtotalItems,
+				"ongkir":           pesanan.OngkosKirim,
+				"biaya_proteksi":   0,
+				"total":            pesanan.TotalPembayaran,
+				"metode":           metodePembayaran,
+				"nama_bank":        payDetail.NamaBank,
+				"kanal_pembayaran": payDetail.KanalPembayaran,
+				"va_number":        payDetail.NomorVA,
+				"qr_url":           payDetail.QrCode,
+				"bill_key":         payDetail.BillKey,
+				"bill_code":        payDetail.BillCode,
+				"order_id":         pembayaran.OrderIdMidtrans,
+				"batas_waktu":      pembayaran.BatasWaktuPembayaran,
 			},
 		},
 	})
@@ -638,6 +642,13 @@ func CheckoutPesanan(c *gin.Context) {
 			}
 		}
 
+		if qrUrl != "" {
+			fmt.Println("==================================================")
+			fmt.Println("🔗 QRIS URL (Copy ini ke Midtrans Simulator):")
+			fmt.Println(qrUrl)
+			fmt.Println("==================================================")
+		}
+
 		// Simpan Record Pembayaran
 		// Petakan nama metode ke kode tipe pembayaran di DB
 		tipePembayaranDB := metodeInput
@@ -645,6 +656,7 @@ func CheckoutPesanan(c *gin.Context) {
 			tipePembayaranDB = "bank_transfer"
 		}
 
+		batasWaktu := time.Now().Add(24 * time.Hour)
 		pembayaran := models.Pembayaran{
 			PesananID:          pesanan.IdPesanan,
 			OrderIdMidtrans:    orderIDMidtrans,
@@ -653,6 +665,7 @@ func CheckoutPesanan(c *gin.Context) {
 			FraudStatusID:      utils.GetFraudStatusID("accept"),
 			MetodePembayaranID: &metodeDb.IdMetodePembayaran,
 			TotalDibayar:       pesanan.TotalPembayaran,
+			BatasWaktuPembayaran: &batasWaktu,
 		}
 		if err := tx.Create(&pembayaran).Error; err != nil {
 			tx.Rollback()
@@ -696,7 +709,7 @@ func CheckoutPesanan(c *gin.Context) {
 	// Notifikasi ke semua kasir bahwa ada pesanan online baru
 	go func() {
 		var kasirUsers []models.User
-		config.DB.Joins("JOIN role ON role.id_role = users.id_role").
+		config.DB.Joins("JOIN role ON role.id_role = \"user\".id_role").
 			Where("role.nama_role = ?", "Kasir").
 			Find(&kasirUsers)
 
@@ -808,8 +821,8 @@ func BatalkanPesanan(c *gin.Context) {
 		return
 	}
 
-	pesanan.StatusPesananID = utils.GetStatusPesananID("Dibatalkan")
-	if err := config.DB.Save(&pesanan).Error; err != nil {
+	newStatusID := utils.GetStatusPesananID("Dibatalkan")
+	if err := config.DB.Exec("UPDATE pesanan SET id_status_pesanan = ? WHERE id_pesanan = ?", newStatusID, pesanan.IdPesanan).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal membatalkan pesanan",

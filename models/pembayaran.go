@@ -23,6 +23,7 @@ type Pembayaran struct {
 	MetodePembayaran    *MetodePembayaran `gorm:"foreignKey:MetodePembayaranID;references:IdMetodePembayaran" json:"metode_pembayaran,omitempty"`
 	TransaksiMidtransID string            `gorm:"column:transaksi_midtrans_id" json:"transaksi_midtrans_id,omitempty"`
 	WaktuPembayaran     *time.Time        `gorm:"column:waktu_pembayaran" json:"waktu_pembayaran,omitempty"`
+	BatasWaktuPembayaran *time.Time       `gorm:"column:batas_waktu_pembayaran" json:"batas_waktu_pembayaran,omitempty"`
 	TotalDibayar        int               `gorm:"column:total_dibayar;default:0" json:"total_dibayar"`
 
 	DetailPembayaran []DetailPembayaran `gorm:"foreignKey:PembayaranID" json:"detail_pembayaran,omitempty"`

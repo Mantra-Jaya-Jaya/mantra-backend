@@ -41,7 +41,7 @@ func GetKategori(c *gin.Context) {
 	// 🚀 2. INTELIJEN DATABASE: Cari Role User Langsung dari Tabel Master!
 	var namaRole string
 	// Asumsi tabel user lu namanya 'user' atau 'users', sesuaikan kalau beda ya bosku!
-	errRole := config.DB.Raw("SELECT role.nama_role FROM user JOIN role ON role.id_role = user.id_role WHERE user.id_user = ?", userID).Scan(&namaRole).Error
+	errRole := config.DB.Raw("SELECT role.nama_role FROM \"user\" JOIN role ON role.id_role = \"user\".id_role WHERE \"user\".id_user = ?", userID).Scan(&namaRole).Error
 	
 	if errRole != nil || namaRole == "" {
 		// Fallback (Jaga-jaga kalau query gagal, kita tetep coba ambil dari token JWT)

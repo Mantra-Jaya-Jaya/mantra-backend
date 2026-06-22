@@ -486,6 +486,13 @@ func BayarNonTunai(c *gin.Context) {
 		}
 	}
 
+	if qrUrl != "" {
+		fmt.Println("==================================================")
+		fmt.Println("🔗 QRIS URL (Copy ini ke Midtrans Simulator):")
+		fmt.Println(qrUrl)
+		fmt.Println("==================================================")
+	}
+
 	// 🚀 7. SIMPAN KE DATABASE SECARA ATOMIC (TRANSACTION)
 	tx := config.DB.Begin()
 

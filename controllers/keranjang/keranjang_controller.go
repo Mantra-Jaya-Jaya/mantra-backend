@@ -327,6 +327,11 @@ func GetKeranjang(c *gin.Context) {
 			}
 		}
 
+		besarDiskon := 0
+		if b.Diskon != nil {
+			besarDiskon = b.Diskon.BesarDiskon
+		}
+
 		responseData = append(responseData, gin.H{
 			"id_keranjang":          item.PublicId,
 			"id_spesifikasi_barang": item.SpesifikasiBarangID,
@@ -335,7 +340,7 @@ func GetKeranjang(c *gin.Context) {
 			"harga_barang":          hargaAsli,
 			"harga_diskon":          hargaDiskon,
 			"punya_diskon":          punyaDiskon,
-			"besar_diskon":          b.Diskon.BesarDiskon,
+			"besar_diskon":          besarDiskon,
 			"gambar_barang":         b.GambarBarang,
 			"quantity":              item.Quantity,
 			"subtotal":              item.Quantity * hargaDiskon,
