@@ -121,7 +121,6 @@ func processExternalShipment(pesananID uint) {
 		return
 	}
 
-<<<<<<< HEAD
 	// Debug log response Biteship
 	fmt.Printf("📦 Biteship Response pesanan %d: success=%v id=%s waybill=%s status=%s\n",
 		pesananID, result.Success, result.ID, result.WaybillID, result.Status)
@@ -132,18 +131,9 @@ func processExternalShipment(pesananID uint) {
 	}
 
 	updates := map[string]any{
+		"nomor_resi":        result.WaybillID,
 		"biteship_order_id": result.ID,
 		"id_status_pesanan": utils.GetStatusPesananID("Dikirim"),
-=======
-	updates := map[string]interface{}{
-		"nomor_resi":         result.WaybillID,
-		"biteship_order_id":  result.ID,
-		"id_status_pesanan":  utils.GetStatusPesananID("Dikirim"),
->>>>>>> 92f6226 (feat: simpan biteship order_id untuk tracking + cancel)
-	}
-	// Waybill bisa kosong di sandbox mode, simpan jika ada
-	if result.WaybillID != "" {
-		updates["nomor_resi"] = result.WaybillID
 	}
 	if err := config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pesananID).Updates(updates).Error; err != nil {
 		fmt.Printf("❌ Shipment Error: Gagal update status pesanan %d: %s\n", pesananID, err.Error())
