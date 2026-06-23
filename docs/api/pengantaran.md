@@ -1,17 +1,32 @@
-# Pengantaran (Courier & Shipping) API
+# 🛵 Pengantaran (Courier & Shipping) API Contract
 
-API untuk melacak pesanan (Customer) dan mengelola pengantaran (Kurir).
+---
+### 🧭 Navigasi Cepat
+[🏠 Utama](../README.md) | [🏛️ Arsitektur](../architecture.md) | [🛠️ Deployment](../deployment.md) | [💳 Midtrans](../pembayaran.md) | [📦 Biteship](../biteship.md) | [📡 API Contract](overview.md) | [🗄️ Database](../database/erd.md) | [🔒 Keamanan](../security/README.md)
+---
+
+API untuk melacak pesanan oleh customer serta manajemen tugas pengantaran oleh kurir toko (internal).
+
+---
+
+## 🧭 Daftar Endpoint Pengantaran
+
+*   [**GET /api/v1/customer/pesanan/:public_id/lacak**](#get-apiv1customerpesananpublic_idlacak) - Melacak status pengantaran paket (Customer)
+*   [**PATCH /api/v1/kurir/pengantaran/:public_id/lokasi**](#patch-apiv1kurirpengantaranpublic_idlokasi) - Memperbarui koordinat GPS live kurir (Kurir)
+*   [**POST /api/v1/kurir/pengantaran/:public_id/ambil**](#post-apiv1kurirpengantaranpublic_idambil) - Mengambil (claim) tugas pengiriman barang (Kurir)
+*   [**POST /api/v1/kurir/pengantaran/:public_id/status**](#post-apiv1kurirpengantaranpublic_idstatus) - Memperbarui status pengantaran & upload bukti foto (Kurir)
 
 ---
 
 ## GET /api/v1/customer/pesanan/:public_id/lacak
 
-Melacak status pengiriman pesanan (Customer).
+Melacak riwayat status dan detail pengiriman suatu pesanan (Customer).
 
-**Auth:** Wajib Login (Customer)
+*   **Autentikasi:** Wajib (Role: `Customer`)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
+*   **Parameter URL:** `public_id` (UUID Pesanan)
 
-**Response (Ekspedisi Eksternal - Biteship):**
-
+### Response (Jika Ekspedisi Eksternal - Biteship)
 ```json
 {
   "status": "success",
@@ -33,8 +48,7 @@ Melacak status pengiriman pesanan (Customer).
 }
 ```
 
-**Response (Ekspedisi Internal - Kurir Toko):**
-
+### Response (Jika Ekspedisi Internal - Kurir Toko)
 ```json
 {
   "status": "success",
@@ -44,15 +58,15 @@ Melacak status pengiriman pesanan (Customer).
     "tipe_ekspedisi": "internal",
     "kurir": {
       "nama": "Ricardo Holahilo",
-      "plat_nomor": "",
+      "plat_nomor": "H 1234 AB",
       "foto": "http://minio:9000/profiles/avatar.png"
     },
     "lokasi_kurir": {
       "latitude": -7.02,
       "longitude": 110.43
     },
-    "estimasi_tiba": "",
-    "jarak_meter": 0
+    "estimasi_tiba": "15 menit",
+    "jarak_meter": 2300
   }
 }
 ```
@@ -61,12 +75,13 @@ Melacak status pengiriman pesanan (Customer).
 
 ## PATCH /api/v1/kurir/pengantaran/:public_id/lokasi
 
-Memperbarui koordinat GPS lokasi kurir secara berkala selama pengantaran.
+Memperbarui koordinat GPS live kurir toko secara periodik selama di perjalanan.
 
-**Auth:** Wajib Login (Kurir)
+*   **Autentikasi:** Wajib (Role: `Kurir`)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
+*   **Parameter URL:** `public_id` (UUID Pengantaran)
 
-**Request:**
-
+### Request Payload
 ```json
 {
   "latitude": -7.02561,
@@ -74,8 +89,7 @@ Memperbarui koordinat GPS lokasi kurir secara berkala selama pengantaran.
 }
 ```
 
-**Response:**
-
+### Response (200 OK)
 ```json
 {
   "status": "success",
@@ -87,12 +101,13 @@ Memperbarui koordinat GPS lokasi kurir secara berkala selama pengantaran.
 
 ## POST /api/v1/kurir/pengantaran/:public_id/ambil
 
-Mengambil (claim) tugas pengantaran pesanan yang statusnya "Dikemas".
+Mengambil tugas pengantaran pesanan oleh kurir toko untuk pesanan yang siap dikirim (`Dikemas`).
 
-**Auth:** Wajib Login (Kurir)
+*   **Autentikasi:** Wajib (Role: `Kurir`)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
+*   **Parameter URL:** `public_id` (UUID Pesanan)
 
-**Response:**
-
+### Response (200 OK)
 ```json
 {
   "status": "success",
@@ -108,18 +123,18 @@ Mengambil (claim) tugas pengantaran pesanan yang statusnya "Dikemas".
 
 ## POST /api/v1/kurir/pengantaran/:public_id/status
 
-Memperbarui status pengantaran (misal: "Tiba di Tujuan", "Selesai").
-Jika status diubah ke **Selesai**, kurir wajib menyertakan foto bukti pengiriman sebagai `multipart/form-data` dengan field name `"foto"`.
+Memperbarui status tugas pengantaran (misal dari "Dalam Perjalanan" menjadi "Selesai"). 
 
-**Auth:** Wajib Login (Kurir)
+*   **Autentikasi:** Wajib (Role: `Kurir`)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
+*   **Parameter URL:** `public_id` (UUID Pengantaran)
+*   **Tipe Request:** `multipart/form-data` (Jika status diubah ke **Selesai**, wajib menyertakan foto bukti pengantaran).
 
-**Request (Multipart/Form-Data untuk Selesai):**
+### Request Payload (Multipart Form Data)
+- `status`: `Selesai` (Text)
+- `foto`: `[Binary Image File]` (File upload gambar bukti penerimaan)
 
-- `status`: "Selesai" (Text)
-- `foto`: [File Image] (Binary)
-
-**Response:**
-
+### Response (200 OK)
 ```json
 {
   "status": "success",

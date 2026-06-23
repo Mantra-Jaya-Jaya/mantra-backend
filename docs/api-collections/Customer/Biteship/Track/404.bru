@@ -1,0 +1,19 @@
+meta {
+  name: 404
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customer/pesanan/00000000-0000-0000-0000-000000000000/lacak
+  body: none
+  auth: bearer
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

@@ -1,15 +1,34 @@
-# Auth API
+# 🔑 Auth API Contract
 
-Endpoint autentikasi — public dan protected.
+---
+### 🧭 Navigasi Cepat
+[🏠 Utama](../README.md) | [🏛️ Arsitektur](../architecture.md) | [🛠️ Deployment](../deployment.md) | [💳 Midtrans](../pembayaran.md) | [📦 Biteship](../biteship.md) | [📡 API Contract](overview.md) | [🗄️ Database](../database/erd.md) | [🔒 Keamanan](../security/README.md)
+---
+
+Pusat integrasi endpoint autentikasi dan otorisasi pengguna sistem MANTRA.
+
+---
+
+## 🧭 Daftar Endpoint Auth
+
+*   [**POST /api/v1/login**](#post-apiv1login) - Masuk menggunakan username/email
+*   [**POST /api/v1/register**](#post-apiv1register) - Mendaftar akun customer baru
+*   [**POST /api/v1/auth/refresh**](#post-apiv1authrefresh) - Memperbarui token akses (access token)
+*   [**POST /api/v1/logout**](#post-apiv1logout) - Keluar dan menonaktifkan refresh token
+*   [**PUT /api/v1/change-password**](#put-apiv1change-password) - Mengubah password pengguna
 
 ---
 
 ## POST /api/v1/login
 
-Public. Login dengan username atau email.
+Melakukan login akun pengguna menggunakan username atau email.
 
-**Request:**
+*   **Autentikasi:** Tidak Ada (Public)
+*   **Header Wajib:**
+    *   `Content-Type: application/json`
+    *   `X-Client-Type`: `flutter` (untuk apps) atau `nextjs` (untuk web admin)
 
+### Request Payload
 ```json
 {
   "username": "johndoe",
@@ -17,8 +36,7 @@ Public. Login dengan username atau email.
 }
 ```
 
-**Response (Flutter):**
-
+### Response (Client Flutter App)
 ```json
 {
   "status": "success",
@@ -40,16 +58,19 @@ Public. Login dengan username atau email.
 }
 ```
 
-**Response (Next.js):** Set cookie `access_token` + `refresh_token`, body tanpa token.
+### Response (Client Next.js Web Admin)
+Response JSON sama dengan Flutter namun **tanpa** field `access_token` dan `refresh_token` di dalam body. Token secara otomatis di-set ke dalam browser client melalui header `Set-Cookie` (menggunakan flag `httpOnly`, `Secure`, dan `SameSite`).
 
 ---
 
 ## POST /api/v1/register
 
-Public. Registrasi customer baru.
+Membuat akun customer baru di database.
 
-**Request:**
+*   **Autentikasi:** Tidak Ada (Public)
+*   **Header Wajib:** `Content-Type: application/json`
 
+### Request Payload
 ```json
 {
   "username": "johndoe",
@@ -61,8 +82,7 @@ Public. Registrasi customer baru.
 }
 ```
 
-**Response:** `201 Created`
-
+### Response (201 Created)
 ```json
 {
   "status": "success",
@@ -78,31 +98,32 @@ Public. Registrasi customer baru.
 }
 ```
 
-**Validasi:**
-
-- Password minimal 8 karakter
-- Konfirmasi password harus cocok
-- Email format valid
-- Username & email unique
+### Validasi Logika Bisnis
+*   Password wajib minimal memiliki panjang **8 karakter**.
+*   `konfirmasi_password` wajib bernilai sama persis dengan `password`.
+*   Format input `email` harus merupakan email yang valid.
+*   `username` dan `email` tidak boleh sama dengan yang sudah terdaftar (Unique Constraint).
 
 ---
 
 ## POST /api/v1/auth/refresh
 
-Public. Mendapatkan access token baru menggunakan refresh token.
+Memperbarui `access_token` yang telah kedaluwarsa dengan menggunakan token penyegar (`refresh_token`).
 
-**Request (Flutter):**
+*   **Autentikasi:** Tidak Ada (Public)
+*   **Header Wajib:** 
+    *   `Content-Type: application/json`
+    *   `X-Client-Type`: `flutter` atau `nextjs`
 
+### Request Payload (Khusus Flutter)
 ```json
 {
   "refresh_token": "a1b2c3d4..."
 }
 ```
+*Catatan: Client Next.js mengirimkan refresh token otomatis via Cookie.*
 
-**Request (Next.js):** Kirim cookie `refresh_token` otomatis.
-
-**Response (Flutter):**
-
+### Response (Client Flutter App)
 ```json
 {
   "status": "success",
@@ -114,26 +135,29 @@ Public. Mendapatkan access token baru menggunakan refresh token.
 }
 ```
 
-**Response (Next.js):** Set cookie baru, body tanpa token.
+### Response (Client Next.js Web Admin)
+Mengembalikan status sukses dan secara otomatis memperbarui cookie access token yang baru.
 
 ---
 
 ## POST /api/v1/logout
 
-Auth required. Menonaktifkan refresh token.
+Mengakhiri sesi pengguna dan menghapus/menonaktifkan status token aktif di database.
 
-**Request (Flutter):**
+*   **Autentikasi:** Wajib (Semua Role)
+*   **Header Wajib:**
+    *   `Authorization: Bearer <access_token>` (Flutter)
+    *   `X-Client-Type`: `flutter` atau `nextjs`
 
+### Request Payload (Khusus Flutter)
 ```json
 {
   "refresh_token": "a1b2c3d4..."
 }
 ```
+*Catatan: Client Next.js cukup menembak endpoint ini dan server otomatis akan menghapus cookie.*
 
-**Request (Next.js):** Cukup panggil endpoint, cookie akan dihapus otomatis.
-
-**Response:**
-
+### Response
 ```json
 {
   "status": "success",
@@ -145,10 +169,12 @@ Auth required. Menonaktifkan refresh token.
 
 ## PUT /api/v1/change-password
 
-Auth required. Mengubah password (semua session di-revoke).
+Mengubah password pengguna yang sedang login.
 
-**Request:**
+*   **Autentikasi:** Wajib (Semua Role)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
 
+### Request Payload
 ```json
 {
   "password_lama": "oldpass123",
@@ -157,8 +183,7 @@ Auth required. Mengubah password (semua session di-revoke).
 }
 ```
 
-**Response:**
-
+### Response
 ```json
 {
   "status": "success",
@@ -166,4 +191,5 @@ Auth required. Mengubah password (semua session di-revoke).
 }
 ```
 
-Semua refresh token milik user akan di-revoke (logout dari semua device).
+> [!NOTE]
+> Setelah password berhasil diubah, seluruh sesi/refresh token pengguna pada device lain otomatis akan di-revoke (logout dari semua perangkat demi keamanan).

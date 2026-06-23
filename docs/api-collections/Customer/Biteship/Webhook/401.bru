@@ -1,0 +1,27 @@
+meta {
+  name: 401
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/webhook/biteship
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Biteship-Signature: invalid_signature_value
+}
+
+body:json {
+  {
+    "event": "order.status",
+    "data": {
+      "id": "{{biteshipOrderId}}",
+      "waybill_id": "{{waybillId}}",
+      "status": "active"
+    }
+  }
+}
