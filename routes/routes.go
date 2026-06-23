@@ -35,12 +35,14 @@ func SetupRoutes(r *gin.Engine) {
 
 		// Public Webhook (tanpa auth)
 		v1.POST("/payment/notification", transaksi.MidtransNotificationHandler)
+		v1.POST("/webhook/biteship", transaksi.BiteshipWebhookHandler)
 
 		// Customer Routes
 		customerGroup := v1.Group("/customer")
 		customerGroup.Use(middleware.AuthMiddleware(), middleware.RoleMiddleware("Customer"))
 		{
 			customerGroup.GET("/promo", katalog.GetPromo)
+			customerGroup.GET("/promo/:public_id/barang", katalog.GetBarangByDiskon)
 			customerGroup.GET("/kategori", katalog.GetKategori)
 			customerGroup.GET("/barang", katalog.GetDaftarBarang)
 			customerGroup.GET("/barang/detail/:public_id", katalog.GetDetailBarang)
@@ -55,6 +57,7 @@ func SetupRoutes(r *gin.Engine) {
 			customerGroup.PATCH("/pesanan/:public_id/batal", transaksi.BatalkanPesanan)
 			customerGroup.GET("/pesanan/:public_id", transaksi.GetDetailPesanan)
 			customerGroup.GET("/pesanan/:public_id/lacak", transaksi.LacakPesanan)
+			customerGroup.GET("/pesanan/:public_id/status-biteship", transaksi.GetBiteshipOrderStatus)
 			customerGroup.POST("/ongkir/cek", transaksi.CekOngkir)
 			customerGroup.POST("/ongkir/cek-radius", transaksi.CekRadius)
 			customerGroup.GET("/metode-pembayaran", transaksi.GetMetodePembayaranAktif)
@@ -159,6 +162,8 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.GET("/pengaturan", user.GetPengaturan)
 			adminGroup.PUT("/pengaturan", user.UpdatePengaturan)
 			adminGroup.GET("/pengantaran", transaksi.GetDaftarPengantaranAdmin)
+			adminGroup.POST("/pesanan/:public_id/cancel-shipment", transaksi.CancelBiteshipOrder)
+			adminGroup.GET("/pesanan/:public_id/status-biteship", transaksi.GetBiteshipOrderStatus)
 		}
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"backend-mantra/config"
+	"backend-mantra/controllers/auth"
 	"backend-mantra/models"
 	"backend-mantra/services"
 	"backend-mantra/utils"
@@ -19,6 +20,19 @@ import (
 	"github.com/midtrans/midtrans-go/coreapi"
 	"github.com/midtrans/midtrans-go/snap"
 )
+
+func isCustomerPesananOwner(publicID string, userID uint) (bool, error) {
+	var count int64
+	if err := config.DB.Raw(`
+		SELECT COUNT(*) FROM pesanan p
+		JOIN customer c ON c.id_customer = p.id_customer
+		WHERE p.public_id = ? AND c.id_user = ?
+	`, publicID, userID).Scan(&count).Error; err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
 
 // GetDaftarPesanan mengambil daftar pesanan.
 // Customer: hanya pesanan milik sendiri.
@@ -33,7 +47,7 @@ func GetDaftarPesanan(c *gin.Context) {
 	limit, _ := strconv.Atoi(limitStr)
 	offset := (page - 1) * limit
 
-	role := c.GetString("role")
+	role := auth.NormalizeRoleName(c.GetString("role"))
 	statusFilter := c.Query("status") // Ambil filter status dari query param
 
 	// 1. Ambil data dari context dengan aman
@@ -181,7 +195,7 @@ func GetDaftarPesanan(c *gin.Context) {
 // Auth: Wajib login
 func GetDetailPesanan(c *gin.Context) {
 	idPesanan := c.Param("public_id")
-	role := c.GetString("role")
+	role := auth.NormalizeRoleName(c.GetString("role"))
 	// 1. Ambil data dari context dengan aman
 	userIDInterface, exists := c.Get("user_id")
 	if !exists {
@@ -210,14 +224,16 @@ func GetDetailPesanan(c *gin.Context) {
 
 	if role == "customer" {
 		// Ownership check: pesanan harus milik customer yang login
-		var count int64
-		config.DB.Raw(`
-			SELECT COUNT(*) FROM pesanan p
-			JOIN customer c ON c.id_customer = p.id_customer
-			WHERE p.public_id = ? AND c.id_user = ?
-		`, idPesanan, userID).Scan(&count)
+		owned, err := isCustomerPesananOwner(idPesanan, uint(userID))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Gagal memverifikasi kepemilikan pesanan",
+			})
+			return
+		}
 
-		if count == 0 {
+		if !owned {
 			// Selalu 403, bukan 404 — jangan bocorkan bahwa ID ada
 			c.JSON(http.StatusForbidden, gin.H{
 				"status":  "error",
@@ -293,10 +309,11 @@ func GetDetailPesanan(c *gin.Context) {
 			ekspedisi = pengantaran.Ekspedisi.NamaEkspedisi
 		}
 		kurirData = gin.H{
-			"nama_kurir": pengantaran.Kurir.Karyawan.User.NamaLengkap,
-			"plat_nomor": "",
-			"ekspedisi":  ekspedisi,
-			"foto_kurir": pengantaran.Kurir.Karyawan.User.FotoProfil,
+			"nama_kurir":            pengantaran.Kurir.Karyawan.User.NamaLengkap,
+			"plat_nomor":            "",
+			"ekspedisi":             ekspedisi,
+			"foto_kurir":            pengantaran.Kurir.Karyawan.User.FotoProfil,
+			"foto_bukti_pengiriman": pengantaran.FotoBuktiPengiriman,
 		}
 	}
 
@@ -326,16 +343,19 @@ func GetDetailPesanan(c *gin.Context) {
 			"tujuan_pengantaran":     tujuanPengantaran,
 			"kurir":                  kurirData,
 			"rincian_pembayaran": gin.H{
-				"subtotal_items": subtotalItems,
-				"ongkir":         pesanan.OngkosKirim,
-				"biaya_proteksi": 0,
-				"total":          pesanan.TotalPembayaran,
-				"metode":         metodePembayaran,
-				"va_number":      payDetail.NomorVA,
-				"qr_url":         payDetail.QrCode,
-				"bill_key":       payDetail.BillKey,
-				"bill_code":      payDetail.BillCode,
-				"order_id":       pembayaran.OrderIdMidtrans,
+				"subtotal_items":   subtotalItems,
+				"ongkir":           pesanan.OngkosKirim,
+				"biaya_proteksi":   0,
+				"total":            pesanan.TotalPembayaran,
+				"metode":           metodePembayaran,
+				"nama_bank":        payDetail.NamaBank,
+				"kanal_pembayaran": payDetail.KanalPembayaran,
+				"va_number":        payDetail.NomorVA,
+				"qr_url":           payDetail.QrCode,
+				"bill_key":         payDetail.BillKey,
+				"bill_code":        payDetail.BillCode,
+				"order_id":         pembayaran.OrderIdMidtrans,
+				"batas_waktu":      pembayaran.BatasWaktuPembayaran,
 			},
 		},
 	})
@@ -491,7 +511,7 @@ func CheckoutPesanan(c *gin.Context) {
 	// Tentukan status awal pesanan berdasarkan metode pembayaran
 	metodeInput := strings.ToLower(input.MetodePembayaran)
 	var initialStatusID uint
-	if metodeInput == "tunai" || metodeInput == "cash" {
+	if metodeInput == "tunai" || metodeInput == "cash" || metodeInput == "cod" {
 		initialStatusID = utils.GetStatusPesananID("Dikemas")
 	} else {
 		initialStatusID = utils.GetStatusPesananID("Menunggu Pembayaran")
@@ -501,6 +521,33 @@ func CheckoutPesanan(c *gin.Context) {
 	tipeKurirID := utils.GetTipeKurirID("internal")
 	if input.IdTipeKurir != nil && *input.IdTipeKurir == utils.GetTipeKurirID("external") {
 		tipeKurirID = utils.GetTipeKurirID("external")
+	}
+	// Auto-detect: kalau ada ekspedisi & layanan → otomatis external
+	if input.IdEkspedisi != nil && *input.IdEkspedisi != 0 &&
+		input.IdLayananEkspedisi != nil && *input.IdLayananEkspedisi != 0 {
+		tipeKurirID = utils.GetTipeKurirID("external")
+	}
+
+	// Sanitize: treat pointer-to-0 sebagai nil (Flutter kadang kirim 0 bukan null)
+	var ekspedisiID *uint
+	var layananEkspedisiID *uint
+	if input.IdEkspedisi != nil && *input.IdEkspedisi != 0 {
+		ekspedisiID = input.IdEkspedisi
+	}
+	if input.IdLayananEkspedisi != nil && *input.IdLayananEkspedisi != 0 {
+		layananEkspedisiID = input.IdLayananEkspedisi
+	}
+
+	// Validasi: kurir external wajib punya ekspedisi dan layanan
+	if tipeKurirID == utils.GetTipeKurirID("external") {
+		if ekspedisiID == nil || layananEkspedisiID == nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "error",
+				"message": "Kurir external harus menyertakan id_ekspedisi dan id_layanan_ekspedisi yang valid",
+			})
+			return
+		}
 	}
 
 	// Buat Pesanan
@@ -513,8 +560,8 @@ func CheckoutPesanan(c *gin.Context) {
 		TipeKurirID:        tipeKurirID,
 		OngkosKirim:        ongkir,
 		Catatan:            input.Catatan,
-		EkspedisiID:        input.IdEkspedisi,
-		LayananEkspedisiID: input.IdLayananEkspedisi,
+		EkspedisiID:        ekspedisiID,
+		LayananEkspedisiID: layananEkspedisiID,
 	}
 	if alamat.IdAlamat != 0 {
 		pesanan.AlamatID = &alamat.IdAlamat
@@ -559,7 +606,7 @@ func CheckoutPesanan(c *gin.Context) {
 		cleanMetode = strings.Replace(metodeInput, "va_", "", 1)
 	}
 
-	if metodeInput != "tunai" && metodeInput != "cash" {
+	if metodeInput != "tunai" && metodeInput != "cash" && metodeInput != "cod" {
 		// Cari ID Metode Pembayaran dari database
 		kodeMetodeDb := "qris" // Default ke QRIS
 		if cleanMetode == "bca" || cleanMetode == "bni" || cleanMetode == "bri" || cleanMetode == "mandiri" || cleanMetode == "permata" {
@@ -638,6 +685,13 @@ func CheckoutPesanan(c *gin.Context) {
 			}
 		}
 
+		if qrUrl != "" {
+			fmt.Println("==================================================")
+			fmt.Println("🔗 QRIS URL (Copy ini ke Midtrans Simulator):")
+			fmt.Println(qrUrl)
+			fmt.Println("==================================================")
+		}
+
 		// Simpan Record Pembayaran
 		// Petakan nama metode ke kode tipe pembayaran di DB
 		tipePembayaranDB := metodeInput
@@ -645,6 +699,7 @@ func CheckoutPesanan(c *gin.Context) {
 			tipePembayaranDB = "bank_transfer"
 		}
 
+		batasWaktu := time.Now().Add(24 * time.Hour)
 		pembayaran := models.Pembayaran{
 			PesananID:          pesanan.IdPesanan,
 			OrderIdMidtrans:    orderIDMidtrans,
@@ -653,6 +708,7 @@ func CheckoutPesanan(c *gin.Context) {
 			FraudStatusID:      utils.GetFraudStatusID("accept"),
 			MetodePembayaranID: &metodeDb.IdMetodePembayaran,
 			TotalDibayar:       pesanan.TotalPembayaran,
+			BatasWaktuPembayaran: &batasWaktu,
 		}
 		if err := tx.Create(&pembayaran).Error; err != nil {
 			tx.Rollback()
@@ -684,11 +740,53 @@ func CheckoutPesanan(c *gin.Context) {
 		}
 	}
 
+	if metodeInput == "cod" {
+		var metodeDb models.MetodePembayaran
+		if err := tx.Where("kode_metode = ?", "cod").First(&metodeDb).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Metode COD belum disetup",
+			})
+			return
+		}
+
+		pembayaran := models.Pembayaran{
+			PesananID:          pesanan.IdPesanan,
+			TipePembayaranID:   utils.GetTipePembayaranID("cash"),
+			StatusTransaksiID:  utils.GetStatusTransaksiID("pending"),
+			FraudStatusID:      utils.GetFraudStatusID("accept"),
+			MetodePembayaranID: &metodeDb.IdMetodePembayaran,
+			TotalDibayar:       pesanan.TotalPembayaran,
+		}
+		if err := tx.Create(&pembayaran).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Gagal membuat record pembayaran COD",
+			})
+			return
+		}
+
+		detailPembayaran := models.DetailPembayaran{
+			PembayaranID:    pembayaran.IdPembayaran,
+			KanalPembayaran: "cod",
+		}
+		if err := tx.Create(&detailPembayaran).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Gagal menyimpan detail pembayaran COD",
+			})
+			return
+		}
+	}
+
 	tx.Commit()
 
-	// 🚚 TRIGGER SHIPMENT UNTUK EXTERNAL + CASH (BUG FIX)
+	// 🚚 TRIGGER SHIPMENT UNTUK EXTERNAL + CASH + COD (BUG FIX)
 	isExternal := pesanan.TipeKurirID == utils.GetTipeKurirID("external")
-	isCash := metodeInput == "tunai" || metodeInput == "cash"
+	isCash := metodeInput == "tunai" || metodeInput == "cash" || metodeInput == "cod"
 	if isExternal && isCash {
 		go processExternalShipment(pesanan.IdPesanan)
 	}
@@ -696,7 +794,7 @@ func CheckoutPesanan(c *gin.Context) {
 	// Notifikasi ke semua kasir bahwa ada pesanan online baru
 	go func() {
 		var kasirUsers []models.User
-		config.DB.Joins("JOIN role ON role.id_role = users.id_role").
+		config.DB.Joins("JOIN role ON role.id_role = \"user\".id_role").
 			Where("role.nama_role = ?", "Kasir").
 			Find(&kasirUsers)
 
@@ -767,14 +865,16 @@ func BatalkanPesanan(c *gin.Context) {
 	userID := uint(userIDInt64)
 
 	// Ownership check
-	var count int64
-	config.DB.Raw(`
-		SELECT COUNT(*) FROM pesanan p
-		JOIN customer c ON c.id_customer = p.id_customer
-		WHERE p.public_id = ? AND c.id_user = ?
-	`, idPesanan, userID).Scan(&count)
+	owned, err := isCustomerPesananOwner(idPesanan, uint(userID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal memverifikasi kepemilikan pesanan",
+		})
+		return
+	}
 
-	if count == 0 {
+	if !owned {
 		c.JSON(http.StatusForbidden, gin.H{
 			"status":  "error",
 			"message": "Anda tidak memiliki akses ke resource ini",
@@ -808,8 +908,8 @@ func BatalkanPesanan(c *gin.Context) {
 		return
 	}
 
-	pesanan.StatusPesananID = utils.GetStatusPesananID("Dibatalkan")
-	if err := config.DB.Save(&pesanan).Error; err != nil {
+	newStatusID := utils.GetStatusPesananID("Dibatalkan")
+	if err := config.DB.Exec("UPDATE pesanan SET id_status_pesanan = ? WHERE id_pesanan = ?", newStatusID, pesanan.IdPesanan).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal membatalkan pesanan",
@@ -842,14 +942,16 @@ func LacakPesanan(c *gin.Context) {
 	userID := c.GetInt64("user_id")
 
 	// Ownership check
-	var count int64
-	config.DB.Raw(`
-		SELECT COUNT(*) FROM pesanan p
-		JOIN customer c ON c.id_customer = p.id_customer
-		WHERE p.public_id = ? AND c.id_user = ?
-	`, idPesanan, userID).Scan(&count)
+	owned, err := isCustomerPesananOwner(idPesanan, uint(userID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal memverifikasi kepemilikan pesanan",
+		})
+		return
+	}
 
-	if count == 0 {
+	if !owned {
 		c.JSON(http.StatusForbidden, gin.H{
 			"status":  "error",
 			"message": "Anda tidak memiliki akses ke resource ini",
@@ -870,9 +972,48 @@ func LacakPesanan(c *gin.Context) {
 		return
 	}
 
-	// 1. Ekspedisi Eksternal (Biteship) - memiliki NomorResi dan Ekspedisi
-	if pesanan.NomorResi != nil && *pesanan.NomorResi != "" && pesanan.Ekspedisi != nil && pesanan.Ekspedisi.KodeApi != "" {
+	// Deteksi apakah pesanan ini menggunakan ekspedisi eksternal (Biteship)
+	// Cek BiteshipOrderID sebagai indikator utama — waybill bisa saja kosong di sandbox/mode awal
+	isExternalBiteship := (pesanan.BiteshipOrderID != nil && *pesanan.BiteshipOrderID != "") ||
+		(pesanan.NomorResi != nil && *pesanan.NomorResi != "")
+
+	// 1. Ekspedisi Eksternal (Biteship) - punya BiteshipOrderID atau NomorResi
+	if isExternalBiteship && pesanan.Ekspedisi != nil {
 		biteship := services.NewBiteshipAdapter()
+
+		// Opsi A: Lazy-fetch waybill via GetOrderStatus jika NomorResi masih kosong.
+		// Ini sebagai fallback saat webhook belum terpicu (misal: sandbox mode).
+		// Webhook Biteship (Opsi B) tetap menjadi mekanisme utama di produksi.
+		if (pesanan.NomorResi == nil || *pesanan.NomorResi == "") && pesanan.BiteshipOrderID != nil && *pesanan.BiteshipOrderID != "" {
+			orderStatus, errFetch := biteship.GetOrderStatus(*pesanan.BiteshipOrderID)
+			if errFetch == nil && orderStatus != nil && orderStatus.WaybillID != "" {
+				// Waybill sudah tersedia — simpan ke DB (self-healing)
+				config.DB.Model(&models.Pesanan{}).
+					Where("id_pesanan = ?", pesanan.IdPesanan).
+					Update("nomor_resi", orderStatus.WaybillID)
+				fmt.Printf("✅ Lazy-fetch waybill: Pesanan %s → resi=%s\n", idPesanan, orderStatus.WaybillID)
+				// Update struct lokal agar bisa dipakai di bawah
+				pesanan.NomorResi = &orderStatus.WaybillID
+			}
+		}
+
+		// Jika setelah lazy-fetch waybill masih kosong, kembalikan status pending
+		if pesanan.NomorResi == nil || *pesanan.NomorResi == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"status":  "success",
+				"message": "Pesanan sedang diproses oleh ekspedisi, nomor resi belum tersedia",
+				"data": gin.H{
+					"id_pesanan":     idPesanan,
+					"nomor_resi":     "",
+					"ekspedisi":      pesanan.Ekspedisi.NamaEkspedisi,
+					"tipe_ekspedisi": "eksternal",
+					"history":        []interface{}{},
+				},
+			})
+			return
+		}
+
+		// Nomor resi tersedia — ambil history tracking dari Biteship
 		history, err := biteship.TrackShipment(*pesanan.NomorResi, pesanan.Ekspedisi.KodeApi)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
@@ -1052,7 +1193,7 @@ func GetDashboardKasir(c *gin.Context) {
 
 	var aktivitasRaw []AktivitasResult
 	config.DB.Table("pesanan").
-		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(tipe_pembayaran.nama_tipe, 'tunai') as raw_payment_type").
+		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(tipe_pembayaran.nama_tipe, '-') as raw_payment_type").
 		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
 		Joins("LEFT JOIN tipe_pembayaran ON tipe_pembayaran.id = pembayaran.id_tipe_pembayaran").
 		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ? AND pesanan.id_kasir = ?", startOfDay, endOfDay, kasir.IdKasir).
@@ -1111,7 +1252,7 @@ func GetSemuaAktivitasHariIni(c *gin.Context) {
 
 	var aktivitasRaw []AktivitasResult
 	config.DB.Table("pesanan").
-		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(tipe_pembayaran.nama_tipe, 'tunai') as raw_payment_type").
+		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(tipe_pembayaran.nama_tipe, '-') as raw_payment_type").
 		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
 		Joins("LEFT JOIN tipe_pembayaran ON tipe_pembayaran.id = pembayaran.id_tipe_pembayaran").
 		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
@@ -1365,7 +1506,7 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 
 	var pembayaran models.Pembayaran
 	config.DB.Where("id_pesanan = ?", pesanan.IdPesanan).Preload("TipePembayaranRel").First(&pembayaran)
-	metodePembayaran := "tunai"
+	metodePembayaran := "-"
 	if pembayaran.TipePembayaranRel != nil {
 		metodePembayaran = pembayaran.TipePembayaranRel.NamaTipe
 	}

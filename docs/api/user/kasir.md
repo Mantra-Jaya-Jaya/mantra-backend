@@ -9,6 +9,7 @@ Auth (Kasir). Profil kasir.
 Mendapatkan profil kasir yang login.
 
 **Response:**
+
 ```json
 {
   "status": "success",

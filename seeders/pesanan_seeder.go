@@ -8,6 +8,7 @@ import (
 	"time"
 
 	fake "github.com/brianvoe/gofakeit/v7"
+	"github.com/google/uuid"
 )
 
 func SeedPesanan() {
@@ -60,6 +61,8 @@ func SeedPesanan() {
 	kasirLen := len(kasirs)
 	custLen := len(customers)
 	alamatLen := len(alamats)
+
+	var pesananList []models.Pesanan
 
 	for idx, tglPesanan := range datesToGenerate {
 		randType := fake.IntRange(1, 100)
@@ -144,6 +147,7 @@ func SeedPesanan() {
 		totalPembayaran := fake.IntRange(50000, 5000000)
 
 		pesanan := models.Pesanan{
+			PublicId:           uuid.New(),
 			TotalPembayaran:    totalPembayaran,
 			TanggalPesanan:     tglPesanan,
 			TipePesananID:      utils.GetTipePesananID(tipePesanan),
@@ -158,8 +162,14 @@ func SeedPesanan() {
 			NomorResi:          nomorResi,
 		}
 
-		if err := config.DB.Create(&pesanan).Error; err == nil {
-			totalCreated++
+		pesananList = append(pesananList, pesanan)
+	}
+
+	if len(pesananList) > 0 {
+		if err := config.DB.CreateInBatches(pesananList, 100).Error; err == nil {
+			totalCreated = len(pesananList)
+		} else {
+			fmt.Println("Error batch insert pesanan:", err)
 		}
 	}
 

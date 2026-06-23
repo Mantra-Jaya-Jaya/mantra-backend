@@ -118,6 +118,52 @@ func CekOngkir(c *gin.Context) {
 		layananMap[key] = l.IdEkspedisiLayanan
 	}
 
+	// Auto-sync: cek apakah ada ekspedisi/layanan dari Biteship yang belum terdaftar di DB
+	needSync := false
+	for _, r := range results {
+		if ekspedisiMap[r.EkspedisiKode] == 0 {
+			needSync = true
+			break
+		}
+		for _, l := range r.Layanan {
+			key := fmt.Sprintf("%s|%s", r.EkspedisiKode, l.NamaLayanan)
+			if layananMap[key] == 0 {
+				needSync = true
+				break
+			}
+		}
+		if needSync {
+			break
+		}
+	}
+
+	if needSync {
+		// Sync dari Biteship API, lalu rebuild maps
+		if err := services.SyncCouriersFromBiteship(); err == nil {
+			// Rebuild ekspedisiMap
+			var freshEkspedisi []models.Ekspedisi
+			config.DB.Where("is_active = ?", true).Find(&freshEkspedisi)
+			ekspedisiMap = make(map[string]uint)
+			for _, e := range freshEkspedisi {
+				ekspedisiMap[e.KodeApi] = e.IdEkspedisi
+			}
+
+			// Rebuild layananMap
+			var freshLayananRows []EkspedisiLayananRow
+			config.DB.Table("ekspedisi_layanan").
+				Select("ekspedisi_layanan.id_ekspedisi_layanan, ekspedisi_layanan.nama_layanan, ekspedisi.kode_api as ekspedisi_kode_api").
+				Joins("JOIN ekspedisi ON ekspedisi.id_ekspedisi = ekspedisi_layanan.id_ekspedisi").
+				Where("ekspedisi_layanan.is_active = ?", true).
+				Scan(&freshLayananRows)
+
+			layananMap = make(map[string]uint)
+			for _, l := range freshLayananRows {
+				key := l.EkspedisiKodeApi + "|" + l.NamaLayanan
+				layananMap[key] = l.IdEkspedisiLayanan
+			}
+		}
+	}
+
 	type LayananDTO struct {
 		IdLayananEkspedisi uint   `json:"id_layanan_ekspedisi"`
 		KodeLayanan        string `json:"kode_layanan"`
@@ -141,8 +187,13 @@ func CekOngkir(c *gin.Context) {
 		var layananList []LayananDTO
 		for _, l := range r.Layanan {
 			layananKey := fmt.Sprintf("%s|%s", r.EkspedisiKode, l.NamaLayanan)
+			idLayanan := layananMap[layananKey]
+			// Skip layanan yang masih belum terdaftar (id = 0) meskipun sudah sync
+			if idLayanan == 0 {
+				continue
+			}
 			layananList = append(layananList, LayananDTO{
-				IdLayananEkspedisi: layananMap[layananKey],
+				IdLayananEkspedisi: idLayanan,
 				KodeLayanan:        l.KodeLayanan,
 				NamaLayanan:        l.NamaLayanan,
 				Deskripsi:          l.Deskripsi,
@@ -151,6 +202,10 @@ func CekOngkir(c *gin.Context) {
 				EstimasiMax:        l.EstimasiMax,
 				Durasi:             l.Durasi,
 			})
+		}
+		// Skip ekspedisi yang tidak punya layanan valid
+		if len(layananList) == 0 {
+			continue
 		}
 		data = append(data, EkspedisiDTO{
 			IdEkspedisi:   ekspedisiMap[r.EkspedisiKode],

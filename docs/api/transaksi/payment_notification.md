@@ -11,6 +11,7 @@ Menerima notifikasi dari Midtrans tentang perubahan status transaksi.
 Verifikasi dilakukan dengan SHA-512 hash dari `order_id + status_code + gross_amount + server_key`.
 
 **Request:**
+
 ```json
 {
   "transaction_time": "2026-06-09 12:00:00",
@@ -28,6 +29,7 @@ Verifikasi dilakukan dengan SHA-512 hash dari `order_id + status_code + gross_am
 ```
 
 **Status yang ditangani:**
+
 | transaction_status | Aksi |
 |--------------------|------|
 | `settlement` | Update status pesanan → "Dikemas" (jika pesanan Online) atau "Selesai" (jika pesanan POS/offline), catat waktu bayar |
@@ -38,6 +40,7 @@ Verifikasi dilakukan dengan SHA-512 hash dari `order_id + status_code + gross_am
 | `expire` | Update status transaksi → expire |
 
 **Response:**
+
 ```json
 {
   "status": "success",

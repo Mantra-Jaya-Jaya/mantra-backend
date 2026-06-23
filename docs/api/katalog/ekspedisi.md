@@ -1,28 +1,48 @@
-# Katalog — Ekspedisi API
+# 🚚 Katalog — Ekspedisi API Contract
 
-Auth (Admin). Semua endpoint CRUD ekspedisi dan layanan pengiriman.
+---
+### 🧭 Navigasi Cepat
+[🏠 Utama](../../README.md) | [🏛️ Arsitektur](../../architecture.md) | [🛠️ Deployment](../../deployment.md) | [💳 Midtrans](../../pembayaran.md) | [📦 Biteship](../../biteship.md) | [📡 API Contract](../overview.md) | [🗄️ Database](../../database/erd.md) | [🔒 Keamanan](../../security/README.md)
+---
+
+Pusat CRUD manajemen kurir pihak ketiga (eksternal) dan sub-layanan pengirimannya.
+
+---
+
+## 🧭 Daftar Endpoint Ekspedisi
+
+*   [**GET /api/v1/admin/ekspedisi**](#get-apiv1adminekspedisi) - Mengambil daftar seluruh ekspedisi & layanannya
+*   [**POST /api/v1/admin/ekspedisi**](#post-apiv1adminekspedisi) - Menambahkan ekspedisi baru
+*   [**PUT /api/v1/admin/ekspedisi/:public_id**](#put-apiv1adminekspedisipublic_id) - Memperbarui informasi ekspedisi
+*   [**DELETE /api/v1/admin/ekspedisi/:public_id**](#delete-apiv1adminekspedisipublic_id) - Menghapus ekspedisi beserta layanannya
+*   [**POST /api/v1/admin/ekspedisi/layanan**](#post-apiv1adminekspedisilayanan) - Menambahkan tipe layanan baru untuk ekspedisi
+*   [**PUT /api/v1/admin/ekspedisi/layanan/:public_id**](#put-apiv1adminekspedisilayananpublic_id) - Memperbarui detail sub-layanan ekspedisi
+*   [**DELETE /api/v1/admin/ekspedisi/layanan/:public_id**](#delete-apiv1adminekspedisilayananpublic_id) - Menghapus layanan ekspedisi
 
 ---
 
 ## GET /api/v1/admin/ekspedisi
 
-Daftar semua ekspedisi.
+Mengambil daftar kurir eksternal yang terdaftar di database beserta sub-layanan pengiriman mereka masing-masing.
 
-**Response:**
+*   **Autentikasi:** Wajib (Role: `Admin`)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
+
+### Response (200 OK)
 ```json
 {
   "status": "success",
   "data": [
     {
-      "public_id": "uuid-...",
-      "nama_ekspedisi": "Ninja Xpress",
-      "logo": "https://...",
-      "deskripsi": "Layanan ekspedisi nasional",
+      "public_id": "9e3c8162-...",
+      "nama_ekspedisi": "J&T Express",
+      "logo": "https://minio-url/bucket/logo_jnt.png",
+      "deskripsi": "Layanan ekspedisi reguler nasional",
       "is_active": true,
       "layanan": [
         {
-          "public_id": "uuid-...",
-          "nama_layanan": "REG",
+          "public_id": "8f3c8162-...",
+          "nama_layanan": "EZ",
           "estimasi_min": 2,
           "estimasi_max": 4,
           "is_active": true
@@ -37,15 +57,17 @@ Daftar semua ekspedisi.
 
 ## POST /api/v1/admin/ekspedisi
 
-Tambah ekspedisi baru.
+Mendaftarkan perusahaan ekspedisi (kurir pihak ketiga) baru ke database.
 
-**Request:**
+*   **Autentikasi:** Wajib (Role: `Admin`)
+
+### Request Payload
 ```json
 {
-  "nama_ekspedisi": "Ninja Xpress",
-  "logo": "https://...",
-  "deskripsi": "Layanan ekspedisi nasional",
-  "kode_api": "",
+  "nama_ekspedisi": "J&T Express",
+  "logo": "https://minio-url/bucket/logo_jnt.png",
+  "deskripsi": "Layanan ekspedisi reguler nasional",
+  "kode_api": "jnt",
   "is_active": true
 }
 ```
@@ -54,28 +76,34 @@ Tambah ekspedisi baru.
 
 ## PUT /api/v1/admin/ekspedisi/:public_id
 
-Update data ekspedisi.
+Mengubah informasi utama dari perusahaan ekspedisi berdasarkan `public_id`.
+
+*   **Autentikasi:** Wajib (Role: `Admin`)
 
 ---
 
 ## DELETE /api/v1/admin/ekspedisi/:public_id
 
-Hapus ekspedisi (cascade menghapus layanan terkait).
+Menghapus data ekspedisi. Penghapusan data ekspedisi secara otomatis akan menghapus seluruh data tipe layanan terkait (Cascade Delete).
+
+*   **Autentikasi:** Wajib (Role: `Admin`)
 
 ---
 
 ## POST /api/v1/admin/ekspedisi/layanan
 
-Tambah layanan baru untuk ekspedisi.
+Menambahkan jenis layanan pengiriman baru untuk salah satu ekspedisi terdaftar.
 
-**Request:**
+*   **Autentikasi:** Wajib (Role: `Admin`)
+
+### Request Payload
 ```json
 {
   "id_ekspedisi": 1,
-  "nama_layanan": "REG",
-  "deskripsi": "Layanan Reguler",
-  "estimasi_min": 2,
-  "estimasi_max": 4,
+  "nama_layanan": "Super Fast",
+  "deskripsi": "Layanan satu hari sampai tujuan",
+  "estimasi_min": 1,
+  "estimasi_max": 1,
   "is_active": true
 }
 ```
@@ -84,10 +112,14 @@ Tambah layanan baru untuk ekspedisi.
 
 ## PUT /api/v1/admin/ekspedisi/layanan/:public_id
 
-Update layanan.
+Mengubah/memperbarui informasi detail sub-layanan pengiriman berdasarkan `public_id` layanan.
+
+*   **Autentikasi:** Wajib (Role: `Admin`)
 
 ---
 
 ## DELETE /api/v1/admin/ekspedisi/layanan/:public_id
 
-Hapus layanan.
+Menghapus tipe layanan pengiriman tertentu berdasarkan `public_id`.
+
+*   **Autentikasi:** Wajib (Role: `Admin`)

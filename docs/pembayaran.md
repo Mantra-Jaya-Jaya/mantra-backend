@@ -1,132 +1,114 @@
-# 🚀 Dokumentasi Integrasi Pembayaran Midtrans (Core API)
+# 💳 Integrasi Pembayaran Midtrans (Core API)
 
-**Metode Pembayaran:** QRIS & Virtual Account (BCA, BNI, BRI)  
+---
+### 🧭 Navigasi Cepat
+[🏠 Utama](README.md) | [🏛️ Arsitektur](architecture.md) | [🛠️ Deployment](deployment.md) | [💳 Midtrans](pembayaran.md) | [📦 Biteship](biteship.md) | [📡 API Contract](api/overview.md) | [🗄️ Database](database/erd.md) | [🔒 Keamanan](security/README.md)
+---
+
+**Metode Pembayaran:** QRIS & Virtual Account (BCA, BNI, BRI, Permata)  
 **Sistem:** Golang (Backend) & Flutter (Frontend)
 
-Dokumentasi ini berisi langkah-langkah untuk melakukan setup dan testing fitur pembayaran non-tunai menggunakan Midtrans Core API pada mode Sandbox.
+Dokumentasi ini berisi panduan untuk melakukan setup, konfigurasi sandbox, penggunaan Ngrok sebagai jembatan webhook, serta alur pengujian fitur pembayaran non-tunai pada sistem MANTRA.
 
 ---
 
 ## 🌐 1. Setup & Instalasi Ngrok (Jembatan Webhook)
 
-Karena server Midtrans berada di internet, Midtrans tidak bisa mengirimkan notifikasi lunas ke Backend yang berjalan di `localhost`. Kita membutuhkan **Ngrok** untuk melakukan port-forwarding.
+Karena server Midtrans berada di internet, server mereka tidak dapat mengirim notifikasi sukses pembayaran (webhook) ke backend yang berjalan di `localhost` komputer Anda. Kita memerlukan **Ngrok** sebagai terowongan (tunneling) untuk meneruskan request tersebut.
 
-### A. Daftar dan Login
+### A. Registrasi & Download
+1. Kunjungi website resmi Ngrok: [https://ngrok.com/](https://ngrok.com/).
+2. Buat akun baru (disarankan menggunakan opsi **Sign up with Google** agar lebih cepat).
+3. Di dashboard Ngrok, unduh package zip Ngrok sesuai dengan Sistem Operasi Anda (Windows/Linux/MacOS).
+4. Ekstrak file zip tersebut dan taruh binary `ngrok` (atau `ngrok.exe`) ke direktori yang mudah diakses.
 
-1. Buka website resmi Ngrok: [https://ngrok.com/](https://ngrok.com/)
-2. Klik tombol **Sign Up** (atau Login jika sudah punya akun). Paling cepat gunakan opsi **Sign up with Google**
-3. Setelah berhasil login, Anda akan masuk ke halaman Dashboard Ngrok
+### B. Konfigurasi Auth Token
+1. Pada dashboard Ngrok web, buka menu **Getting Started** → **Your Authtoken**.
+2. Salin token panjang yang disediakan.
+3. Buka terminal (Bash/PowerShell/CMD) dan jalankan perintah:
+   ```bash
+   ngrok config add-authtoken TOKEN_ANDA_DI_SINI
+   ```
+4. Jika berhasil, pesan `Authtoken saved to configuration file` akan muncul.
 
-### B. Download Ngrok
+---
 
-1. Di halaman Dashboard, pada menu **Setup & Installation**, pilih OS yang Anda gunakan (Windows/Linux/Mac)
-2. Download file `.zip` Ngrok
-3. Ekstrak file `.zip` tersebut. Di dalamnya ada file aplikasi `ngrok` (atau `ngrok.exe` untuk Windows)
-4. Pindahkan file `ngrok` ini ke folder yang mudah diakses, atau masukkan ke Environment Variables (PATH) OS Anda agar bisa dipanggil dari terminal mana saja
-
-### C. Verifikasi Auth Token
-
-1. Kembali ke Dashboard Ngrok di browser
-2. Di menu sebelah kiri, klik **Getting Started** → **Your Authtoken**
-3. Copy token panjang yang ada di halaman tersebut (klik icon Copy)
-4. Buka terminal (Command Prompt/PowerShell/Bash), lalu ketikkan perintah berikut dan paste token Anda:
-
-```bash
-ngrok config add-authtoken TOKEN_ANDA_DI_SINI
-```
-
-5. Tekan Enter. Jika berhasil, akan muncul tulisan `Authtoken saved to configuration file`. Setup Ngrok selesai!
 ## 🛠️ 2. Setup Environment Variables (.env)
 
-Pastikan Anda sudah memiliki akun Midtrans. Kita akan menggunakan Sandbox Environment untuk testing.
+Lakukan konfigurasi credentials Sandbox Midtrans Anda pada file `.env` backend:
 
-1. Login ke Midtrans Dashboard
-2. Masuk ke menu **Settings** > **Access Keys**
-3. Copy Server Key Sandbox Anda
-4. Buka file `.env` di project Backend (Golang) Anda, dan tambahkan/ubah baris berikut:
+1. Login ke [Midtrans Sandbox Dashboard](https://dashboard.sandbox.midtrans.com/).
+2. Masuk ke menu **Settings** > **Access Keys**.
+3. Salin Server Key, Client Key, dan Merchant ID.
+4. Tambahkan konfigurasi berikut ke file `.env` backend Golang Anda:
+   ```env
+   MIDTRANS_SERVER_KEY=Mid-server-SB-XXXXXXXXXX
+   MIDTRANS_CLIENT_KEY=Mid-client-SB-XXXXXXXXXX
+   MIDTRANS_ENVIRONMENT=sandbox
+   MERCHANID=GXXXXXXXXX
+   ```
 
-```env
-# Konfigurasi Midtrans
-MIDTRANS_SERVER_KEY=Mid-server-XXXXXXXXXX
-MIDTRANS_ENVIRONMENT=sandbox
-MIDTRANS_CLIENT_KEY=Mid-XXXXXXXXXX
-MERCHANID=XXXXXXXXX
-```
+> [!IMPORTANT]
+> Pastikan API Key yang Anda gunakan diawali dengan `Mid-server-SB-` untuk memastikan Anda berada dalam mode Sandbox (Testing).
 
-> **Catatan:** Pastikan `MIDTRANS_SERVER_KEY` menggunakan awalan `SB-` yang menandakan akun Sandbox
+---
+
 ## 🚀 3. Menjalankan Ngrok & Update Webhook Midtrans
 
-Langkah ini bertujuan untuk memberi tahu Midtrans ke mana mereka harus mengirim pesan/notifikasi jika pelanggan sudah membayar (Settlement).
+Langkah ini bertujuan untuk mendaftarkan URL tujuan notifikasi ketika pelanggan telah menyelesaikan pembayarannya.
 
-1. Buka terminal baru (biarkan terminal Backend Golang tetap berjalan di port 8080)
+1. Buka terminal baru dan jalankan Ngrok pada port backend Anda (default: `8080`):
+   ```bash
+   ngrok http 8080
+   ```
+2. Salin URL publik HTTPS yang tampil di bagian **Forwarding** (contoh: `https://abcd-123.ngrok-free.app`).
+   > [!WARNING]
+   > Biarkan terminal Ngrok ini tetap berjalan selama Anda melakukan testing pembayaran!
+3. Masuk ke Dashboard Midtrans Sandbox > menu **Settings** > **Configuration**.
+4. Cari kolom **Payment Notification URL**.
+5. Masukkan alamat webhook Anda dengan format berikut:
+   ```text
+   https://<DOMAIN-NGROK-ANDA>/api/v1/payment/notification
+   ```
+   *Contoh:* `https://abcd-123.ngrok-free.app/api/v1/payment/notification`
+6. Gulir ke bawah halaman dan klik tombol **Update / Save**.
 
-2. Jalankan perintah berikut:
+---
 
-```bash
-ngrok http 8080
-```
+## 🧪 4. Alur Pengujian Pembayaran (End-to-End Testing)
 
-3. Tunggu hingga layar Ngrok muncul, lalu copy URL HTTPS yang ada di bagian **Forwarding** (Contoh: `https://a1b2-c3d4.ngrok-free.app`)
+Gunakan alur berikut untuk menyimulasikan transaksi non-tunai secara penuh:
 
-   > **⚠️ PENTING:** Jangan tutup terminal Ngrok ini selama proses testing berlangsung!
+### Langkah 1: Jalankan Backend & Ngrok
+- Pastikan server backend Golang Anda sudah menyala (`go run main.go` atau `make run`).
+- Pastikan Ngrok telah menyala dan alamat notifikasi di dashboard Midtrans sudah diperbarui dengan URL Ngrok terbaru.
 
-4. Buka Midtrans Sandbox Dashboard
+### Langkah 2: Lakukan Checkout dari Aplikasi Mobile/Kasir
+- Masukkan produk ke keranjang belanja.
+- Pilih metode pembayaran non-tunai (misal: QRIS atau BCA Virtual Account).
+- Selesaikan pesanan. Aplikasi akan menampilkan gambar QR Code (untuk QRIS) atau nomor rekening virtual (untuk VA).
 
-5. Buka menu **Settings** > **Configuration** (Pengaturan > Pengaturan Umum)
+### Langkah 3: Simulasi Pembayaran di Midtrans Simulator
+- Buka browser dan kunjungi [Midtrans Sandbox Simulator](https://payment-simulator.sandbox.midtrans.com/).
+- **Jika QRIS:** Pilih tab QRIS, salin URL gambar QRIS yang didapat dari API backend, tempel di simulator, lalu klik bayar.
+- **Jika Virtual Account:**
+  - Pilih bank yang sesuai (misal: BCA).
+  - Masukkan nomor rekening virtual yang tampil pada aplikasi kasir/customer.
+  - Klik **Inquire**, kemudian klik **Pay**.
 
-6. Cari kolom **Payment Notification URL**
+### Langkah 4: Verifikasi Status Otomatis
+- Kembali ke aplikasi klien Anda. Status pesanan akan otomatis terupdate.
+- Pada log terminal backend Golang, Anda akan melihat request masuk ke `POST /api/v1/payment/notification` dengan response `200 OK`.
+- Status transaksi di database backend akan berubah menjadi `settlement` (Lunas).
 
-7. Masukkan URL Ngrok Anda ditambah dengan endpoint webhook Backend:
+---
 
-```
-https://<ALAMAT-NGROK-ANDA>/api/v1/payment/notification
-```
-
-Contoh: `https://a1b2-c3d4.ngrok-free.app/api/v1/payment/notification`
-
-8. Scroll ke bawah dan klik tombol **Update** / **Simpan**
-## 🧪 4. Alur Testing (End-to-End)
-
-Ikuti langkah-langkah ini untuk mensimulasikan pembayaran dari awal hingga selesai:
-
-### Step 1: Jalankan Backend
-- Pastikan server Golang sudah berjalan (`make run`)
-
-### Step 2: Jalankan Ngrok
-- Pastikan Ngrok sudah menyala dan URL sudah di-update di Midtrans
-
-### Step 3: Jalankan Aplikasi Kasir (Flutter)
-1. Masukkan barang ke keranjang
-2. Pilih menu pembayaran Non-Tunai
-3. Pilih metode pembayaran (misal: QRIS atau BCA Virtual Account)
-4. Klik **Konfirmasi Pembayaran**. Aplikasi akan menampilkan URL Gambar QRIS atau Nomor Virtual Account
-
-### Step 4: Simulasi Pembayaran
-1. Buka browser dan masuk ke Midtrans Simulator
-2. Jika QRIS: Pilih QRIS dan ikuti instruksi sukses
-3. Jika VA: 
-   - Pilih Bank yang sesuai (misal: BCA)
-   - Masukkan nomor VA yang tampil di aplikasi kasir
-   - Klik **Inquire**, lalu klik **Pay**
-
-### Step 5: Cek Status di Aplikasi
-1. Kembali ke aplikasi kasir (Flutter)
-2. Klik tombol **Cek Status Pembayaran**
-3. Jika berhasil, aplikasi akan otomatis memunculkan pop-up Sukses dan beralih ke halaman nota! 🎉
 ## 🐛 Troubleshooting
 
-### Error 402 (Payment Channel Not Activated)
-
-**Masalah:** Terjadi karena metode pembayaran belum aktif di akun Midtrans Sandbox Anda.
-
-**Solusi:** 
-- Buat akun email baru
-- Daftar ulang Midtrans
-- Gunakan Server Key yang baru
-
-### Status Tidak Berubah Menjadi "Selesai"
-
-**Checklist:**
-- ✅ Pastikan terminal Ngrok masih menyala
-- ✅ Pastikan **Payment Notification URL** di Midtrans sudah menggunakan URL Ngrok terbaru (URL Ngrok berubah setiap kali direstart)
-- ✅ Cek log terminal Golang, pastikan ada notifikasi masuk `POST /api/v1/payment/notification` dengan status `200 OK`
+*   **Error 402 (Payment Channel Not Activated):**
+    *   *Penyebab:* Tipe pembayaran (QRIS/VA) yang di-request belum diaktifkan di dashboard akun sandbox Anda.
+    *   *Solusi:* Masuk ke dashboard Midtrans web, klik menu **Settings** > **Payment Methods**, lalu centang dan aktifkan metode pembayaran yang ingin digunakan.
+*   **Status Transaksi Tidak Berubah Menjadi Lunas:**
+    *   Pastikan terminal Ngrok masih aktif dan tidak terputus.
+    *   Pastikan URL Notifikasi di dashboard Midtrans sama persis dengan URL Ngrok yang sedang berjalan (ingat bahwa URL Ngrok berubah setiap kali program Ngrok direstart).
+    *   Periksa log terminal backend untuk melihat apakah ada error parsing notifikasi atau error koneksi DB.

@@ -36,6 +36,7 @@ type Pesanan struct {
 	OngkosKirim        int               `gorm:"column:ongkos_kirim;default:0" json:"ongkos_kirim"`
 	Catatan            string            `gorm:"column:catatan" json:"catatan"`
 	NomorResi          *string           `gorm:"column:nomor_resi" json:"nomor_resi,omitempty"`
+	BiteshipOrderID    *string           `gorm:"column:biteship_order_id" json:"biteship_order_id,omitempty"`
 
 	DetailPesanan []DetailPesanan `gorm:"foreignKey:PesananID;references:IdPesanan" json:"detail_pesanan,omitempty"`
 	Pembayaran    *Pembayaran     `gorm:"foreignKey:PesananID" json:"pembayaran,omitempty"`
