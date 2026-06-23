@@ -1,79 +1,54 @@
-# Dokumentasi MANTRA Backend
+# 📚 Dokumentasi MANTRA Backend
 
-Pusat dokumentasi teknis backend service **MANTRA**.
+Selamat datang di pusat dokumentasi teknis untuk **MANTRA Backend Service**. Dokumentasi ini dirancang untuk memudahkan developer dalam memahami arsitektur, database, alur deployment, serta integrasi pihak ketiga pada sistem MANTRA.
 
-## API Contract
+---
+### 🧭 Navigasi Cepat
+[🏠 Utama](README.md) | [🏛️ Arsitektur](architecture.md) | [🛠️ Deployment](deployment.md) | [💳 Midtrans](pembayaran.md) | [📦 Biteship](biteship.md) | [📡 API Contract](api/overview.md) | [🗄️ Database](database/erd.md) | [🔒 Keamanan](security/README.md)
+---
 
-Dokumentasi endpoint API diorganisir per domain — mirror struktur `controllers/`.
+## 🏛️ Fondasi Sistem & Arsitektur
 
-| Domain | File | Method | Role |
-|--------|------|--------|------|
-| Auth | `api/auth.md` | Public + Auth | Semua |
-| Katalog | `api/katalog/barang.md` | Public + Auth | Customer, Kasir, Admin |
-| Katalog | `api/katalog/kategori.md` | Public + Auth | Customer, Kasir, Admin |
-| Katalog | `api/katalog/diskon.md` | Public + Auth | Customer, Kasir, Admin |
-| Katalog | `api/katalog/ekspedisi.md` | Auth | Admin |
-| Ongkir | `api/transaksi/ongkir.md` | Auth | Customer |
-| Metode Pembayaran | `api/transaksi/metode_pembayaran.md` | Auth | Customer, Admin |
-| Payment Notification | `api/transaksi/payment_notification.md` | Public (Webhook) | Midtrans |
-| Keranjang | `api/keranjang.md` | Auth | Customer |
-| Notifikasi | `api/notifikasi.md` | Auth | Customer, Kasir, Admin, Kurir |
-| Pengantaran | `api/pengantaran.md` | Auth | Customer, Kurir |
-| Stok | `api/stok.md` | Auth | Admin |
-| Transaksi | `api/transaksi/pesanan.md` | Auth | Customer, Kasir |
-| Transaksi | `api/transaksi/pembayaran.md` | Auth | Kasir |
-| User | `api/user/customer.md` | Auth | Customer |
-| User | `api/user/kasir.md` | Auth | Kasir |
-| User | `api/user/kurir.md` | Auth | Kurir |
-| User | `api/user/admin.md` | Auth | Admin |
-| User | `api/user/karyawan.md` | Auth | Admin |
-| User | `api/user/alamat.md` | Auth | Customer |
+*   [**architecture.md**](architecture.md) - Penjelasan detail mengenai arsitektur sistem, Tech Stack, request flow, hubungan model database, dan keputusan arsitektural utama.
+*   [**deployment.md**](deployment.md) - Panduan cara membangun binary, daftar environment variables (`.env`), serta checklist kesiapan produksi.
 
-> Format umum request/response lihat `api/overview.md`.
+---
 
-## Arsitektur & Keamanan
+## 💳 & 📦 Integrasi Pihak Ketiga (Gateway)
 
-| Dokumen | Isi |
-|---------|-----|
-| `architecture.md` | Overview arsitektur, decision records, component interaction |
-| `security/README.md` | Index dokumentasi security |
-| `security/jwt.md` | JWT flow, claims structure, sliding expiration |
-| `security/middleware.md` | AuthMiddleware, RoleMiddleware, OwnershipMiddleware |
-| `security/rbac.md` | RBAC matrix per endpoint & role |
-| `security/errors.md` | Error codes, HTTP status, response format |
+*   [**pembayaran.md**](pembayaran.md) - Panduan integrasi pembayaran non-tunai (QRIS & Virtual Account) via **Midtrans Core API**, konfigurasi sandbox, setup Ngrok, serta alur testing pembayaran.
+*   [**biteship.md**](biteship.md) - Panduan integrasi pengiriman eksternal via **Biteship API** (Rates, Order Shipment, Tracking), setup Ngrok webhook, saldo virtual, dan fallback mock.
 
-## Database
+---
 
-| Dokumen | Isi |
-|---------|-----|
-| `database/erd.md` | Panduan baca ERD, konvensi tabel & kolom |
-| `database/migrations.md` | Workflow Atlas CLI, cara nambah tabel |
-| `mantra.dbml` | Skema ERD (source of truth — 25 tabel) |
-| `mantra.dbdiagram` | Layout diagram dbdiagram.io |
+## 📡 API Contract & Collections
 
-## Deployment
+*   [**api/overview.md**](api/overview.md) - Base URL, format komunikasi request/response (sukses & error), HTTP Status Codes, dan format ID (public vs private).
+*   **API per Domain:**
+    *   [Auth API](api/auth.md) - Autentikasi user (Login, Logout, Refresh Token, Change Password)
+    *   [Katalog API](api/katalog/barang.md) - CRUD & Pencarian Barang, Kategori, Diskon, Ekspedisi
+    *   [Keranjang API](api/keranjang.md) - Manajemen keranjang belanja customer
+    *   [Transaksi API](api/transaksi/pesanan.md) - Checkout, Cek Ongkir, Pembayaran, Notification
+    *   [Pengantaran API](api/pengantaran.md) - Manajemen status pengiriman oleh kurir internal
+    *   [Notifikasi API](api/notifikasi.md) - Pengiriman notifikasi real-time & history
+    *   [User API](api/user/customer.md) - Profil & Manajemen Customer, Karyawan, Kasir, Kurir, Alamat
+*   [**api-collections/**](api-collections/) - Folder koleksi API untuk **Bruno** (alternatif Postman/Insomnia) untuk mempermudah testing manual.
 
-| Dokumen | Isi |
-|---------|-----|
-| `deployment.md` | Build binary, environment variables, production checklist |
+---
 
-## API Collections (Bruno)
+## 🗄️ Database & Migrasi
 
-Folder `api-collections/` berisi koleksi request API untuk **Bruno** (open-source API client, alternative Postman).
+*   [**database/erd.md**](database/erd.md) - Panduan membaca skema database, relasi tabel utama, dan konvensi kolom.
+*   [**database/migrations.md**](database/migrations.md) - Workflow penggunaan Atlas CLI & GORM AutoMigrate untuk modifikasi skema tabel.
+*   [**mantra.dbml**](mantra.dbml) - Source of truth skema database MANTRA (25 tabel).
+*   [**mantra.dbdiagram**](mantra.dbdiagram) - Konfigurasi visual layout ERD untuk dbdiagram.io.
 
-| Path | Isi |
-|------|-----|
-| `api-collections/collection.bru` | Global settings (baseUrl, auth bearer) |
-| `api-collections/environments/` | Environment variables (local, dev, production) |
-| `api-collections/Public/` | Scan Barcode (no auth) |
-| `api-collections/Customer/` | Login, Register, Logout, Change Password, Refresh Token, Profil, Notifikasi, Promo, Kategori, Barang, Keranjang, Pesanan, Alamat |
-| `api-collections/Kasir/` | Login, Logout, Change Password, Refresh Token, Profil, Dashboard, Laporan, Transaksi |
-| `api-collections/Kurir/` | Login, Profil, Notifikasi, Pesanan, Pengantaran |
-| `api-collections/Admin/` | Login, Logout, Change Password, Refresh Token, Profil, Notifikasi, Dashboard, Kategori, Barang, Diskon, Karyawan, Satuan |
-| `api-collections/Admin/Ekspedisi/` | CRUD Ekspedisi & Layanan (Tambah, Update, Hapus, Daftar) |
-| `api-collections/Admin/Metode Pembayaran/` | CRUD Metode Pembayaran (Tambah, Update, Hapus, Daftar) |
-| `api-collections/Customer/Ongkir/` | Cek Ongkos Kirim (via Biteship) |
-| `api-collections/Customer/Metode Pembayaran/` | Daftar Metode Pembayaran Aktif |
-| `api-collections/Public/Payment Notification/` | Midtrans Webhook (200, 400, 401) |
+---
 
-**Cara pakai:** Buka Bruno → Import collection → Pilih folder `docs/api-collections/`. |
+## 🔒 Keamanan & Penanganan Error
+
+*   [**security/README.md**](security/README.md) - Index dokumentasi sistem keamanan MANTRA.
+*   [**security/jwt.md**](security/jwt.md) - Mekanisme JWT, claims structure, dan sliding expiration token.
+*   [**security/middleware.md**](security/middleware.md) - Penjelasan Middleware: Auth, Role, dan Ownership.
+*   [**security/rbac.md**](security/rbac.md) - Matrix Role-Based Access Control (RBAC) per role & endpoint.
+*   [**security/errors.md**](security/errors.md) - Daftar lengkap kode error standar, deskripsi user-facing, dan status HTTP.

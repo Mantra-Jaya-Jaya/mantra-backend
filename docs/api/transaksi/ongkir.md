@@ -1,18 +1,25 @@
-# Transaksi — Ongkir API
+# 🚚 Transaksi — Ongkir API Contract
 
-Auth (Customer). Cek ongkos kirim via Biteship API.
+---
+### 🧭 Navigasi Cepat
+[🏠 Utama](../../README.md) | [🏛️ Arsitektur](../../architecture.md) | [🛠️ Deployment](../../deployment.md) | [💳 Midtrans](../../pembayaran.md) | [📦 Biteship](../../biteship.md) | [📡 API Contract](../overview.md) | [🗄️ Database](../../database/erd.md) | [🔒 Keamanan](../../security/README.md)
+---
+
+Endpoint kalkulasi tarif pengiriman (cek ongkos kirim) secara real-time via Biteship.
 
 ---
 
 ## POST /api/v1/customer/ongkir/cek
 
-Hitung ongkos kirim dari berbagai ekspedisi berdasarkan alamat tujuan dan berat barang.
+Menghitung estimasi ongkos kirim dari berbagai perusahaan ekspedisi eksternal berdasarkan alamat pengiriman customer dan berat total barang belanjaan.
 
-**Request:**
+*   **Autentikasi:** Wajib (Role: `Customer`)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
 
+### Request Payload
 ```json
 {
-  "id_alamat": "uuid-...",
+  "id_alamat": "9e3c8162-...",
   "items": [
     {
       "id_spesifikasi_barang": 1,
@@ -22,20 +29,19 @@ Hitung ongkos kirim dari berbagai ekspedisi berdasarkan alamat tujuan dan berat 
 }
 ```
 
-**Response:**
-
+### Response (200 OK)
 ```json
 {
   "status": "success",
   "data": [
     {
-      "nama_ekspedisi": "Ninja Xpress",
+      "nama_ekspedisi": "J&T Express",
       "layanan": [
         {
           "id_ekspedisi_layanan": 1,
-          "nama_layanan": "REG",
-          "ongkir": 15000,
-          "estimasi": "2-4 hari"
+          "nama_layanan": "EZ",
+          "ongkir": 12000,
+          "estimasi": "2-3 hari"
         }
       ]
     }

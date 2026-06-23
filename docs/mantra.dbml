@@ -273,6 +273,13 @@ Table status_notifikasi {
   nama_status  varchar   [note: 'unread | read', unique]
 }
 
+// Master tipe kurir (internal | external)
+Table tipe_kurir {
+  id           int       [pk]
+  nama_tipe    varchar   [note: 'internal | external', unique]
+}
+
+
 
 // -----------------------------------------------------------------------------
 // TRANSAKSI & PESANAN
@@ -287,13 +294,18 @@ Table pesanan {
   id_alamat            int       [note: 'Null jika tanpa pengiriman/takeaway']
   id_ekspedisi         int       [note: 'Null jika offline/tanpa kirim']
   id_layanan_ekspedisi int       [note: 'Null jika offline/tanpa kirim']
+  id_tipe_pesanan      int
+  id_status_pesanan    int
+  id_tipe_kurir        int       [note: 'FK ke tipe_kurir']
   total_pembayaran     int
   ongkos_kirim         int       [note: 'default 0']
   catatan              text
   nomor_resi           varchar   [note: 'Nomor resi untuk pengiriman eksternal (Biteship), nullable']
+  biteship_order_id    varchar   [note: 'ID order dari Biteship']
   tanggal_pesanan      timestamp
   updated_at           timestamp
 }
+
 
 // Detail item per pesanan. harga_satuan adalah snapshot harga saat transaksi
 Table detail_pesanan {
@@ -317,6 +329,7 @@ Table pembayaran {
   transaksi_midtrans_id varchar   [note: 'transaction_id dari Midtrans']
   total_dibayar         int       [note: 'Nilai yg dibayar, default 0']
   waktu_pembayaran      timestamp [note: 'Diisi saat settlement']
+  batas_waktu_pembayaran timestamp [note: 'Batas akhir waktu pembayaran']
   created_at            timestamp
   updated_at            timestamp
 }
@@ -443,6 +456,17 @@ Table keranjang {
   quantity              int
 }
 
+// -----------------------------------------------------------------------------
+// PENGATURAN TOKO
+// -----------------------------------------------------------------------------
+
+// Konfigurasi / Pengaturan Toko (Key-Value)
+Table pengaturan_toko {
+  key   varchar [pk]
+  value text
+}
+
+
 
 // =============================================================================
 // RELASI
@@ -480,6 +504,8 @@ Ref: barcode.id_spesifikasi_barang - spesifikasi_barang.id_spesifikasi_barang
 // Enum FK - Pesanan
 Ref: pesanan.id_tipe_pesanan > tipe_pesanan.id
 Ref: pesanan.id_status_pesanan > status_pesanan.id
+Ref: pesanan.id_tipe_kurir > tipe_kurir.id
+
 
 // Transaksi & Pesanan
 Ref: pesanan.id_customer > customer.id_customer

@@ -1,13 +1,31 @@
-# Transaksi — Pesanan API
+# 📦 Transaksi — Pesanan API Contract
+
+---
+### 🧭 Navigasi Cepat
+[🏠 Utama](../../README.md) | [🏛️ Arsitektur](../../architecture.md) | [🛠️ Deployment](../../deployment.md) | [💳 Midtrans](../../pembayaran.md) | [📦 Biteship](../../biteship.md) | [📡 API Contract](../overview.md) | [🗄️ Database](../../database/erd.md) | [🔒 Keamanan](../../security/README.md)
+---
+
+Pusat manajemen pembuatan pesanan, riwayat belanja, detail rincian belanjaan, pembatalan pesanan, dan pelacakan pengiriman untuk customer, kasir, dan kurir.
+
+---
+
+## 🧭 Daftar Endpoint Pesanan
+
+*   [**GET /api/v1/customer/pesanan**](#get-apiv1customerpesanan-customer--get-apiv1kasirpesanan-kasir) - Mengambil riwayat transaksi belanja (Customer / Kasir)
+*   [**POST /api/v1/customer/pesanan/checkout**](#post-apiv1customerpesanancheckout) - Checkout & buat pesanan online (Customer)
+*   [**GET /api/v1/customer/pesanan/:public_id**](#get-apiv1customerpesananpublic_id-customer--get-apiv1kasirpesananpublic_id-kasir--get-apiv1kurirpesananpublic_id-kurir) - Mengambil rincian detail pesanan lengkap (Customer / Kasir / Kurir)
+*   [**PATCH /api/v1/customer/pesanan/:public_id/batal**](#patch-apiv1customerpesananpublic_idbatal) - Membatalkan pesanan (Customer)
 
 ---
 
 ## GET /api/v1/customer/pesanan (Customer) / GET /api/v1/kasir/pesanan (Kasir)
 
-Auth. Mendapatkan daftar pesanan online/offline.
+Mengambil daftar riwayat pesanan (baik pesanan online maupun transaksi fisik offline kasir).
 
-**Response:**
+*   **Autentikasi:** Wajib (Role: `Customer` atau `Kasir`)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
 
+### Response (200 OK)
 ```json
 {
   "status": "success",
@@ -28,10 +46,12 @@ Auth. Mendapatkan daftar pesanan online/offline.
 
 ## POST /api/v1/customer/pesanan/checkout
 
-Auth (Customer). Membuat pesanan online baru dari isi keranjang.
+Membuat pesanan online baru dari isi keranjang belanja aktif customer dan men-generate link pembayaran Midtrans Snap.
 
-**Request:**
+*   **Autentikasi:** Wajib (Role: `Customer`)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
 
+### Request Payload
 ```json
 {
   "id_alamat": "9e3c8162-...",
@@ -43,8 +63,7 @@ Auth (Customer). Membuat pesanan online baru dari isi keranjang.
 }
 ```
 
-**Response:**
-
+### Response (201 Created)
 ```json
 {
   "status": "success",
@@ -64,10 +83,12 @@ Auth (Customer). Membuat pesanan online baru dari isi keranjang.
 
 ## GET /api/v1/customer/pesanan/:public_id (Customer) / GET /api/v1/kasir/pesanan/:public_id (Kasir) / GET /api/v1/kurir/pesanan/:public_id (Kurir)
 
-Auth. Mendapatkan detail pesanan lengkap beserta info pengiriman dan rincian item.
+Mengambil detail rincian produk, alamat pengantaran, identitas kurir, serta rincian pembayaran untuk satu transaksi spesifik.
 
-**Response:**
+*   **Autentikasi:** Wajib (Semua Role terkait)
+*   **Parameter URL:** `public_id` (UUID Pesanan)
 
+### Response (200 OK)
 ```json
 {
   "status": "success",
@@ -79,28 +100,28 @@ Auth. Mendapatkan detail pesanan lengkap beserta info pengiriman dan rincian ite
     "items": [
       {
         "id_barang": 1,
-        "nama_barang": "Produk A",
-        "varian": "Ukuran: L",
+        "nama_barang": "Teh Sosro Kotak 300ml",
+        "varian": "Ukuran: Reguler",
         "jumlah": 2,
-        "harga_satuan": 50000,
-        "gambar": "http://minio:9000/products/item.png"
+        "harga_satuan": 5000,
+        "gambar": "http://minio-url/bucket/products/teh.png"
       }
     ],
     "tujuan_pengantaran": {
-      "nama_penerima": "Surya",
-      "alamat_lengkap": "Semarang"
+      "nama_penerima": "Surya Pratama",
+      "alamat_lengkap": "Jl. Prof Soedarto SH, Tembalang, Semarang"
     },
     "kurir": {
       "nama_kurir": "Ricardo Holahilo",
-      "plat_nomor": "",
+      "plat_nomor": "H 1234 AB",
       "ekspedisi": "Internal Toko",
-      "foto_kurir": ""
+      "foto_kurir": "http://minio-url/bucket/profiles/avatar.png"
     },
     "rincian_pembayaran": {
-      "subtotal_items": 100000,
+      "subtotal_items": 10000,
       "ongkir": 20000,
       "biaya_proteksi": 0,
-      "total": 120000
+      "total": 30000
     }
   }
 }
@@ -110,10 +131,11 @@ Auth. Mendapatkan detail pesanan lengkap beserta info pengiriman dan rincian ite
 
 ## PATCH /api/v1/customer/pesanan/:public_id/batal
 
-Auth (Customer). Membatalkan pesanan.
+Membatalkan transaksi pesanan online yang belum terbayar/terkirim.
 
-**Response:**
+*   **Autentikasi:** Wajib (Role: `Customer` & Verifikasi Kepemilikan)
 
+### Response (200 OK)
 ```json
 {
   "status": "success",
@@ -125,4 +147,4 @@ Auth (Customer). Membatalkan pesanan.
 
 ## GET /api/v1/customer/pesanan/:public_id/lacak
 
-Auth (Customer). Lihat status pengiriman. Detail skema kembalian dapat dilihat di `pengantaran.md`.
+*   **Info:** Digunakan untuk melacak status pengiriman kurir. Skema detail parameter response silakan merujuk pada file [pengantaran.md](../pengantaran.md).

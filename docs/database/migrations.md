@@ -1,105 +1,115 @@
-# Database Migrations (Atlas CLI)
+# 🚀 Migrasi Database (Atlas CLI & GORM)
 
-## Prasyarat
+---
+### 🧭 Navigasi Cepat
+[🏠 Utama](../README.md) | [🏛️ Arsitektur](../architecture.md) | [🛠️ Deployment](../deployment.md) | [💳 Midtrans](../pembayaran.md) | [📦 Biteship](../biteship.md) | [📡 API Contract](../api/overview.md) | [🗄️ Database](erd.md) | [🔒 Keamanan](../security/README.md)
+---
 
-- PostgreSQL running dengan database `mantra_db` dan `mantra_dev`
-- Atlas CLI terinstall
-- Atlas Provider GORM terinstall
-- File `.env` sudah dikonfigurasi
+Dokumen ini menjelaskan alur kerja deklaratif untuk mengelola migrasi skema database PostgreSQL menggunakan **Atlas CLI** dan **GORM ORM**.
 
-## Konsep
+---
 
-Atlas membandingkan **GORM Structs** (Single Source of Truth) dengan **database sandbox** (`mantra_dev`), lalu menghasilkan SQL untuk menyinkronkan **database utama** (`mantra_db`).
+## 📋 1. Prasyarat System
+
+Sebelum menjalankan perintah migrasi, pastikan prasyarat berikut sudah terpenuhi di sistem lokal Anda:
+*   **PostgreSQL:** Sudah berjalan di localhost.
+*   **Database:** Memiliki dua database terpisah di PostgreSQL:
+    1.  `mantra_db` (Database utama untuk runtime aplikasi).
+    2.  `mantra_dev` (Database sandbox/temporary untuk kalkulasi diff).
+*   **Atlas CLI:** Sudah terinstall di komputer Anda.
+*   **Go Dependencies:** `atlas-provider-gorm` terpasang di modul Go.
+*   **Env File:** File `.env` sudah terisi dengan benar.
+
+---
+
+## 💡 2. Konsep Dasar Migrasi Deklaratif
+
+Mantra menggunakan pendekatan migrasi deklaratif. Alih-alih menulis file migrasi SQL secara manual (seperti `UP` atau `DOWN`), Atlas akan membandingkan skema model struct Go Anda (**GORM Models** sebagai *Single Source of Truth*) dengan database sandbox (`mantra_dev`), kemudian menghasilkan instruksi SQL migrasi secara dinamis untuk memperbarui database utama (`mantra_db`).
 
 ```text
-┌──────────────┐    diff     ┌─────────────┐    apply    ┌───────────┐
-│  GORM Models │───────────▶│ Sandbox DB  │────────────▶│  Main DB  │
-│  (models/)   │            │ (mantra_dev)│             │(mantra_db)│
-└──────────────┘            └─────────────┘             └───────────┘
+GORM Models (models/)
+        │
+        ▼ (perbandingan otomatis / diff)
+Sandbox DB (mantra_dev)
+        │
+        ▼ (aplikasikan perubahan / apply)
+Database Utama (mantra_db)
 ```
 
-## Workflow Harian
+---
 
-### 1. Buat / ubah struct di `models/`
+## 🔄 3. Alur Kerja Harian (Daily Workflow)
 
-Buat file baru atau edit struct yang sudah ada. Pastikan:
+Ikuti 5 langkah berikut ketika Anda perlu menambah tabel atau mengubah kolom database:
 
-- Nama struct Capital (exported)
-- Tag `gorm:"column:nama_kolom"` snake_case
-- Method `TableName() string` mengembalikan nama tabel
+### Langkah 1: Buat atau Ubah Struct di Folder `models/`
+Buat file Go baru atau modifikasi struct yang sudah ada. Pastikan konvensi GORM terpenuhi:
+```go
+package models
 
-### 2. Cek perubahan
+type Baru struct {
+    IdBaru   uint   `gorm:"primaryKey;column:id_baru"`
+    NamaBaru string `gorm:"column:nama_baru"`
+}
 
+func (Baru) TableName() string {
+    return "baru"
+}
+```
+
+### Langkah 2: Daftarkan Model Baru
+Buka file `config/database.go` dan tambahkan referensi pointer struct baru Anda ke dalam fungsi pembungkus GORM `AutoMigrate()`.
+
+### Langkah 3: Deteksi Perubahan Skema
+Jalankan perintah ini untuk memicu Atlas mendeteksi perbedaan kode model vs sandbox database:
 ```bash
 make db-diff
 ```
 
-### 3. Lihat SQL yang akan dijalankan (dry run)
-
+### Langkah 4: Tinjau SQL (Dry Run)
+Tinjau perintah SQL apa saja yang akan dieksekusi oleh Atlas untuk memperbarui database utama:
 ```bash
 make db-plan
 ```
 
-### 4. Apply ke database utama
-
+### Langkah 5: Terapkan Perubahan (Apply)
+Terapkan perubahan skema database secara langsung ke database utama Anda:
 ```bash
 make db-apply
 ```
 
-### 5. Update DBML
+---
 
-Setelah apply, update file `docs/mantra.dbml` agar sinkron dengan kode.
+## 💻 4. Daftar Perintah Migrasi (Makefile Commands)
 
-## Perintah Lengkap
+Gunakan perintah `make` berikut di terminal direktori root backend:
 
-| Perintah | Fungsi |
-|----------|--------|
-| `make db-diff` | Deteksi perubahan model → sandbox |
-| `make db-plan` | Lihat SQL sebelum apply |
-| `make db-apply` | Apply perubahan ke DB utama |
-| `make db-inspect` | Lihat skema DB utama dalam HCL |
-| `make db-ui` | Buka ERD visual di browser |
-| `make db-clean` | Drop semua tabel di DB utama (⚠️ reset) |
-| `make db-clean-dev` | Drop semua tabel di sandbox |
-| `make db-clean-all` | Clean DB utama + sandbox |
+| Perintah | Fungsi / Kegunaan |
+| :--- | :--- |
+| **`make db-diff`** | Deteksi perbedaan skema models vs database sandbox |
+| **`make db-plan`** | Melihat rancangan query SQL migrasi yang akan berjalan (*dry-run*) |
+| **`make db-apply`** | Menerapkan (apply) perubahan skema ke database utama |
+| **`make db-inspect`** | Menghasilkan skema database saat ini dalam format representasi HCL |
+| **`make db-ui`** | Membuka antarmuka ERD visual interaktif di browser lokal |
+| **`make db-clean`** | Menghapus (drop) semua tabel di database utama **(⚠️ Data Hilang!)** |
+| **`make db-clean-dev`** | Menghapus (drop) semua tabel di database sandbox/dev |
+| **`make db-clean-all`** | Menghapus semua tabel baik di database utama maupun sandbox |
 
-## Cara Tambah Tabel Baru
+---
 
-1. Buat file `models/baru.go`:
+## 🐛 Troubleshooting
 
-   ```go
-   package models
-
-   func (Baru) TableName() string {
-       return "baru"
-   }
-
-   type Baru struct {
-       IdBaru   uint   `gorm:"primaryKey;column:id_baru"`
-       NamaBaru string `gorm:"column:nama_baru"`
-       // FK ke tabel lain
-       UserID   uint   `gorm:"column:id_user"`
-       User     User   `gorm:"foreignKey:UserID;references:IdUser"`
-   }
-   ```
-
-2. Daftarkan di `config/database.go` → `AutoMigrate()`
-
-3. Jalankan:
-
-   ```bash
-   make db-diff
-   make db-apply
-   ```
-
-4. Update `docs/mantra.dbml` dengan tabel baru dan relasinya.
-
-## Troubleshooting
-
-| Masalah | Solusi |
-|---------|--------|
-| `atlas` command not found | Install Atlas CLI, pastikan ada di PATH |
-| `dial tcp ...:5432: connect: connection refused` | Pastikan PostgreSQL running |
-| `mantra_dev` database not found | Buat database `mantra_dev` |
-| GORM provider error | Jalankan `go mod tidy`, pastikan `atlas-provider-gorm` terinstall |
-| `relation sudah ada` | Bersihkan sandbox: `make db-clean-dev` |
+*   **Error: `atlas` command not found**
+    *   *Solusi:* Install Atlas CLI melalui dokumentasi resmi [Atlasgo.io](https://atlasgo.io/) dan masukkan direktori instalasinya ke PATH OS Anda.
+*   **Error: `dial tcp ...:5432: connect: connection refused`**
+    *   *Solusi:* Pastikan service database PostgreSQL Anda sudah aktif dan port `5432` dapat diakses.
+*   **Error: `database "mantra_dev" does not exist`**
+    *   *Solusi:* Buat database kosong bernama `mantra_dev` di server PostgreSQL lokal Anda menggunakan pgAdmin, DBeaver, atau SQL Shell:
+        ```sql
+        CREATE DATABASE mantra_dev;
+        ```
+*   **Error: `relation "xxx" already exists`**
+    *   *Solusi:* Terjadi ketidaksinkronan di sandbox. Bersihkan database sandbox dengan menjalankan perintah:
+        ```bash
+        make db-clean-dev
+        ```
