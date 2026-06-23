@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -43,9 +44,12 @@ func UploadFileToMinio(c *gin.Context, fileKey string, folderTarget string) (str
 		return "", fmt.Errorf("gagal upload ke MinIO: %v", err)
 	}
 
-	// 4. Return URL publiknya (Sesuaikan dengan domain lu)
-	// Kalau belum pake domain, ganti jadi IP lu misal: http://192.168.10.36:9000/mantra-storage/...
-	fileUrl := fmt.Sprintf("https://storage.mantra.web.id/%s/%s", bucketName, objectName)
+	// 4. Return URL publiknya (Menggunakan dynamic env STORAGE_PUBLIC_URL)
+	storageURL := os.Getenv("STORAGE_PUBLIC_URL")
+	if storageURL == "" {
+		storageURL = "https://storage.mantra.web.id" // Fallback
+	}
+	fileUrl := fmt.Sprintf("%s/%s/%s", storageURL, bucketName, objectName)
 
 	return fileUrl, nil
 }
