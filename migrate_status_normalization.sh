@@ -42,7 +42,7 @@ echo ""
 
 # Step 2: Run data migration SQL
 echo "🗃️  Step 2: Running data migration..."
-PGPASSWORD=${DB_PASSWORD} psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -f migrations/001_status_pesanan_data.sql
+PGPASSWORD=${DB_PASSWORD} psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -f migrations/safe_status_migration.sql
 if [ $? -eq 0 ]; then
     echo "✅ Data migration completed"
 else

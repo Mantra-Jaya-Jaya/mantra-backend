@@ -16,11 +16,8 @@ import (
 var DB *gorm.DB
 
 func ConnectDatabase() {
-	// Load file .env
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Gagal load file .env!")
-	}
+	// Load file .env (opsional di kontainer produksi)
+	_ = godotenv.Load()
 
 	// Ambil data dari variabel environment
 	host := os.Getenv("DB_HOST")

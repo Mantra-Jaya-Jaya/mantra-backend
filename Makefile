@@ -1,5 +1,5 @@
-# Include file .env dan export semua variabel di dalamnya agar terbaca oleh Atlas
-include .env
+# Include file .env dan export semua variabel di dalamnya agar terbaca oleh Atlas (opsional jika file absen)
+-include .env
 export
 
 # Cross-platform detection (Linux / Git Bash / cmd / PowerShell)

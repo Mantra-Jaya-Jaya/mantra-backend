@@ -35,7 +35,10 @@ func UploadFileToMinio(c *gin.Context, fileKey string, folderTarget string) (str
 	)
 
 	// 3. Upload ke MinIO (Pastikan nama bucket sesuai di config/env lu)
-	bucketName := "mantra-storage"
+	bucketName := os.Getenv("MINIO_BUCKET")
+	if bucketName == "" {
+		bucketName = "mantra-storage"
+	}
 	_, err = config.MinioClient.PutObject(c, bucketName, objectName, file, header.Size, minio.PutObjectOptions{
 		ContentType: header.Header.Get("Content-Type"),
 	})
