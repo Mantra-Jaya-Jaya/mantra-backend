@@ -6,6 +6,7 @@ import (
 	"backend-mantra/config"
 	"backend-mantra/routes"
 	"backend-mantra/seeders"
+	"backend-mantra/utils"
 	"log"
 	"os"
 
@@ -21,6 +22,9 @@ func main() {
 
 	// Inisialisasi MinIO
 	config.InitMinio()
+
+	// Jalankan cron job auto-completion pesanan
+	utils.StartOrderAutoCompletionCron()
 
 	// Inisialisasi Gin router
 	r := gin.Default()

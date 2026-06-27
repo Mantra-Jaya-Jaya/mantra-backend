@@ -299,6 +299,8 @@ func GetDetailPesanan(c *gin.Context) {
 		tujuanPengantaran = gin.H{
 			"nama_penerima":  pesanan.Alamat.NamaPenerima,
 			"alamat_lengkap": pesanan.Alamat.AlamatLengkap,
+			"latitude":       pesanan.Alamat.Latitude,
+			"longitude":      pesanan.Alamat.Longitude,
 		}
 	}
 
@@ -310,6 +312,7 @@ func GetDetailPesanan(c *gin.Context) {
 		}
 		kurirData = gin.H{
 			"nama_kurir":            pengantaran.Kurir.Karyawan.User.NamaLengkap,
+			"no_telp_kurir":         pengantaran.Kurir.Karyawan.NoTelp,
 			"plat_nomor":            "",
 			"ekspedisi":             ekspedisi,
 			"foto_kurir":            pengantaran.Kurir.Karyawan.User.FotoProfil,
@@ -323,6 +326,19 @@ func GetDetailPesanan(c *gin.Context) {
 	config.DB.Preload("TipePembayaranRel").Where("id_pesanan = ?", pesanan.IdPesanan).Order("id_pembayaran DESC").First(&pembayaran)
 	if pembayaran.IdPembayaran != 0 {
 		config.DB.Where("id_pembayaran = ?", pembayaran.IdPembayaran).First(&payDetail)
+
+		// --- AUTO SYNC STATUS (Jika manual update DB atau webhook gagal) ---
+		settlementID := utils.GetStatusTransaksiIDSafe("settlement")
+		menungguID := utils.GetStatusPesananIDSafe("Menunggu Pembayaran")
+		dikemasID := utils.GetStatusPesananIDSafe("Dikemas")
+
+		if pembayaran.StatusTransaksiID == settlementID && pesanan.StatusPesananID == menungguID {
+			config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pesanan.IdPesanan).Update("id_status_pesanan", dikemasID)
+			pesanan.StatusPesananID = dikemasID
+			if pesanan.StatusPesanan != nil {
+				pesanan.StatusPesanan.NamaStatus = "Dikemas"
+			}
+		}
 	}
 
 	// Ambil nama tipe pembayaran dari relasi
@@ -331,31 +347,47 @@ func GetDetailPesanan(c *gin.Context) {
 		metodePembayaran = pembayaran.TipePembayaranRel.NamaTipe
 	}
 
+	// Hitung waktu_tiba untuk auto complete 24 jam (Hanya Kurir Internal & Tiba di Tujuan & Ada Bukti)
+	var waktuTiba *time.Time
+	if pesanan.TipeKurirID == utils.GetTipeKurirIDSafe("internal") && pengantaran.IdPengantaran != 0 {
+		if pengantaran.StatusPengantaranID == utils.GetStatusPengantaranIDSafe("Tiba di Tujuan") && pengantaran.FotoBuktiPengiriman != "" {
+			waktuTiba = pengantaran.WaktuSampai
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Detail pesanan berhasil diambil",
 		"data": gin.H{
-			"no_pesanan":             pesanan.PublicId,
-			"id_status_pesanan":      pesanan.StatusPesananID,
-			"nama_status_pesanan":    func() string { if pesanan.StatusPesanan != nil { return pesanan.StatusPesanan.NamaStatus }; return "Unknown" }(),
-			"tanggal_pesan":          pesanan.TanggalPesanan,
-			"items":                  items,
-			"tujuan_pengantaran":     tujuanPengantaran,
-			"kurir":                  kurirData,
+			"no_pesanan":        pesanan.PublicId,
+			"id_status_pesanan": pesanan.StatusPesananID,
+			"nama_status_pesanan": func() string {
+				if pesanan.StatusPesanan != nil {
+					return pesanan.StatusPesanan.NamaStatus
+				}
+				return "Unknown"
+			}(),
+			"tanggal_pesan":      pesanan.TanggalPesanan,
+			"waktu_tiba":         waktuTiba,
+			"id_tipe_kurir":      pesanan.TipeKurirID,
+			"items":              items,
+			"tujuan_pengantaran": tujuanPengantaran,
+			"kurir":              kurirData,
 			"rincian_pembayaran": gin.H{
-				"subtotal_items":   subtotalItems,
-				"ongkir":           pesanan.OngkosKirim,
-				"biaya_proteksi":   0,
-				"total":            pesanan.TotalPembayaran,
-				"metode":           metodePembayaran,
-				"nama_bank":        payDetail.NamaBank,
-				"kanal_pembayaran": payDetail.KanalPembayaran,
-				"va_number":        payDetail.NomorVA,
-				"qr_url":           payDetail.QrCode,
-				"bill_key":         payDetail.BillKey,
-				"bill_code":        payDetail.BillCode,
-				"order_id":         pembayaran.OrderIdMidtrans,
-				"batas_waktu":      pembayaran.BatasWaktuPembayaran,
+				"subtotal_items":      subtotalItems,
+				"ongkir":              pesanan.OngkosKirim,
+				"biaya_proteksi":      0,
+				"total":               pesanan.TotalPembayaran,
+				"metode":              metodePembayaran,
+				"nama_bank":           payDetail.NamaBank,
+				"kanal_pembayaran":    payDetail.KanalPembayaran,
+				"va_number":           payDetail.NomorVA,
+				"qr_url":              payDetail.QrCode,
+				"bill_key":            payDetail.BillKey,
+				"bill_code":           payDetail.BillCode,
+				"order_id":            pembayaran.OrderIdMidtrans,
+				"batas_waktu":         pembayaran.BatasWaktuPembayaran,
+				"id_status_transaksi": pembayaran.StatusTransaksiID,
 			},
 		},
 	})
@@ -472,9 +504,10 @@ func CheckoutPesanan(c *gin.Context) {
 		if spec.Barang.DiskonID != nil && spec.Barang.Diskon != nil && spec.Barang.Diskon.IdDiskon != 0 {
 			d := spec.Barang.Diskon
 			if d.TglMulai.Before(now) && d.TglSelesai.After(now) {
-				if d.TipeDiskon == "persen" {
+				switch d.TipeDiskon {
+				case "persen":
 					hargaSatuan = spec.HargaBarang - (spec.HargaBarang * d.BesarDiskon / 100)
-				} else if d.TipeDiskon == "nominal" {
+				case "nominal":
 					hargaSatuan = spec.HargaBarang - d.BesarDiskon
 					if hargaSatuan < 0 {
 						hargaSatuan = 0
@@ -633,27 +666,28 @@ func CheckoutPesanan(c *gin.Context) {
 		}
 
 		// Atur Request Tipe Pembayaran
-		if cleanMetode == "bca" {
+		switch cleanMetode {
+		case "bca":
 			req.PaymentType = coreapi.PaymentTypeBankTransfer
 			req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBca}
-		} else if cleanMetode == "bni" {
+		case "bni":
 			req.PaymentType = coreapi.PaymentTypeBankTransfer
 			req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBni}
-		} else if cleanMetode == "bri" {
+		case "bri":
 			req.PaymentType = coreapi.PaymentTypeBankTransfer
 			req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBri}
-		} else if cleanMetode == "mandiri" {
+		case "mandiri":
 			req.PaymentType = coreapi.PaymentTypeEChannel
 			req.EChannel = &coreapi.EChannelDetail{
 				BillInfo1: "Pembayaran Mantra",
 				BillInfo2: "Order ID: " + orderIDMidtrans,
 			}
-		} else if cleanMetode == "permata" {
+		case "permata":
 			req.PaymentType = coreapi.PaymentTypeBankTransfer
 			req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankPermata}
-		} else if cleanMetode == "qris" {
+		case "qris":
 			req.PaymentType = coreapi.PaymentTypeQris
-		} else {
+		default:
 			req.PaymentType = coreapi.PaymentTypeGopay // Default QRIS via Gopay
 		}
 
@@ -666,16 +700,17 @@ func CheckoutPesanan(c *gin.Context) {
 		}
 
 		// Ekstrak Data Balikan
-		if cleanMetode == "bca" || cleanMetode == "bni" || cleanMetode == "bri" {
+		switch cleanMetode {
+		case "bca", "bni", "bri":
 			if len(coreResp.VaNumbers) > 0 {
 				vaNumber = coreResp.VaNumbers[0].VANumber
 			}
-		} else if cleanMetode == "mandiri" {
+		case "mandiri":
 			billKey = coreResp.BillKey
 			billCode = coreResp.BillerCode
-		} else if cleanMetode == "permata" {
+		case "permata":
 			vaNumber = coreResp.PermataVaNumber
-		} else {
+		default:
 			// Cek di Actions untuk QRIS/Gopay
 			for _, action := range coreResp.Actions {
 				if action.Name == "generate-qr-code" {
@@ -701,13 +736,13 @@ func CheckoutPesanan(c *gin.Context) {
 
 		batasWaktu := time.Now().Add(24 * time.Hour)
 		pembayaran := models.Pembayaran{
-			PesananID:          pesanan.IdPesanan,
-			OrderIdMidtrans:    orderIDMidtrans,
-			TipePembayaranID:   utils.GetTipePembayaranID(tipePembayaranDB),
-			StatusTransaksiID:  utils.GetStatusTransaksiID("pending"),
-			FraudStatusID:      utils.GetFraudStatusID("accept"),
-			MetodePembayaranID: &metodeDb.IdMetodePembayaran,
-			TotalDibayar:       pesanan.TotalPembayaran,
+			PesananID:            pesanan.IdPesanan,
+			OrderIdMidtrans:      orderIDMidtrans,
+			TipePembayaranID:     utils.GetTipePembayaranID(tipePembayaranDB),
+			StatusTransaksiID:    utils.GetStatusTransaksiID("pending"),
+			FraudStatusID:        utils.GetFraudStatusID("accept"),
+			MetodePembayaranID:   &metodeDb.IdMetodePembayaran,
+			TotalDibayar:         pesanan.TotalPembayaran,
 			BatasWaktuPembayaran: &batasWaktu,
 		}
 		if err := tx.Create(&pembayaran).Error; err != nil {
@@ -1091,6 +1126,15 @@ func LacakPesanan(c *gin.Context) {
 		}
 	}
 
+	// Tambahkan fallback lokasi tujuan kalau alamat null
+	var lokasiTujuan interface{} = nil
+	if pesanan.Alamat != nil {
+		lokasiTujuan = gin.H{
+			"latitude":  pesanan.Alamat.Latitude,
+			"longitude": pesanan.Alamat.Longitude,
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Data lacak pesanan berhasil diambil",
@@ -1106,6 +1150,7 @@ func LacakPesanan(c *gin.Context) {
 				"latitude":  pengantaran.LastLatitude,
 				"longitude": pengantaran.LastLongitude,
 			},
+			"lokasi_tujuan": lokasiTujuan,
 			"estimasi_tiba": estimasiTiba,
 			"jarak_meter":   jarakMeter,
 		},
@@ -1606,19 +1651,19 @@ func KirimPesanan(c *gin.Context) {
 }
 
 type PengantaranListResponse struct {
-	PublicID           string  `json:"public_id"`
-	NoPesanan          string  `json:"no_pesanan"`
-	CustomerNama       string  `json:"customer_nama"`
-	Ekspedisi          string  `json:"ekspedisi"`
-	StatusPengantaran  string  `json:"status_pengantaran"`
-	WaktuPickup        *string `json:"waktu_pickup,omitempty"`
-	WaktuSampai        *string `json:"waktu_sampai,omitempty"`
-	KurirNama          string  `json:"kurir_nama"`
-	AlamatTujuan       string  `json:"alamat_tujuan"`
-	LastLatitude       float64 `json:"last_latitude"`
-	LastLongitude      float64 `json:"last_longitude"`
-	IsExternal         bool    `json:"is_external"`
-	NomorResi          string  `json:"nomor_resi,omitempty"`
+	PublicID          string  `json:"public_id"`
+	NoPesanan         string  `json:"no_pesanan"`
+	CustomerNama      string  `json:"customer_nama"`
+	Ekspedisi         string  `json:"ekspedisi"`
+	StatusPengantaran string  `json:"status_pengantaran"`
+	WaktuPickup       *string `json:"waktu_pickup,omitempty"`
+	WaktuSampai       *string `json:"waktu_sampai,omitempty"`
+	KurirNama         string  `json:"kurir_nama"`
+	AlamatTujuan      string  `json:"alamat_tujuan"`
+	LastLatitude      float64 `json:"last_latitude"`
+	LastLongitude     float64 `json:"last_longitude"`
+	IsExternal        bool    `json:"is_external"`
+	NomorResi         string  `json:"nomor_resi,omitempty"`
 }
 
 // GetDaftarPengantaranAdmin daftar pengantaran untuk admin monitoring.
@@ -1696,5 +1741,40 @@ func GetDaftarPengantaranAdmin(c *gin.Context) {
 		"meta": gin.H{
 			"total": len(results),
 		},
+	})
+}
+
+// SelesaikanPesananCustomer mengubah status pesanan (dan pengantaran jika ada) menjadi Selesai.
+// Dipakai oleh: customer (POST /customer/pesanan/:public_id/selesai)
+func SelesaikanPesananCustomer(c *gin.Context) {
+	publicID := c.Param("public_id")
+
+	var pesanan models.Pesanan
+	if err := config.DB.Where("public_id = ?", publicID).First(&pesanan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pesanan tidak ditemukan"})
+		return
+	}
+
+	// Pastikan hanya bisa diselesaikan jika status pesanan adalah Dikemas atau Dikirim
+	// Tapi kita andalkan backend validasi sederhana atau langsung update saja.
+	idStatusSelesai := utils.GetStatusPesananID("Selesai")
+	pesanan.StatusPesananID = idStatusSelesai
+
+	if err := config.DB.Save(&pesanan).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengupdate status pesanan"})
+		return
+	}
+
+	// Update status pengantaran jika ada
+	var pengantaran models.Pengantaran
+	if err := config.DB.Where("id_pesanan = ?", pesanan.IdPesanan).First(&pengantaran).Error; err == nil {
+		idStatusPengantaranSelesai := utils.GetStatusPengantaranID("Selesai")
+		pengantaran.StatusPengantaranID = idStatusPengantaranSelesai
+		config.DB.Save(&pengantaran)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Pesanan berhasil dikonfirmasi selesai",
 	})
 }

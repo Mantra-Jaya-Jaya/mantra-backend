@@ -7,6 +7,7 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -185,6 +186,75 @@ func EditAkunCustomer(c *gin.Context) {
 			"no_telp":      customer.NoTelp,
 			"email":        customer.User.Email,
 			"foto_profil":  fotoProfil,
+		},
+	})
+}
+
+// UploadFotoProfilCustomer mengunggah foto profil ke MinIO dan memperbarui database.
+// Dipakai oleh: customer (POST /customer/profil/foto)
+// Auth: Wajib login, role customer
+func UploadFotoProfilCustomer(c *gin.Context) {
+	uid, exists := getUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "User belum login",
+			"error":   gin.H{"code": "AUTH_001", "detail": "Token tidak valid"},
+		})
+		return
+	}
+
+	// Cari customer berdasarkan id_user
+	var customer models.Customer
+	if err := config.DB.Preload("User").Where("id_user = ?", uid).First(&customer).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Data customer tidak ditemukan",
+			"error":   gin.H{"code": "DATA_004", "detail": "Customer tidak ditemukan di database"},
+		})
+		return
+	}
+
+	// Gunakan utils untuk upload file (parameter nama field form-data: "foto", folder: "profil")
+	// Pastikan kita sudah import "backend-mantra/utils" jika belum (tapi file ini package user, jadi mungkin butuh utils)
+	// Wait, we need to import utils! I will ensure utils is imported if not already.
+	// Ah, I need to check if 'backend-mantra/utils' is imported in customer_controller.go.
+	// We'll see.
+	fotoURL, err := utils.UploadFileToMinio(c, "foto", "profil")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Gagal mengunggah foto profil",
+			"error":   gin.H{"code": "UPLOAD_001", "detail": err.Error()},
+		})
+		return
+	}
+
+	// Update foto profil di tabel user
+	customer.User.FotoProfil = fotoURL
+	if err := config.DB.Save(&customer.User).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal menyimpan foto profil ke database",
+			"error":   gin.H{"code": "SERVER_001", "detail": err.Error()},
+		})
+		return
+	}
+
+	// Build absolute URL for response
+	fotoProfil := fotoURL
+	if fotoProfil != "" && !strings.HasPrefix(fotoProfil, "http") {
+		baseURL := os.Getenv("BASE_URL")
+		if baseURL != "" {
+			fotoProfil = strings.TrimRight(baseURL, "/") + "/" + strings.TrimLeft(fotoProfil, "/")
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Foto profil berhasil diperbarui",
+		"data": gin.H{
+			"foto_profil": fotoProfil,
 		},
 	})
 }

@@ -24,12 +24,12 @@ func SeedCustomer() {
 	}
 
 	semarangCoords := [][2]float64{
-		{-7.051410, 110.438125},  // Tembalang (dalam radius ~500m)
-		{-7.041000, 110.442000},  // Sambiroto (dalam radius ~1.5km)
-		{-7.050000, 110.430000},  // Polines area (dalam)
-		{3.139003, 101.686855},   // KBRI Kuala Lumpur (LUAR NEGERI)
-		{-6.983333, 110.409722},  // Kendal (luar radius ~15km)
-		{-7.816667, 110.916667},  // Wonogiri (luar radius ~100km)
+		{-7.051410, 110.438125}, // Tembalang (dalam radius ~500m)
+		{-7.041000, 110.442000}, // Sambiroto (dalam radius ~1.5km)
+		{-7.050000, 110.430000}, // Polines area (dalam)
+		{3.139003, 101.686855},  // KBRI Kuala Lumpur (LUAR NEGERI)
+		{-6.983333, 110.409722}, // Kendal (luar radius ~15km)
+		{-7.816667, 110.916667}, // Wonogiri (luar radius ~100km)
 	}
 	semarangAlamat := []string{
 		"Jl. Banjarsari Selatan, Tembalang, Kota Semarang",
@@ -70,9 +70,12 @@ func SeedCustomer() {
 		}
 		totalCustomer++
 
-		// Lepas FK dulu, baru hapus alamat lama biar bisa di-create ulang
-		config.DB.Exec("UPDATE pesanan SET id_alamat = NULL WHERE id_customer = ?", customerProfil.IdCustomer)
-		config.DB.Where("id_customer = ?", customerProfil.IdCustomer).Delete(&models.Alamat{})
+		var existingAlamat int64
+		config.DB.Model(&models.Alamat{}).Where("id_customer = ?", customerProfil.IdCustomer).Count(&existingAlamat)
+		if existingAlamat > 0 {
+			totalAlamat += int(existingAlamat)
+			continue
+		}
 
 		numAlamat := 1
 		if gofakeit.Bool() {

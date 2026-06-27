@@ -227,10 +227,11 @@ func TambahKaryawan(c *gin.Context) {
 		return
 	}
 
-	if input.Role == "Kasir" {
+	switch input.Role {
+	case "Kasir":
 		kasir := models.Kasir{KaryawanID: newKaryawan.IdKaryawan, ShiftKasirID: utils.GetShiftKasirID(input.Shift)}
 		tx.Create(&kasir)
-	} else if input.Role == "Kurir" {
+	case "Kurir":
 		kurir := models.Kurir{KaryawanID: newKaryawan.IdKaryawan}
 		tx.Create(&kurir)
 	}
@@ -249,9 +250,10 @@ func HapusKaryawan(c *gin.Context) {
 
 	tx := config.DB.Begin()
 
-	if karyawan.User.Role.NamaRole == "Kasir" {
+	switch karyawan.User.Role.NamaRole {
+	case "Kasir":
 		tx.Where("id_karyawan = ?", karyawan.IdKaryawan).Delete(&models.Kasir{})
-	} else if karyawan.User.Role.NamaRole == "Kurir" {
+	case "Kurir":
 		tx.Where("id_karyawan = ?", karyawan.IdKaryawan).Delete(&models.Kurir{})
 	}
 
@@ -322,7 +324,7 @@ func GetDetailKaryawan(c *gin.Context) {
 				}
 				return "Aktif" // fallback ke kolom lama
 			}(),
-			"foto_profil":    karyawan.User.FotoProfil,
+			"foto_profil": karyawan.User.FotoProfil,
 			"dibuat_pada": func() string {
 				if !karyawan.User.CreatedAt.IsZero() {
 					return karyawan.User.CreatedAt.Format("02 Jan 2006, 15:04")

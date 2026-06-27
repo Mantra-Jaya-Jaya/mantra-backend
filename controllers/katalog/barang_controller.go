@@ -42,6 +42,7 @@ func GetDaftarBarang(c *gin.Context) {
 	var total int64
 
 	kategoriIdStr := c.Query("id_kategori") // Bisa berisi public_id (UUID)
+	searchStr := c.Query("search")          // Keyword pencarian dari customer app
 
 	queryCount := config.DB.Model(&models.Barang{})
 	querySelect := config.DB.Table("barang")
@@ -52,6 +53,12 @@ func GetDaftarBarang(c *gin.Context) {
 			queryCount = queryCount.Where("id_kategori = ?", kat.IdKategori)
 			querySelect = querySelect.Where("barang.id_kategori = ?", kat.IdKategori)
 		}
+	}
+
+	// 🔥 Filter berdasarkan pencarian nama barang (Case-Insensitive)
+	if searchStr != "" {
+		queryCount = queryCount.Where("nama_barang ILIKE ?", "%"+searchStr+"%")
+		querySelect = querySelect.Where("barang.nama_barang ILIKE ?", "%"+searchStr+"%")
 	}
 
 	// Hitung total barang

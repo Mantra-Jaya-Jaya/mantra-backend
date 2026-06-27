@@ -87,10 +87,10 @@ func handleOrderStatus(data json.RawMessage) {
 
 	// Update status pesanan
 	statusMap := map[string]string{
-		"pending":  "Dikemas",
-		"active":   "Dikirim",
+		"pending":   "Dikemas",
+		"active":    "Dikirim",
 		"delivered": "Selesai",
-		"returned": "Dikirim", // atau Dibatalkan, tergantung logika bisnis
+		"returned":  "Dikirim", // atau Dibatalkan, tergantung logika bisnis
 	}
 
 	if newStatus, ok := statusMap[order.Status]; ok {
