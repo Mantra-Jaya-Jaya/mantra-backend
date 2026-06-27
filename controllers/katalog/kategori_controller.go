@@ -42,7 +42,7 @@ func GetKategori(c *gin.Context) {
 	var namaRole string
 	// Asumsi tabel user lu namanya 'user' atau 'users', sesuaikan kalau beda ya bosku!
 	errRole := config.DB.Raw("SELECT role.nama_role FROM \"user\" JOIN role ON role.id_role = \"user\".id_role WHERE \"user\".id_user = ?", userID).Scan(&namaRole).Error
-	
+
 	if errRole != nil || namaRole == "" {
 		// Fallback (Jaga-jaga kalau query gagal, kita tetep coba ambil dari token JWT)
 		namaRole = c.GetString("role")
@@ -89,7 +89,6 @@ func GetKategori(c *gin.Context) {
 		"data":    result,
 	})
 }
-
 
 // TambahKategori menambahkan kategori baru.
 // Dipakai oleh: admin (POST /admin/katalog/kategori)

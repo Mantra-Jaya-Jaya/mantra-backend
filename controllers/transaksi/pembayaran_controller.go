@@ -214,13 +214,13 @@ func UpdateQuantityItem(c *gin.Context) {
 			TipePesananID:   idTipeOffline,
 			StatusPesananID: idStatusAwal, // 🚀 Pakai status yang beneran ada di DB lu!
 		}
-		
+
 		if err := tx.Create(&pesananBaru).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat transaksi baru"})
 			return
 		}
-		
+
 		input.IdPesanan = pesananBaru.IdPesanan
 	} else {
 		// Proteksi: Jangan edit pesanan yang sudah Selesai / Batal
@@ -443,21 +443,22 @@ func BayarNonTunai(c *gin.Context) {
 	}
 
 	// 4. Atur Request Tipe Pembayaran Midtrans (Tanpa Mandiri)
-	if cleanMetode == "bca" {
+	switch cleanMetode {
+	case "bca":
 		req.PaymentType = coreapi.PaymentTypeBankTransfer
 		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBca}
-	} else if cleanMetode == "bni" {
+	case "bni":
 		req.PaymentType = coreapi.PaymentTypeBankTransfer
 		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBni}
-	} else if cleanMetode == "bri" {
+	case "bri":
 		req.PaymentType = coreapi.PaymentTypeBankTransfer
 		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankBri}
-	} else if cleanMetode == "permata" {
+	case "permata":
 		req.PaymentType = coreapi.PaymentTypeBankTransfer
 		req.BankTransfer = &coreapi.BankTransferDetails{Bank: midtrans.BankPermata}
-	} else if cleanMetode == "qris" {
+	case "qris":
 		req.PaymentType = coreapi.PaymentTypeQris
-	} else {
+	default:
 		req.PaymentType = coreapi.PaymentTypeGopay
 	}
 
@@ -471,13 +472,14 @@ func BayarNonTunai(c *gin.Context) {
 
 	// 6. Ekstrak Data Balikan (Cuma QR atau VA)
 	var qrUrl, vaNumber string
-	if cleanMetode == "bca" || cleanMetode == "bni" || cleanMetode == "bri" {
+	switch cleanMetode {
+	case "bca", "bni", "bri":
 		if len(coreResp.VaNumbers) > 0 {
 			vaNumber = coreResp.VaNumbers[0].VANumber
 		}
-	} else if cleanMetode == "permata" {
+	case "permata":
 		vaNumber = coreResp.PermataVaNumber
-	} else {
+	default:
 		for _, action := range coreResp.Actions {
 			if action.Name == "generate-qr-code" {
 				qrUrl = action.URL
@@ -537,7 +539,7 @@ func BayarNonTunai(c *gin.Context) {
 		MetodePembayaranID: &metodeDb.IdMetodePembayaran,
 		TotalDibayar:       pesanan.TotalPembayaran,
 	}
-	
+
 	if err := tx.Create(&pembayaran).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat pembayaran"})
@@ -595,7 +597,7 @@ func CekStatusPembayaran(c *gin.Context) {
 	// 🚀 AMANIN PAKAI FUNGSI SAFE (Biar gak jantungan / Panic)
 	settledID := utils.GetStatusTransaksiIDSafe("settlement")
 	captureID := utils.GetStatusTransaksiIDSafe("capture")
-	
+
 	isLunas := false
 	if pembayaran.StatusTransaksiID == settledID || pembayaran.StatusTransaksiID == captureID {
 		isLunas = true
@@ -609,9 +611,9 @@ func CekStatusPembayaran(c *gin.Context) {
 
 	// 🚀 PINDAHIN is_lunas KE DALAM 'data' BIAR FLUTTER GAMPANG PARSINGNYA
 	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Status pembayaran berhasil dicek",
-		"is_lunas":            isLunas,
+		"status":   "success",
+		"message":  "Status pembayaran berhasil dicek",
+		"is_lunas": isLunas,
 		"data": gin.H{
 			"is_lunas":            isLunas,
 			"id_status_transaksi": pembayaran.StatusTransaksiID,

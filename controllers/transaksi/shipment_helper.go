@@ -10,7 +10,6 @@ import (
 	"backend-mantra/config"
 	"backend-mantra/models"
 	"backend-mantra/services"
-	"backend-mantra/utils"
 )
 
 func processExternalShipment(pesananID uint) {
@@ -133,7 +132,6 @@ func processExternalShipment(pesananID uint) {
 	updates := map[string]any{
 		"nomor_resi":        result.WaybillID,
 		"biteship_order_id": result.ID,
-		"id_status_pesanan": utils.GetStatusPesananID("Dikirim"),
 	}
 	if err := config.DB.Model(&models.Pesanan{}).Where("id_pesanan = ?", pesananID).Updates(updates).Error; err != nil {
 		fmt.Printf("❌ Shipment Error: Gagal update status pesanan %d: %s\n", pesananID, err.Error())

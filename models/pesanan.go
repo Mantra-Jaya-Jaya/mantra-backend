@@ -15,6 +15,7 @@ type Pesanan struct {
 	PublicId        uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
 	TotalPembayaran int            `gorm:"column:total_pembayaran" json:"total_pembayaran"`
 	TanggalPesanan  time.Time      `gorm:"column:tanggal_pesanan" json:"tanggal_pesanan"`
+	UpdatedAt       time.Time      `gorm:"autoUpdateTime;column:updated_at" json:"updated_at"`
 	TipePesananID   uint           `gorm:"column:id_tipe_pesanan;not null" json:"id_tipe_pesanan"`
 	TipePesananRel  *TipePesanan   `gorm:"foreignKey:TipePesananID;references:IdTipePesanan" json:"tipe_pesanan,omitempty"`
 	StatusPesananID uint           `gorm:"column:id_status_pesanan;not null" json:"id_status_pesanan"`
