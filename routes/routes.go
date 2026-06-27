@@ -110,6 +110,7 @@ func SetupRoutes(r *gin.Engine) {
 			kurirGroup.POST("/pengantaran/:public_id/ambil", pengantaran.AmbilPesanan)
 			kurirGroup.POST("/pengantaran/:public_id/status", pengantaran.UpdateStatusPengantaran)
 			kurirGroup.PUT("/pengantaran/:public_id/selesai", pengantaran.UploadBuktiPengiriman)
+			kurirGroup.PUT("/pengantaran/:public_id/pembayaran", pengantaran.KonfirmasiPembayaran)
 			kurirGroup.GET("/notifikasi", notifikasi.GetNotifikasi)
 		}
 

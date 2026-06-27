@@ -400,8 +400,9 @@ func GetDetailPesanan(c *gin.Context) {
 	}
 
 	type MetodeBayarDTO struct {
-		IDMetode   string `json:"id_metode_bayar"`
-		NamaMetode string `json:"nama_metode"`
+		IDMetode          string `json:"id_metode_bayar"`
+		NamaMetode        string `json:"nama_metode"`
+		IDStatusTransaksi uint   `json:"id_status_transaksi"`
 	}
 
 	type DetailPesananBungkus struct {
@@ -447,16 +448,18 @@ func GetDetailPesanan(c *gin.Context) {
 
 	// 🚀 6. MAPPING METODE BAYAR (Aman dari Nil Pointer)
 	metodeBayar := MetodeBayarDTO{
-		IDMetode:   "-",
-		NamaMetode: "Belum ada pembayaran",
+		IDMetode:          "-",
+		NamaMetode:        "Belum ada pembayaran",
+		IDStatusTransaksi: 0,
 	}
 
 	// 🚀 PERBAIKAN DI SINI: Cek ganda! Pastikan Pembayaran ADA dan MetodePembayaran ADA!
-	if pesanan.Pembayaran != nil && pesanan.Pembayaran.MetodePembayaran != nil {
-		metodeBayar = MetodeBayarDTO{
-			IDMetode:   fmt.Sprintf("%d", pesanan.Pembayaran.MetodePembayaran.IdMetodePembayaran),
-			NamaMetode: pesanan.Pembayaran.MetodePembayaran.NamaMetode,
+	if pesanan.Pembayaran != nil {
+		if pesanan.Pembayaran.MetodePembayaran != nil {
+			metodeBayar.IDMetode = fmt.Sprintf("%d", pesanan.Pembayaran.MetodePembayaran.IdMetodePembayaran)
+			metodeBayar.NamaMetode = pesanan.Pembayaran.MetodePembayaran.NamaMetode
 		}
+		metodeBayar.IDStatusTransaksi = pesanan.Pembayaran.StatusTransaksiID
 	}
 
 	namaCust := "Customer Offline"
@@ -562,10 +565,12 @@ func TerimaPesanan(c *gin.Context) {
 		return
 	}
 
+	waktuSekarang := time.Now()
 	pengantaranBaru := models.Pengantaran{
 		PesananID:           pesanan.IdPesanan,
 		KurirID:             &kurir.IdKurir,
-		StatusPengantaranID: utils.GetStatusPengantaranID("Menunggu Pickup"),
+		StatusPengantaranID: utils.GetStatusPengantaranIDSafe("Dalam Perjalanan"),
+		WaktuPickup:         &waktuSekarang,
 		EkspedisiID:         pesanan.EkspedisiID,
 	}
 
@@ -575,7 +580,7 @@ func TerimaPesanan(c *gin.Context) {
 		return
 	}
 
-	if err := tx.Model(&pesanan).Update("id_status_pesanan", utils.GetStatusPesananID("Dikirim")).Error; err != nil {
+	if err := tx.Model(&pesanan).Update("id_status_pesanan", utils.GetStatusPesananIDSafe("Dikirim")).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal memperbarui status pesanan"})
 		return
