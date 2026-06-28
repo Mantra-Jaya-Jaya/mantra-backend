@@ -44,12 +44,12 @@ type biteshipRateRequest struct {
 }
 
 type biteshipItem struct {
-	Name     string `json:"name"`
-	Weight   int    `json:"weight"`
-	Length   int    `json:"length"`
-	Width    int    `json:"width"`
-	Height   int    `json:"height"`
-	Value    int    `json:"value"`
+	Name   string `json:"name"`
+	Weight int    `json:"weight"`
+	Length int    `json:"length"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+	Value  int    `json:"value"`
 }
 
 type biteshipRateResponse struct {
@@ -292,31 +292,31 @@ func (b *BiteshipAdapter) GetCouriers() ([]BiteshipCourierItem, error) {
 
 // CreateShipmentRequest is the request payload for creating a Biteship order
 type CreateShipmentRequest struct {
-	OriginAddress            string
-	OriginLat                float64
-	OriginLng                float64
-	OriginPostalCode         int
-	DestinationAddress       string
-	DestinationLat           float64
-	DestinationLng           float64
-	DestinationPostalCode    int
-	DestinationContactName   string
-	DestinationContactPhone  string
-	DestinationNote          string
-	CourierCode              string
-	CourierServiceCode       string
-	OrderNote                string
-	Items                    []CreateShipmentItem
+	OriginAddress           string
+	OriginLat               float64
+	OriginLng               float64
+	OriginPostalCode        int
+	DestinationAddress      string
+	DestinationLat          float64
+	DestinationLng          float64
+	DestinationPostalCode   int
+	DestinationContactName  string
+	DestinationContactPhone string
+	DestinationNote         string
+	CourierCode             string
+	CourierServiceCode      string
+	OrderNote               string
+	Items                   []CreateShipmentItem
 }
 
 type CreateShipmentItem struct {
-	Name          string `json:"name"`
-	Weight        int    `json:"weight"`
-	Quantity      int    `json:"quantity"`
-	Value         int    `json:"value"`
-	Length        int    `json:"length,omitempty"`
-	Width         int    `json:"width,omitempty"`
-	Height        int    `json:"height,omitempty"`
+	Name     string `json:"name"`
+	Weight   int    `json:"weight"`
+	Quantity int    `json:"quantity"`
+	Value    int    `json:"value"`
+	Length   int    `json:"length,omitempty"`
+	Width    int    `json:"width,omitempty"`
+	Height   int    `json:"height,omitempty"`
 }
 
 type biteshipCoordinate struct {
@@ -341,7 +341,7 @@ type biteshipCreateOrderRequest struct {
 	CourierInsurance        int                 `json:"courier_insurance,omitempty"`
 	DeliveryType            string              `json:"delivery_type"`
 	OrderNote               string              `json:"order_note,omitempty"`
-	Items []struct {
+	Items                   []struct {
 		Name     string `json:"name"`
 		Weight   int    `json:"weight"`
 		Quantity int    `json:"quantity"`

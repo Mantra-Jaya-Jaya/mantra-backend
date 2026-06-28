@@ -5,10 +5,10 @@ import (
 	"backend-mantra/controllers/katalog"
 	"backend-mantra/controllers/keranjang"
 	"backend-mantra/controllers/notifikasi"
+	"backend-mantra/controllers/pemesanan"
+	"backend-mantra/controllers/pengantaran"
 	"backend-mantra/controllers/transaksi"
 	"backend-mantra/controllers/user"
-	"backend-mantra/controllers/pengantaran"
-	"backend-mantra/controllers/pemesanan"
 	"backend-mantra/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -56,12 +56,14 @@ func SetupRoutes(r *gin.Engine) {
 			customerGroup.POST("/pesanan/checkout", transaksi.CheckoutPesanan)
 			customerGroup.PATCH("/pesanan/:public_id/batal", transaksi.BatalkanPesanan)
 			customerGroup.GET("/pesanan/:public_id", transaksi.GetDetailPesanan)
+			customerGroup.POST("/pesanan/:public_id/selesai", transaksi.SelesaikanPesananCustomer)
 			customerGroup.GET("/pesanan/:public_id/lacak", transaksi.LacakPesanan)
 			customerGroup.GET("/pesanan/:public_id/status-biteship", transaksi.GetBiteshipOrderStatus)
 			customerGroup.POST("/ongkir/cek", transaksi.CekOngkir)
 			customerGroup.POST("/ongkir/cek-radius", transaksi.CekRadius)
 			customerGroup.GET("/metode-pembayaran", transaksi.GetMetodePembayaranAktif)
 			customerGroup.GET("/profil", user.GetProfilCustomer)
+			customerGroup.POST("/profil/foto", user.UploadFotoProfilCustomer)
 			customerGroup.PUT("/akun", user.EditAkunCustomer)
 			customerGroup.GET("/alamat", user.GetAlamat)
 			customerGroup.POST("/alamat", user.TambahAlamat)
@@ -90,6 +92,7 @@ func SetupRoutes(r *gin.Engine) {
 			kasirGroup.GET("/transaksi/cek-status/:order_id", transaksi.CekStatusPembayaran)
 			kasirGroup.GET("/profil", user.GetProfilKasir)
 			kasirGroup.PUT("/profil", user.UpdateProfilKasir)
+			kasirGroup.POST("/profil/upload", user.UploadFotoKaryawan)
 			kasirGroup.PATCH("/pesanan/:public_id/kirim", transaksi.KirimPesanan)
 			kasirGroup.GET("/notifikasi", notifikasi.GetNotifikasi)
 		}
@@ -110,6 +113,7 @@ func SetupRoutes(r *gin.Engine) {
 			kurirGroup.POST("/pengantaran/:public_id/ambil", pengantaran.AmbilPesanan)
 			kurirGroup.POST("/pengantaran/:public_id/status", pengantaran.UpdateStatusPengantaran)
 			kurirGroup.PUT("/pengantaran/:public_id/selesai", pengantaran.UploadBuktiPengiriman)
+			kurirGroup.PUT("/pengantaran/:public_id/pembayaran", pengantaran.KonfirmasiPembayaran)
 			kurirGroup.GET("/notifikasi", notifikasi.GetNotifikasi)
 		}
 

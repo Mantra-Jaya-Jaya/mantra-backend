@@ -62,10 +62,10 @@ func SeedPengantaran() {
 	for i, pesanan := range daftarPesanan {
 		roll := i % 10
 		var (
-			statusPengID  uint
-			waktuPickup   *time.Time
-			waktuSampai   *time.Time
-			updateStatus  uint
+			statusPengID uint
+			waktuPickup  *time.Time
+			waktuSampai  *time.Time
+			updateStatus uint
 		)
 
 		switch {

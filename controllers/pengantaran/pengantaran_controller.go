@@ -64,11 +64,21 @@ func GetDaftarPengantaran(c *gin.Context) {
 
 	// 🚀 3. FILTER STATUS — exclude Selesai by default, sertakan query param untuk lihat riwayat
 	filterStatus := c.DefaultQuery("status", "aktif")
-	selesaiID := utils.GetStatusPengantaranIDSafe("Selesai")
-	if filterStatus == "aktif" && selesaiID > 0 {
-		query = query.Where("id_status_pengantaran != ?", selesaiID)
-	} else if filterStatus == "selesai" && selesaiID > 0 {
-		query = query.Where("id_status_pengantaran = ?", selesaiID)
+	switch filterStatus {
+	case "pengantaran":
+		id1 := utils.GetStatusPengantaranIDSafe("Menunggu Pickup")
+		id2 := utils.GetStatusPengantaranIDSafe("Dalam Perjalanan")
+		query = query.Where("id_status_pengantaran IN (?, ?)", id1, id2)
+
+	case "tiba_di_tujuan":
+		id3 := utils.GetStatusPengantaranIDSafe("Tiba di Tujuan")
+		query = query.Where("id_status_pengantaran = ?", id3)
+	case "selesai":
+		id4 := utils.GetStatusPengantaranIDSafe("Selesai")
+		query = query.Where("id_status_pengantaran = ?", id4)
+	default:
+		id4 := utils.GetStatusPengantaranIDSafe("Selesai")
+		query = query.Where("id_status_pengantaran != ?", id4)
 	}
 
 	query = query.Order("id_pengantaran DESC")
@@ -290,12 +300,14 @@ func GetLaporanHariIni(c *gin.Context) {
 	}
 
 	if statusDikemasID > 0 {
-		// Asumsi ID tipe Online itu 1 atau 2 (kalau Utils-nya belum support tipe pesanan safe)
-		// Kalau temen lu belum bikin GetTipePesananIDSafe, tembak manual ke relasi string:
+		internalID := utils.GetTipeKurirIDSafe("internal")
+
 		config.DB.Model(&models.Pesanan{}).
 			Joins("JOIN tipe_pesanan ON pesanan.id_tipe_pesanan = tipe_pesanan.id").
 			Where("tipe_pesanan.nama_tipe = ?", "Online").
 			Where("id_status_pesanan = ?", statusDikemasID).
+			Where("id_tipe_kurir = ?", internalID).
+			Where("NOT EXISTS (SELECT 1 FROM pengantaran WHERE pengantaran.id_pesanan = pesanan.id_pesanan)").
 			Count(&pesananBaruCount)
 	}
 
@@ -305,7 +317,7 @@ func GetLaporanHariIni(c *gin.Context) {
 		"data": gin.H{
 			"pesanan_selesai":  selesaiCount,
 			"pesanan_proses":   belumSelesaiCount,
-			"pesanan_tersedia": pesananBaruCount, 
+			"pesanan_tersedia": pesananBaruCount,
 		},
 	})
 }
@@ -362,6 +374,7 @@ func GetDetailPengantaran(c *gin.Context) {
 		Preload("Pesanan.DetailPesanan.SpesifikasiBarang.Barang").
 		Preload("Pesanan.DetailPesanan.SpesifikasiBarang.DetailSpesifikasi.Spesifikasi").
 		Preload("StatusPengantaran").
+		Preload("Pesanan.Pembayaran").
 		Where("public_id = ?", idPengantaran).
 		First(&pengantaran).Error
 
@@ -436,20 +449,31 @@ func GetDetailPengantaran(c *gin.Context) {
 		}
 	}
 
+	idMetodePembayaran := uint(0)
+	idStatusTransaksi := uint(0)
+
+	if pengantaran.Pesanan.Pembayaran != nil {
+		if pengantaran.Pesanan.Pembayaran.MetodePembayaranID != nil {
+			idMetodePembayaran = *pengantaran.Pesanan.Pembayaran.MetodePembayaranID
+		}
+		idStatusTransaksi = pengantaran.Pesanan.Pembayaran.StatusTransaksiID
+	}
+
 	// ✅ [SUCCESS 200: OK]
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"code":    200,
 		"message": "Detail pengantaran berhasil ditarik",
 		"data": gin.H{
-			"id_pengantaran":     pengantaran.PublicId,
-			"status_pengantaran": statusNama,
-			"waktu_pickup":       pengantaran.WaktuPickup,
-			"waktu_sampai":       pengantaran.WaktuSampai,
-			"foto_bukti":         pengantaran.FotoBuktiPengiriman,
-			"total_pembayaran":   totalPembayaran,
-			"daftar_barang":      listBarang,
-
+			"id_pengantaran":       pengantaran.PublicId,
+			"status_pengantaran":   statusNama,
+			"waktu_pickup":         pengantaran.WaktuPickup,
+			"waktu_sampai":         pengantaran.WaktuSampai,
+			"foto_bukti":           pengantaran.FotoBuktiPengiriman,
+			"total_pembayaran":     totalPembayaran,
+			"id_metode_pembayaran": idMetodePembayaran,
+			"id_status_transaksi":  idStatusTransaksi,
+			"daftar_barang":        listBarang,
 			"penerima": gin.H{
 				"nama":    namaPenerima,
 				"no_telp": noTelpPenerima,
@@ -534,29 +558,27 @@ func UploadBuktiPengiriman(c *gin.Context) {
 	}
 
 	// 🚀 4. CEK ID STATUS DARI DATABASE (Versi Safe!)
-	selesaiPengID := utils.GetStatusPengantaranIDSafe("Selesai")
-	selesaiPesananID := utils.GetStatusPesananIDSafe("Selesai")
-	if selesaiPengID == 0 || selesaiPesananID == 0 {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Setup status Selesai di database belum lengkap"})
+	tibaDiTujuanID := utils.GetStatusPengantaranIDSafe("Tiba di Tujuan")
+	if tibaDiTujuanID == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Setup status Tiba di Tujuan di database belum lengkap"})
 		return
 	}
 
 	waktuSekarang := time.Now()
 
-	pengantaran.FotoBuktiPengiriman = fileUrl
-	pengantaran.StatusPengantaranID = selesaiPengID
-	pengantaran.WaktuSampai = &waktuSekarang
-
-	if err := config.DB.Save(&pengantaran).Error; err != nil {
+	if err := config.DB.Model(&pengantaran).Select("foto_bukti_pengiriman", "id_status_pengantaran", "waktu_sampai").Updates(map[string]interface{}{
+		"foto_bukti_pengiriman": fileUrl,
+		"id_status_pengantaran": tibaDiTujuanID,
+		"waktu_sampai":          &waktuSekarang,
+	}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gambar berhasil diupload, tapi gagal update database"})
 		return
 	}
 
-	if pengantaran.Pesanan != nil {
-		config.DB.Model(&models.Pesanan{}).
-			Where("id_pesanan = ?", pengantaran.PesananID).
-			Update("id_status_pesanan", selesaiPesananID)
-	}
+	// Agar response data tetap akurat dengan data terbaru
+	pengantaran.FotoBuktiPengiriman = fileUrl
+	pengantaran.StatusPengantaranID = tibaDiTujuanID
+	pengantaran.WaktuSampai = &waktuSekarang
 
 	var listBarang []gin.H
 	if pengantaran.Pesanan != nil {
@@ -836,11 +858,10 @@ func UpdateStatusPengantaran(c *gin.Context) {
 				var metode models.MetodePembayaran
 				if err := tx.First(&metode, *pembayaran.MetodePembayaranID).Error; err == nil {
 					if metode.KodeMetode == "cod" || metode.KodeMetode == "cash" {
-						// StatusTransaksi itu string (bukan relasi ID)
 						tx.Model(&pembayaran).Updates(map[string]interface{}{
-							"status_transaksi": "settlement",
-							"total_dibayar":    pengantaran.Pesanan.TotalPembayaran,
-							"waktu_pembayaran": now,
+							"id_status_transaksi": 2, // 2 = settlement
+							"total_dibayar":       pengantaran.Pesanan.TotalPembayaran,
+							"waktu_pembayaran":    now,
 						})
 					}
 				}
@@ -890,4 +911,33 @@ func UpdateStatusPengantaran(c *gin.Context) {
 			"waktu_sampai": updatePengantaran["waktu_sampai"],
 		},
 	})
+}
+
+// KonfirmasiPembayaran updates the payment transaction status to settlement (2)
+func KonfirmasiPembayaran(c *gin.Context) {
+	idPengantaran := c.Param("public_id")
+
+	var pengantaran models.Pengantaran
+	if err := config.DB.Preload("Pesanan.Pembayaran").Where("public_id = ?", idPengantaran).First(&pengantaran).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pengantaran tidak ditemukan"})
+		return
+	}
+
+	if pengantaran.Pesanan == nil || pengantaran.Pesanan.Pembayaran == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Data pembayaran tidak ditemukan"})
+		return
+	}
+
+	waktuSekarang := time.Now()
+	err := config.DB.Model(pengantaran.Pesanan.Pembayaran).Updates(map[string]interface{}{
+		"id_status_transaksi": 2, // 2 = settlement
+		"waktu_pembayaran":    waktuSekarang,
+	}).Error
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal update pembayaran"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Pembayaran berhasil dikonfirmasi"})
 }

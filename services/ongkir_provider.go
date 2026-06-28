@@ -1,22 +1,22 @@
 package services
 
 type OngkirRequest struct {
-	OriginLat      float64
-	OriginLng      float64
-	OriginPostal   string
-	DestLat        float64
-	DestLng        float64
-	DestPostal     string
-	Items          []OngkirItem
+	OriginLat    float64
+	OriginLng    float64
+	OriginPostal string
+	DestLat      float64
+	DestLng      float64
+	DestPostal   string
+	Items        []OngkirItem
 }
 
 type OngkirItem struct {
-	Name     string
-	Weight   int
-	Length   int
-	Width    int
-	Height   int
-	Value    int
+	Name   string
+	Weight int
+	Length int
+	Width  int
+	Height int
+	Value  int
 }
 
 type OngkirResult struct {
