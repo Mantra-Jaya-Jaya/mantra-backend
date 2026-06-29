@@ -430,17 +430,6 @@ func ChangePassword(c *gin.Context) {
 		RespondWithError(c, http.StatusInternalServerError, "Gagal mengubah password", "SERVER_001", err.Error())
 		return
 	}
-
-	// Revoke seluruh refresh token user (logout semua device)
-	now := time.Now()
-	if err := tx.Model(&models.RefreshToken{}).
-		Where("id_user = ? AND revoked_at IS NULL", uid).
-		Update("revoked_at", &now).Error; err != nil {
-		tx.Rollback()
-		RespondWithError(c, http.StatusInternalServerError, "Gagal me-revoke sesi lama", "SERVER_001", err.Error())
-		return
-	}
-
 	tx.Commit()
 
 	c.JSON(http.StatusOK, gin.H{
