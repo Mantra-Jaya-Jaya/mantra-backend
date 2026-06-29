@@ -104,6 +104,7 @@ func SetupRoutes(r *gin.Engine) {
 			kurirGroup.GET("/tugas", pengantaran.GetDaftarPengantaran)
 			kurirGroup.GET("/laporan", pengantaran.GetLaporanHariIni)
 			kurirGroup.GET("/profile", user.GetProfilKurir)
+			kurirGroup.POST("/profil/foto", user.UploadFotoProfilKurir)
 			kurirGroup.GET("/pesanan/new", pemesanan.GetPesananTerbaru)
 			kurirGroup.GET("/pesanan", pemesanan.GetAllPesananOnline)
 			kurirGroup.GET("/pesanan/:public_id", pemesanan.GetDetailPesanan)
