@@ -304,9 +304,15 @@ func HapusKaryawan(c *gin.Context) {
 		return
 	}
 
+	if err := tx.Where("id_user = ?", karyawan.UserID).Delete(&models.Notifikasi{}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menghapus notifikasi terkait: " + err.Error()})
+		return
+	}
+
 	if err := tx.Where("id_user = ?", karyawan.UserID).Delete(&models.User{}).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menghapus data user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menghapus data user: " + err.Error()})
 		return
 	}
 
