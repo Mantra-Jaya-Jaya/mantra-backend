@@ -152,6 +152,7 @@ func SetupRoutes(r *gin.Engine) {
 			adminGroup.DELETE("/notifikasi/:id", notifikasi.HapusNotifikasi)
 			adminGroup.GET("/profil", user.GetProfilAdmin)
 			adminGroup.PUT("/profil", user.UpdateProfilAdmin)
+			adminGroup.POST("/profil/upload", user.UploadFotoProfilAdmin)
 			adminGroup.GET("/ekspedisi", katalog.GetDaftarEkspedisi)
 			adminGroup.POST("/ekspedisi", katalog.TambahEkspedisi)
 			adminGroup.PUT("/ekspedisi/:public_id", katalog.UpdateEkspedisi)
