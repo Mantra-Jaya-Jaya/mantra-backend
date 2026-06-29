@@ -69,6 +69,19 @@ func Login(c *gin.Context) {
 		}
 	}
 
+	// Cek status untuk Kasir dan Kurir (karyawan)
+	if roleName == "Kasir" || roleName == "Kurir" {
+		var karyawan models.Karyawan
+		if err := config.DB.Preload("StatusKaryawanRel").
+			Where("id_user = ?", user.IdUser).
+			First(&karyawan).Error; err == nil {
+			if karyawan.StatusKaryawanRel.NamaStatus == "Nonaktif" {
+				RespondWithError(c, http.StatusUnauthorized, "Akun Anda telah dinonaktifkan. Silakan hubungi admin.", "AUTH_006", "Karyawan dengan status Nonaktif mencoba login")
+				return
+			}
+		}
+	}
+
 	// Generate real JWT token
 	accessToken, err := GenerateJWT(user.IdUser, user.PublicId.String(), roleName)
 	if err != nil {
