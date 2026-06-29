@@ -165,6 +165,56 @@ func UpdateProfilAdmin(c *gin.Context) {
 	})
 }
 
+// UploadFotoProfilAdmin mengunggah foto profil admin ke MinIO dan memperbarui database.
+// Dipakai oleh: admin (POST /admin/profil/upload)
+// Auth: Wajib login, role admin
+func UploadFotoProfilAdmin(c *gin.Context) {
+	uid, exists := getUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "User belum login",
+			"error":   gin.H{"code": "AUTH_001", "detail": "Token tidak valid"},
+		})
+		return
+	}
+
+	fotoURL, err := utils.UploadFileToMinio(c, "foto", "profil")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Gagal mengunggah foto profil: " + err.Error(),
+		})
+		return
+	}
+
+	var admin models.User
+	if err := config.DB.Where("id_user = ?", uid).First(&admin).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Admin tidak ditemukan",
+		})
+		return
+	}
+
+	admin.FotoProfil = fotoURL
+	if err := config.DB.Save(&admin).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal menyimpan foto profil",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Foto profil berhasil diperbarui",
+		"data": gin.H{
+			"foto_profil": fotoURL,
+		},
+	})
+}
+
 // Helper: Format Nominal Rupiah
 func formatNominalRupiah(amount int64) string {
 	if amount >= 1000000000 {

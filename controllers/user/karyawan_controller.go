@@ -248,17 +248,73 @@ func HapusKaryawan(c *gin.Context) {
 		return
 	}
 
-	tx := config.DB.Begin()
-
-	switch karyawan.User.Role.NamaRole {
-	case "Kasir":
-		tx.Where("id_karyawan = ?", karyawan.IdKaryawan).Delete(&models.Kasir{})
-	case "Kurir":
-		tx.Where("id_karyawan = ?", karyawan.IdKaryawan).Delete(&models.Kurir{})
+	roleName := karyawan.User.Role.NamaRole
+	if roleName != "Kasir" && roleName != "Kurir" {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Role tidak valid"})
+		return
 	}
 
-	tx.Where("id_karyawan = ?", karyawan.IdKaryawan).Delete(&models.Karyawan{})
-	tx.Where("id_user = ?", karyawan.UserID).Delete(&models.User{})
+	// Cek apakah karyawan memiliki riwayat transaksi
+	var count int64
+	if roleName == "Kasir" {
+		var kasir models.Kasir
+		if err := config.DB.Where("id_karyawan = ?", karyawan.IdKaryawan).First(&kasir).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Data kasir tidak ditemukan"})
+			return
+		}
+		config.DB.Model(&models.Pesanan{}).Where("id_kasir = ?", kasir.IdKasir).Count(&count)
+	} else {
+		var kurir models.Kurir
+		if err := config.DB.Where("id_karyawan = ?", karyawan.IdKaryawan).First(&kurir).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Data kurir tidak ditemukan"})
+			return
+		}
+		config.DB.Model(&models.Pengantaran{}).Where("id_kurir = ?", kurir.IdKurir).Count(&count)
+	}
+
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{
+			"status":  "error",
+			"message": "Karyawan memiliki riwayat transaksi. Tidak dapat dihapus. Nonaktifkan saja.",
+			"error":   gin.H{"code": "CONF_003", "detail": "Karyawan memiliki data transaksi"},
+		})
+		return
+	}
+
+	tx := config.DB.Begin()
+
+	switch roleName {
+	case "Kasir":
+		if err := tx.Where("id_karyawan = ?", karyawan.IdKaryawan).Delete(&models.Kasir{}).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menghapus data kasir"})
+			return
+		}
+	case "Kurir":
+		if err := tx.Where("id_karyawan = ?", karyawan.IdKaryawan).Delete(&models.Kurir{}).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menghapus data kurir"})
+			return
+		}
+	}
+
+	if err := tx.Where("id_karyawan = ?", karyawan.IdKaryawan).Delete(&models.Karyawan{}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menghapus data karyawan"})
+		return
+	}
+
+	if err := tx.Where("id_user = ?", karyawan.UserID).Delete(&models.Notifikasi{}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menghapus notifikasi terkait: " + err.Error()})
+		return
+	}
+
+	if err := tx.Where("id_user = ?", karyawan.UserID).Delete(&models.User{}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menghapus data user: " + err.Error()})
+		return
+	}
 
 	now := time.Now()
 	tx.Model(&models.RefreshToken{}).Where("id_user = ? AND revoked_at IS NULL", karyawan.UserID).Update("revoked_at", &now)

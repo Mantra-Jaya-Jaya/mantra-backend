@@ -69,6 +69,19 @@ func Login(c *gin.Context) {
 		}
 	}
 
+	// Cek status untuk Kasir dan Kurir (karyawan)
+	if roleName == "Kasir" || roleName == "Kurir" {
+		var karyawan models.Karyawan
+		if err := config.DB.Preload("StatusKaryawanRel").
+			Where("id_user = ?", user.IdUser).
+			First(&karyawan).Error; err == nil {
+			if karyawan.StatusKaryawanRel.NamaStatus == "Nonaktif" {
+				RespondWithError(c, http.StatusUnauthorized, "Akun Anda telah dinonaktifkan. Silakan hubungi admin.", "AUTH_006", "Karyawan dengan status Nonaktif mencoba login")
+				return
+			}
+		}
+	}
+
 	// Generate real JWT token
 	accessToken, err := GenerateJWT(user.IdUser, user.PublicId.String(), roleName)
 	if err != nil {
@@ -430,17 +443,6 @@ func ChangePassword(c *gin.Context) {
 		RespondWithError(c, http.StatusInternalServerError, "Gagal mengubah password", "SERVER_001", err.Error())
 		return
 	}
-
-	// Revoke seluruh refresh token user (logout semua device)
-	now := time.Now()
-	if err := tx.Model(&models.RefreshToken{}).
-		Where("id_user = ? AND revoked_at IS NULL", uid).
-		Update("revoked_at", &now).Error; err != nil {
-		tx.Rollback()
-		RespondWithError(c, http.StatusInternalServerError, "Gagal me-revoke sesi lama", "SERVER_001", err.Error())
-		return
-	}
-
 	tx.Commit()
 
 	c.JSON(http.StatusOK, gin.H{
