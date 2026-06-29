@@ -75,7 +75,7 @@ func GetDaftarPesanan(c *gin.Context) {
 
 	var pesanan []models.Pesanan
 	var total int64
-	query := config.DB.Model(&models.Pesanan{}).Preload("StatusPesanan")
+	query := config.DB.Model(&models.Pesanan{}).Preload("StatusPesanan").Preload("TipePesananRel")
 
 	// Terapkan filter status jika ada — konversi snake_case query ke nama_status di DB
 	if statusFilter != "" && statusFilter != "Semua" {
@@ -160,10 +160,16 @@ func GetDaftarPesanan(c *gin.Context) {
 			namaStatus = p.StatusPesanan.NamaStatus
 		}
 
+		tipePesanan := ""
+		if p.TipePesananRel != nil {
+			tipePesanan = p.TipePesananRel.NamaTipe
+		}
+
 		responseData = append(responseData, gin.H{
 			"id_pesanan":          p.PublicId,
 			"id_status_pesanan":   p.StatusPesananID,
 			"nama_status_pesanan": namaStatus, // nama string dari relasi, bukan hardcode
+			"tipe_pesanan":        tipePesanan,
 			"tanggal_pesan":       p.TanggalPesanan,
 			"total_bayar":         p.TotalPembayaran,
 			"items":               items,
