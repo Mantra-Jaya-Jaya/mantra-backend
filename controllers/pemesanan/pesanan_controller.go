@@ -101,8 +101,8 @@ func GetPesananTerbaru(c *gin.Context) {
 		noTelp = pesanan.Alamat.NoTelpPenerima
 		alamatLengkap = pesanan.Alamat.AlamatLengkap
 		catatan = pesanan.Alamat.CatatanLokasi
-	} else if pesanan.Customer.User.NamaLengkap != "" {
-		// Fallback ke nama akun kalau alamat null
+	} else if pesanan.Customer != nil && pesanan.Customer.User.NamaLengkap != "" {
+		// Fallback jika tidak ada alamat tapi ada data user
 		namaCust = pesanan.Customer.User.NamaLengkap
 	}
 
@@ -258,7 +258,7 @@ func GetAllPesananOnline(c *gin.Context) {
 			noTelp = pesanan.Alamat.NoTelpPenerima
 			alamatLengkap = pesanan.Alamat.AlamatLengkap
 			catatan = pesanan.Alamat.CatatanLokasi
-		} else if pesanan.Customer.User.NamaLengkap != "" {
+		} else if pesanan.Customer != nil && pesanan.Customer.User.NamaLengkap != "" {
 			namaCust = pesanan.Customer.User.NamaLengkap
 		}
 
@@ -470,7 +470,7 @@ func GetDetailPesanan(c *gin.Context) {
 		namaCust = pesanan.Alamat.NamaPenerima
 		noTelp = pesanan.Alamat.NoTelpPenerima
 		alamatLengkap = pesanan.Alamat.AlamatLengkap
-	} else if pesanan.Customer.User.NamaLengkap != "" {
+	} else if pesanan.Customer != nil && pesanan.Customer.User.NamaLengkap != "" {
 		namaCust = pesanan.Customer.User.NamaLengkap
 	}
 

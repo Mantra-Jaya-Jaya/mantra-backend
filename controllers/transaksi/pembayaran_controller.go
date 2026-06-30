@@ -190,13 +190,6 @@ func UpdateQuantityItem(c *gin.Context) {
 			return
 		}
 
-		var customer models.Customer
-		if err := tx.First(&customer).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusFailedDependency, gin.H{"status": "error", "message": "Data customer offline (placeholder) tidak ditemukan"})
-			return
-		}
-
 		// 🚀 FIX FATALNYA DI SINI ABANGKU! Ganti "Draft" jadi "Menunggu Pembayaran"
 		idStatusAwal := utils.GetStatusPesananIDSafe("Menunggu Pembayaran")
 		idTipeOffline := utils.GetTipePesananIDSafe("Offline")
@@ -208,11 +201,11 @@ func UpdateQuantityItem(c *gin.Context) {
 		}
 
 		pesananBaru := models.Pesanan{
-			CustomerID:      customer.IdCustomer,
+			CustomerID:      nil, // 🚀 Dibuat nil agar offline customer tidak masuk ke antrean orang lain
 			KasirID:         &kasir.IdKasir,
 			TanggalPesanan:  time.Now(),
 			TipePesananID:   idTipeOffline,
-			StatusPesananID: idStatusAwal, // 🚀 Pakai status yang beneran ada di DB lu!
+			StatusPesananID: idStatusAwal, 
 		}
 
 		if err := tx.Create(&pesananBaru).Error; err != nil {

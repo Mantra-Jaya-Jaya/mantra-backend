@@ -75,7 +75,7 @@ func GetDaftarPesanan(c *gin.Context) {
 
 	var pesanan []models.Pesanan
 	var total int64
-	query := config.DB.Model(&models.Pesanan{}).Preload("StatusPesanan")
+	query := config.DB.Model(&models.Pesanan{}).Preload("StatusPesanan").Preload("TipePesananRel")
 
 	// Terapkan filter status jika ada — konversi snake_case query ke nama_status di DB
 	if statusFilter != "" && statusFilter != "Semua" {
@@ -160,10 +160,16 @@ func GetDaftarPesanan(c *gin.Context) {
 			namaStatus = p.StatusPesanan.NamaStatus
 		}
 
+		tipePesanan := ""
+		if p.TipePesananRel != nil {
+			tipePesanan = p.TipePesananRel.NamaTipe
+		}
+
 		responseData = append(responseData, gin.H{
 			"id_pesanan":          p.PublicId,
 			"id_status_pesanan":   p.StatusPesananID,
 			"nama_status_pesanan": namaStatus, // nama string dari relasi, bukan hardcode
+			"tipe_pesanan":        tipePesanan,
 			"tanggal_pesan":       p.TanggalPesanan,
 			"total_bayar":         p.TotalPembayaran,
 			"items":               items,
@@ -585,7 +591,7 @@ func CheckoutPesanan(c *gin.Context) {
 
 	// Buat Pesanan
 	pesanan := models.Pesanan{
-		CustomerID:         customerID,
+		CustomerID:         &customerID,
 		TotalPembayaran:    grandTotal,
 		TanggalPesanan:     now,
 		TipePesananID:      utils.GetTipePesananID("Online"),
@@ -818,6 +824,13 @@ func CheckoutPesanan(c *gin.Context) {
 	}
 
 	tx.Commit()
+
+	// 🚚 NOTIFIKASI KURIR JIKA PESANAN COD/TUNAI
+	if initialStatusID == utils.GetStatusPesananID("Dikemas") && tipeKurirID == utils.GetTipeKurirID("internal") {
+		go func() {
+			utils.BuatNotifikasiRole("Kurir", "Pesanan Baru Masuk!", "Ada pesanan COD/Tunai baru yang siap diantar. Segera cek aplikasi!")
+		}()
+	}
 
 	// 🚚 TRIGGER SHIPMENT UNTUK EXTERNAL + CASH + COD (BUG FIX)
 	isExternal := pesanan.TipeKurirID == utils.GetTipeKurirID("external")
@@ -1295,12 +1308,31 @@ func GetSemuaAktivitasHariIni(c *gin.Context) {
 		RawPaymentType  string
 	}
 
+	val, _ := c.Get("user_id")
+	var userID int64
+	switch v := val.(type) {
+	case float64:
+		userID = int64(v)
+	case int64:
+		userID = v
+	case int:
+		userID = int64(v)
+	case uint:
+		userID = int64(v)
+	}
+
+	var kasir models.Kasir
+	if err := config.DB.Joins("JOIN karyawan ON karyawan.id_karyawan = kasir.id_karyawan").Where("karyawan.id_user = ?", userID).First(&kasir).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Data kasir tidak ditemukan"})
+		return
+	}
+
 	var aktivitasRaw []AktivitasResult
 	config.DB.Table("pesanan").
 		Select("pesanan.id_pesanan, pesanan.tanggal_pesanan, pesanan.total_pembayaran, COALESCE(tipe_pembayaran.nama_tipe, '-') as raw_payment_type").
 		Joins("LEFT JOIN pembayaran ON pembayaran.id_pesanan = pesanan.id_pesanan").
 		Joins("LEFT JOIN tipe_pembayaran ON tipe_pembayaran.id = pembayaran.id_tipe_pembayaran").
-		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
+		Where("pesanan.tanggal_pesanan >= ? AND tanggal_pesanan < ? AND pesanan.id_kasir = ?", startOfDay, endOfDay, kasir.IdKasir).
 		Order("pesanan.tanggal_pesanan DESC").
 		Scan(&aktivitasRaw)
 
@@ -1558,7 +1590,7 @@ func GetDetailPesananDariLaporan(c *gin.Context) {
 
 	customerNama := "Walk-in Customer"
 	customerAlamat := "-"
-	if pesanan.CustomerID != 0 && pesanan.Customer.IdCustomer != 0 {
+	if pesanan.CustomerID != nil && *pesanan.CustomerID != 0 && pesanan.Customer != nil && pesanan.Customer.IdCustomer != 0 {
 		customerNama = pesanan.Customer.User.NamaLengkap
 	}
 	if pesanan.Alamat != nil {
