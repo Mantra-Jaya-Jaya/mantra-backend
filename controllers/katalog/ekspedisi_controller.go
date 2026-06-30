@@ -66,61 +66,7 @@ func TambahEkspedisi(c *gin.Context) {
 	})
 }
 
-func UpdateEkspedisi(c *gin.Context) {
-	publicID := c.Param("public_id")
-	var eks models.Ekspedisi
-	if err := config.DB.Where("public_id = ?", publicID).First(&eks).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Ekspedisi tidak ditemukan",
-		})
-		return
-	}
 
-	var input struct {
-		NamaEkspedisi string `json:"nama_ekspedisi"`
-		KodeApi       string `json:"kode_api"`
-		Logo          string `json:"logo"`
-		Deskripsi     string `json:"deskripsi"`
-		IsActive      *bool  `json:"is_active"`
-	}
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "Input tidak valid",
-		})
-		return
-	}
-
-	if input.NamaEkspedisi != "" {
-		eks.NamaEkspedisi = input.NamaEkspedisi
-	}
-	if input.KodeApi != "" {
-		eks.KodeApi = input.KodeApi
-	}
-	if input.Logo != "" {
-		eks.Logo = input.Logo
-	}
-	if input.Deskripsi != "" {
-		eks.Deskripsi = input.Deskripsi
-	}
-	if input.IsActive != nil {
-		eks.IsActive = *input.IsActive
-	}
-
-	if err := config.DB.Save(&eks).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal mengupdate ekspedisi",
-		})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Ekspedisi berhasil diupdate",
-		"data":    eks,
-	})
-}
 
 func HapusEkspedisi(c *gin.Context) {
 	publicID := c.Param("public_id")
@@ -184,61 +130,7 @@ func TambahLayanan(c *gin.Context) {
 	})
 }
 
-func UpdateLayanan(c *gin.Context) {
-	publicID := c.Param("public_id")
-	var layanan models.EkspedisiLayanan
-	if err := config.DB.First(&layanan, "public_id = ?", publicID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Layanan ekspedisi tidak ditemukan",
-		})
-		return
-	}
 
-	var input struct {
-		NamaLayanan string `json:"nama_layanan"`
-		Deskripsi   string `json:"deskripsi"`
-		EstimasiMin int    `json:"estimasi_min"`
-		EstimasiMax int    `json:"estimasi_max"`
-		IsActive    *bool  `json:"is_active"`
-	}
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "Input tidak valid",
-		})
-		return
-	}
-
-	if input.NamaLayanan != "" {
-		layanan.NamaLayanan = input.NamaLayanan
-	}
-	if input.Deskripsi != "" {
-		layanan.Deskripsi = input.Deskripsi
-	}
-	if input.EstimasiMin > 0 {
-		layanan.EstimasiMin = input.EstimasiMin
-	}
-	if input.EstimasiMax > 0 {
-		layanan.EstimasiMax = input.EstimasiMax
-	}
-	if input.IsActive != nil {
-		layanan.IsActive = *input.IsActive
-	}
-
-	if err := config.DB.Save(&layanan).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Gagal mengupdate layanan ekspedisi",
-		})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Layanan ekspedisi berhasil diupdate",
-		"data":    layanan,
-	})
-}
 
 func HapusLayanan(c *gin.Context) {
 	publicID := c.Param("public_id")
