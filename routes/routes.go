@@ -21,6 +21,9 @@ func SetupRoutes(r *gin.Engine) {
 		v1.POST("/login", auth.Login)
 		v1.POST("/register", auth.RegisterCustomer)
 		v1.POST("/auth/refresh", auth.RefreshToken)
+		v1.POST("/auth/forgot-password", auth.ForgotPassword)
+		v1.POST("/auth/verify-otp", auth.VerifyOTP)
+		v1.POST("/auth/reset-password", auth.ResetPassword)
 
 		// Protected Auth Routes
 		authGroup := v1.Group("/")

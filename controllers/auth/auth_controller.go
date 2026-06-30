@@ -9,6 +9,7 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -446,7 +447,134 @@ func ChangePassword(c *gin.Context) {
 	tx.Commit()
 
 	c.JSON(http.StatusOK, gin.H{
+		"message": "Password berhasil diubah",
+	})
+}
+
+// ForgotPassword handles initiating password reset
+func ForgotPassword(c *gin.Context) {
+	var req struct {
+		Username string `json:"username" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondWithError(c, http.StatusBadRequest, "Username diperlukan", "VAL_001", "Format request tidak sesuai")
+		return
+	}
+
+	var user models.User
+	if err := config.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
+		RespondWithError(c, http.StatusNotFound, "Username tidak ditemukan", "REQ_004", "Username tidak ada di database")
+		return
+	}
+
+	if user.Email == "" {
+		RespondWithError(c, http.StatusBadRequest, "User ini belum mendaftarkan email", "REQ_005", "Email kosong")
+		return
+	}
+
+	// Generate 6 digit OTP
+	otp := ""
+	for i := 0; i < 6; i++ {
+		b := make([]byte, 1)
+		rand.Read(b)
+		otp += string("0123456789"[int(b[0])%10])
+	}
+
+	// Save OTP
+	exp := time.Now().Add(10 * time.Minute)
+	user.ResetPasswordOtp = &otp
+	user.ResetPasswordExpiredAt = &exp
+	config.DB.Save(&user)
+
+	// Send Email
+	utils.SendOTPEmail(user.Email, otp, user.NamaLengkap)
+
+	// Sensor email for response
+	emailMasked := ""
+	if len(user.Email) > 3 {
+		emailMasked = user.Email[0:1] + "***" + user.Email[len(user.Email)-3:]
+	} else {
+		emailMasked = "***"
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "OTP terkirim",
+		"email":   emailMasked,
+	})
+}
+
+// VerifyOTP handles OTP validation
+func VerifyOTP(c *gin.Context) {
+	var req struct {
+		Username string `json:"username" binding:"required"`
+		Otp      string `json:"otp" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondWithError(c, http.StatusBadRequest, "Input tidak valid", "VAL_001", "Format request tidak sesuai")
+		return
+	}
+
+	var user models.User
+	if err := config.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
+		RespondWithError(c, http.StatusNotFound, "Username tidak ditemukan", "REQ_004", "User tidak ada")
+		return
+	}
+
+	if user.ResetPasswordOtp == nil || *user.ResetPasswordOtp != req.Otp || user.ResetPasswordExpiredAt == nil || time.Now().After(*user.ResetPasswordExpiredAt) {
+		RespondWithError(c, http.StatusBadRequest, "Kode OTP salah atau sudah kadaluarsa", "REQ_006", "OTP invalid/expired")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "OTP valid",
+	})
+}
+
+// ResetPassword handles saving the new password
+func ResetPassword(c *gin.Context) {
+	var req struct {
+		Username           string `json:"username" binding:"required"`
+		Otp                string `json:"otp" binding:"required"`
+		PasswordBaru       string `json:"password_baru" binding:"required"`
+		KonfirmasiPassword string `json:"konfirmasi_password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondWithError(c, http.StatusBadRequest, "Input tidak valid", "VAL_001", "Format request tidak sesuai")
+		return
+	}
+
+	if req.PasswordBaru != req.KonfirmasiPassword {
+		RespondWithError(c, http.StatusBadRequest, "Konfirmasi password tidak cocok", "VAL_002", "password tidak match")
+		return
+	}
+
+	var user models.User
+	if err := config.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
+		RespondWithError(c, http.StatusNotFound, "Username tidak ditemukan", "REQ_004", "User tidak ada")
+		return
+	}
+
+	if user.ResetPasswordOtp == nil || *user.ResetPasswordOtp != req.Otp || user.ResetPasswordExpiredAt == nil || time.Now().After(*user.ResetPasswordExpiredAt) {
+		RespondWithError(c, http.StatusBadRequest, "Kode OTP salah atau sudah kadaluarsa", "REQ_006", "OTP invalid/expired")
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.PasswordBaru), 12)
+	if err != nil {
+		RespondWithError(c, http.StatusInternalServerError, "Gagal memproses password", "SERVER_001", err.Error())
+		return
+	}
+
+	user.Password = string(hashedPassword)
+	user.ResetPasswordOtp = nil
+	user.ResetPasswordExpiredAt = nil
+	config.DB.Save(&user)
+
+	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Password berhasil diubah",
 	})
 }
+

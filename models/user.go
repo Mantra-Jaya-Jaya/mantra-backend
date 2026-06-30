@@ -24,4 +24,7 @@ type User struct {
 
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+
+	ResetPasswordOtp       *string    `gorm:"column:reset_password_otp" json:"-"`
+	ResetPasswordExpiredAt *time.Time `gorm:"column:reset_password_expired_at" json:"-"`
 }
