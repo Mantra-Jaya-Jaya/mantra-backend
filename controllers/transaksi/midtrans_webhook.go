@@ -145,6 +145,11 @@ func MidtransNotificationHandler(c *gin.Context) {
 				}
 				config.DB.Create(&notif)
 			}
+			
+			// Notifikasi ke Kurir Internal kalau ini pesanan internal
+			if pesanan.TipeKurirID == utils.GetTipeKurirID("internal") {
+				utils.BuatNotifikasiRole("Kurir", "Pesanan Baru Masuk!", "Ada pesanan baru yang siap diantar. Segera cek aplikasi!")
+			}
 		}()
 	}
 

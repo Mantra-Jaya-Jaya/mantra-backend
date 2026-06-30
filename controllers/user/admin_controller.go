@@ -259,11 +259,17 @@ func GetDashboardAdmin(c *gin.Context) {
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
-	// Net (Hanya Selesai)
+	// Net (Hanya Selesai Hari Ini)
 	selesaiID := utils.GetStatusPesananID("Selesai")
 	config.DB.Model(&models.Pesanan{}).
 		Where("id_status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", selesaiID, startOfDay, endOfDay).
 		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&penjualanHariIni)
+
+	// Net (Semua Waktu / All Time)
+	var totalRevenue int64
+	config.DB.Model(&models.Pesanan{}).
+		Where("id_status_pesanan = ?", selesaiID).
+		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&totalRevenue)
 
 	// Gross (Semua status)
 	config.DB.Model(&models.Pesanan{}).
@@ -380,7 +386,7 @@ func GetDashboardAdmin(c *gin.Context) {
 			kasirName = p.Kasir.Karyawan.User.NamaLengkap
 		}
 		custName := "-"
-		if p.Customer.User.NamaLengkap != "" {
+		if p.Customer != nil && p.Customer.User.NamaLengkap != "" {
 			custName = p.Customer.User.NamaLengkap
 		}
 
@@ -408,6 +414,7 @@ func GetDashboardAdmin(c *gin.Context) {
 		"data": gin.H{
 			"penjualan_hari_ini":       penjualanHariIni,
 			"penjualan_kotor_hari_ini": penjualanKotorHariIni,
+			"total_revenue":            totalRevenue,
 			"total_pesanan":            totalPesanan,
 			"total_pesanan_selesai":    totalPesananSelesai,
 			"total_customer_aktif":     totalCustomerAktif,

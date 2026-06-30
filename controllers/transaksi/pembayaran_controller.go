@@ -190,41 +190,6 @@ func UpdateQuantityItem(c *gin.Context) {
 			return
 		}
 
-		var customer models.Customer
-		// Cari Walk-in Customer berdasarkan no_telp khusus (000000000000)
-		if err := tx.Where("no_telp = ?", "000000000000").First(&customer).Error; err != nil {
-			// Jika tidak ada, buat secara otomatis (Walk-in)
-			var role models.Role
-			if errRole := tx.Where("nama_role = ?", "Customer").First(&role).Error; errRole != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Role Customer tidak ditemukan untuk membuat Walk-in User"})
-				return
-			}
-
-			walkinUser := models.User{
-				Username:    "walkin_customer",
-				Email:       "walkin@mantra.com",
-				Password:    "rahasia",
-				NamaLengkap: "Walk-in Customer (Offline)",
-				RoleID:      role.IdRole,
-			}
-			if errUser := tx.Where("username = ?", "walkin_customer").FirstOrCreate(&walkinUser).Error; errUser != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat Walk-in User"})
-				return
-			}
-
-			customer = models.Customer{
-				UserID: walkinUser.IdUser,
-				NoTelp: "000000000000",
-			}
-			if errCust := tx.Where("id_user = ?", walkinUser.IdUser).FirstOrCreate(&customer).Error; errCust != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal membuat Walk-in Customer"})
-				return
-			}
-		}
-
 		// 🚀 FIX FATALNYA DI SINI ABANGKU! Ganti "Draft" jadi "Menunggu Pembayaran"
 		idStatusAwal := utils.GetStatusPesananIDSafe("Menunggu Pembayaran")
 		idTipeOffline := utils.GetTipePesananIDSafe("Offline")
@@ -236,11 +201,11 @@ func UpdateQuantityItem(c *gin.Context) {
 		}
 
 		pesananBaru := models.Pesanan{
-			CustomerID:      customer.IdCustomer,
+			CustomerID:      nil, // 🚀 Dibuat nil agar offline customer tidak masuk ke antrean orang lain
 			KasirID:         &kasir.IdKasir,
 			TanggalPesanan:  time.Now(),
 			TipePesananID:   idTipeOffline,
-			StatusPesananID: idStatusAwal, // 🚀 Pakai status yang beneran ada di DB lu!
+			StatusPesananID: idStatusAwal, 
 		}
 
 		if err := tx.Create(&pesananBaru).Error; err != nil {

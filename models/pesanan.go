@@ -23,10 +23,10 @@ type Pesanan struct {
 	TipeKurirID     uint           `gorm:"column:id_tipe_kurir;not null;default:1" json:"id_tipe_kurir"`
 	TipeKurir       *TipeKurir     `gorm:"foreignKey:TipeKurirID;references:IdTipeKurir" json:"tipe_kurir,omitempty"`
 
-	CustomerID uint     `gorm:"column:id_customer;not null" json:"id_customer"`
+	CustomerID *uint    `gorm:"column:id_customer" json:"id_customer,omitempty"`
 	KasirID    *uint    `gorm:"column:id_kasir" json:"id_kasir"`
 	AlamatID   *uint    `gorm:"column:id_alamat" json:"id_alamat"`
-	Customer   Customer `gorm:"foreignKey:CustomerID;references:IdCustomer" json:"customer"`
+	Customer   *Customer `gorm:"foreignKey:CustomerID;references:IdCustomer" json:"customer,omitempty"`
 	Kasir      *Kasir   `gorm:"foreignKey:KasirID;references:IdKasir" json:"kasir,omitempty"`
 	Alamat     *Alamat  `gorm:"foreignKey:AlamatID;references:IdAlamat" json:"alamat"`
 

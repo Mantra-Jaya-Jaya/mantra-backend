@@ -3,6 +3,7 @@ package pengantaran
 import (
 	"net/http"
 	"time"
+	"fmt"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
@@ -120,7 +121,7 @@ func GetDaftarPengantaran(c *gin.Context) {
 			namaCust = p.Pesanan.Alamat.NamaPenerima
 			noTelp = p.Pesanan.Alamat.NoTelpPenerima
 			alamatLengkap = p.Pesanan.Alamat.AlamatLengkap
-		} else if p.Pesanan.Customer.User.NamaLengkap != "" {
+		} else if p.Pesanan.Customer != nil && p.Pesanan.Customer.User.NamaLengkap != "" {
 			namaCust = p.Pesanan.Customer.User.NamaLengkap
 		}
 
@@ -406,7 +407,7 @@ func GetDetailPengantaran(c *gin.Context) {
 
 	// Pelindung Pesanan & Customer
 	if pengantaran.Pesanan != nil {
-		if pengantaran.Pesanan.Customer.User.NamaLengkap != "" {
+		if pengantaran.Pesanan.Customer != nil && pengantaran.Pesanan.Customer.User.NamaLengkap != "" {
 			namaPenerima = pengantaran.Pesanan.Customer.User.NamaLengkap
 		}
 		// Asumsi ada field NoTelp di Customer lu (sesuaikan kalau beda)
@@ -598,7 +599,13 @@ func UploadBuktiPengiriman(c *gin.Context) {
 		}
 	}
 
-	// 🚀 6. KEMBALIKAN RESPON SUKSES
+	// 🚀 6. NOTIFIKASI KURIR
+	go func() {
+		pesan := "Anda telah memperbarui status pesanan menjadi Tiba di Tujuan"
+		utils.BuatNotifikasi(uint(userID), "Status Pengantaran Diperbarui", pesan)
+	}()
+
+	// 🚀 7. KEMBALIKAN RESPON SUKSES
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Mantap! Bukti pengiriman berhasil diupload dan pesanan diselesaikan.",
@@ -742,6 +749,12 @@ func AmbilPesanan(c *gin.Context) {
 	// Reload pengantaran biar PublicId barunya pasti dapet
 	config.DB.Where("id_pesanan = ?", pesanan.IdPesanan).First(&pengantaran)
 
+	// 🚀 10. NOTIFIKASI KURIR
+	go func() {
+		pesan := "Anda telah memperbarui status pesanan menjadi Dalam Perjalanan"
+		utils.BuatNotifikasi(uint(userID), "Status Pengantaran Diperbarui", pesan)
+	}()
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Pesanan berhasil diambil oleh Kurir",
@@ -879,6 +892,12 @@ func UpdateStatusPengantaran(c *gin.Context) {
 	// 🚀 9. BUNGKUS TRANSAKSINYA
 	tx.Commit()
 
+	// 🚀 10. NOTIFIKASI KURIR
+	go func() {
+		pesan := fmt.Sprintf("Anda telah memperbarui status pesanan menjadi %s", statusInput)
+		utils.BuatNotifikasi(uint(userID), "Status Pengantaran Diperbarui", pesan)
+	}()
+
 	// Notifikasi ke customer jika pengantaran selesai
 	if statusInput == "Selesai" {
 		go func() {
@@ -918,7 +937,7 @@ func KonfirmasiPembayaran(c *gin.Context) {
 	idPengantaran := c.Param("public_id")
 
 	var pengantaran models.Pengantaran
-	if err := config.DB.Preload("Pesanan.Pembayaran").Where("public_id = ?", idPengantaran).First(&pengantaran).Error; err != nil {
+	if err := config.DB.Preload("Pesanan").Preload("Pesanan.Pembayaran").Where("public_id = ?", idPengantaran).First(&pengantaran).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pengantaran tidak ditemukan"})
 		return
 	}
@@ -932,6 +951,7 @@ func KonfirmasiPembayaran(c *gin.Context) {
 	err := config.DB.Model(pengantaran.Pesanan.Pembayaran).Updates(map[string]interface{}{
 		"id_status_transaksi": 2, // 2 = settlement
 		"waktu_pembayaran":    waktuSekarang,
+		"total_dibayar":       pengantaran.Pesanan.TotalPembayaran,
 	}).Error
 
 	if err != nil {
