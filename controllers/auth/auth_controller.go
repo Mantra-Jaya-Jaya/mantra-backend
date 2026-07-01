@@ -277,8 +277,12 @@ type RegisterCustomerInput struct {
 	Email              string `json:"email" binding:"required"`
 	Password           string `json:"password" binding:"required"`
 	KonfirmasiPassword string `json:"konfirmasi_password" binding:"required"`
-	NamaLengkap        string `json:"nama_lengkap" binding:"required"`
-	NoTelp             string `json:"no_telp" binding:"required"`
+	NamaLengkap        string  `json:"nama_lengkap" binding:"required"`
+	NoTelp             string  `json:"no_telp" binding:"required"`
+	AlamatLengkap      string  `json:"alamat_lengkap" binding:"required"`
+	Latitude           float64 `json:"latitude" binding:"required"`
+	Longitude          float64 `json:"longitude" binding:"required"`
+	CatatanLokasi      string  `json:"catatan_lokasi"`
 }
 
 // RegisterCustomer handles customer registration
@@ -356,6 +360,24 @@ func RegisterCustomer(c *gin.Context) {
 	if err := tx.Create(&newCustomer).Error; err != nil {
 		tx.Rollback()
 		RespondWithError(c, http.StatusInternalServerError, "Gagal membuat data customer", "SERVER_001", err.Error())
+		return
+	}
+
+	newAlamat := models.Alamat{
+		CustomerID:     newCustomer.IdCustomer,
+		NamaPenerima:   req.NamaLengkap,
+		LabelAlamat:    "Rumah",
+		NoTelpPenerima: req.NoTelp,
+		AlamatLengkap:  req.AlamatLengkap,
+		Latitude:       req.Latitude,
+		Longitude:      req.Longitude,
+		CatatanLokasi:  req.CatatanLokasi,
+		IsUtama:        true,
+	}
+
+	if err := tx.Create(&newAlamat).Error; err != nil {
+		tx.Rollback()
+		RespondWithError(c, http.StatusInternalServerError, "Gagal membuat data alamat default", "SERVER_001", err.Error())
 		return
 	}
 

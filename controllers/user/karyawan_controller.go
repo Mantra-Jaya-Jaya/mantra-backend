@@ -310,14 +310,17 @@ func HapusKaryawan(c *gin.Context) {
 		return
 	}
 
+	if err := tx.Where("id_user = ?", karyawan.UserID).Delete(&models.RefreshToken{}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menghapus token terkait: " + err.Error()})
+		return
+	}
+
 	if err := tx.Where("id_user = ?", karyawan.UserID).Delete(&models.User{}).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menghapus data user: " + err.Error()})
 		return
 	}
-
-	now := time.Now()
-	tx.Model(&models.RefreshToken{}).Where("id_user = ? AND revoked_at IS NULL", karyawan.UserID).Update("revoked_at", &now)
 
 	tx.Commit()
 	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Karyawan berhasil dihapus"})

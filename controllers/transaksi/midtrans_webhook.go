@@ -136,7 +136,7 @@ func MidtransNotificationHandler(c *gin.Context) {
 		go func() {
 			var pesanan models.Pesanan
 			config.DB.Preload("Customer.User").Where("id_pesanan = ?", pembayaran.PesananID).First(&pesanan)
-			if pesanan.Customer.User.IdUser != 0 {
+			if pesanan.Customer != nil && pesanan.Customer.User.IdUser != 0 {
 				notif := models.Notifikasi{
 					UserID:             pesanan.Customer.User.IdUser,
 					Judul:              "Pembayaran Berhasil",
