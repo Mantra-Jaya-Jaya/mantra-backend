@@ -42,7 +42,7 @@ func GetRiwayatStok(c *gin.Context) {
 			"nama_barang":           r.SpesifikasiBarang.Barang.NamaBarang,
 			"varian":                varianName,
 			"harga_beli":            r.HargaBeli,
-			"status":                r.Status, // true = masuk, false = keluar
+			"tipe_pergerakan":       r.TipePergerakan, // masuk, keluar, penyesuaian, retur
 			"jumlah_stok":           r.JumlahStok,
 			"keterangan":            r.Keterangan,
 			"tanggal":               r.Tanggal,
@@ -125,10 +125,15 @@ func OpnameStok(c *gin.Context) {
 	}
 
 	// 4. Catat riwayat opname di stok_opname
+	// Convert boolean ke string tipe pergerakan
+	tipePergerakan := "masuk"
+	if !statusVal {
+		tipePergerakan = "keluar"
+	}
 	opnameLog := models.StokOpname{
 		SpesifikasiBarangID: input.IdSpesifikasiBarang,
 		HargaBeli:           input.HargaBeli,
-		Status:              statusVal,
+		TipePergerakan:      tipePergerakan,
 		JumlahStok:          input.JumlahStok,
 		Keterangan:          input.Keterangan,
 		Tanggal:             time.Now(),

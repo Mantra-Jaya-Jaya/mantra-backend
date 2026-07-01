@@ -3,6 +3,7 @@ package seeders
 import (
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 	"fmt"
 	"time"
 
@@ -20,38 +21,50 @@ func SeedPembayaran() {
 	}
 
 	var daftarPesanan []models.Pesanan
-	if err := config.DB.Find(&daftarPesanan).Error; err != nil || len(daftarPesanan) == 0 {
+	if err := config.DB.Preload("StatusPesanan").Find(&daftarPesanan).Error; err != nil || len(daftarPesanan) == 0 {
 		fmt.Println("Gagal: Data Pesanan masih kosong!")
 		return
 	}
 
+	// Pre-fetch which pesanan already have pembayaran records
+	var existingPesananIDs []uint
+	config.DB.Model(&models.Pembayaran{}).Distinct("id_pesanan").Pluck("id_pesanan", &existingPesananIDs)
+	existingMap := make(map[uint]bool)
+	for _, id := range existingPesananIDs {
+		existingMap[id] = true
+	}
+
 	onlinePaymentTypes := []string{"qris", "bank_transfer", "gopay"}
 	totalCreated := 0
+	var pembayaranList []models.Pembayaran
 
 	for _, pesanan := range daftarPesanan {
-		var countItem int64
-		config.DB.Model(&models.Pembayaran{}).Where("id_pesanan = ?", pesanan.IdPesanan).Count(&countItem)
-		if countItem > 0 {
-			continue // Skip jika pembayaran untuk pesanan ini sudah ada
+		if existingMap[pesanan.IdPesanan] {
+			continue
 		}
 
 		ptype := "cash"
 		status := "settlement"
 		orderIdMidtrans := ""
+		statusName := ""
+		if pesanan.StatusPesanan != nil {
+			statusName = pesanan.StatusPesanan.NamaStatus
+		}
 
-		if pesanan.TipePesanan == "Online" {
+		if pesanan.TipePesananID == utils.GetTipePesananID("Online") {
 			ptype = fake.RandomString(onlinePaymentTypes)
-			if pesanan.StatusPesanan == "Selesai" || pesanan.StatusPesanan == "Dikirim" {
+			switch statusName {
+			case "Selesai", "Dikirim":
 				status = "settlement"
-			} else if pesanan.StatusPesanan == "Dibatalkan" {
+			case "Dibatalkan":
 				status = "cancel"
-			} else {
+			default:
 				status = "pending"
 			}
 			orderIdMidtrans = fmt.Sprintf("MANTRA-%d-%d", pesanan.IdPesanan, time.Now().UnixNano())
 		} else {
 			ptype = "cash"
-			if pesanan.StatusPesanan == "Dibatalkan" {
+			if statusName == "Dibatalkan" {
 				status = "cancel"
 			} else {
 				status = "settlement"
@@ -59,15 +72,21 @@ func SeedPembayaran() {
 		}
 
 		pembayaran := models.Pembayaran{
-			OrderIdMidtrans: orderIdMidtrans,
-			PaymentType:     ptype,
-			StatusTransaksi: status,
-			FraudStatus:     "accept",
-			PesananID:       pesanan.IdPesanan,
+			OrderIdMidtrans:   orderIdMidtrans,
+			TipePembayaranID:  utils.GetTipePembayaranID(ptype),
+			StatusTransaksiID: utils.GetStatusTransaksiID(status),
+			FraudStatusID:     utils.GetFraudStatusID("accept"),
+			PesananID:         pesanan.IdPesanan,
 		}
 
-		if err := config.DB.Create(&pembayaran).Error; err == nil {
-			totalCreated++
+		pembayaranList = append(pembayaranList, pembayaran)
+	}
+
+	if len(pembayaranList) > 0 {
+		if err := config.DB.CreateInBatches(pembayaranList, 100).Error; err == nil {
+			totalCreated = len(pembayaranList)
+		} else {
+			fmt.Println("Error batch insert pembayaran:", err)
 		}
 	}
 

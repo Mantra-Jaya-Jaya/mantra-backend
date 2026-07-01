@@ -9,6 +9,7 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -164,6 +165,56 @@ func UpdateProfilAdmin(c *gin.Context) {
 	})
 }
 
+// UploadFotoProfilAdmin mengunggah foto profil admin ke MinIO dan memperbarui database.
+// Dipakai oleh: admin (POST /admin/profil/upload)
+// Auth: Wajib login, role admin
+func UploadFotoProfilAdmin(c *gin.Context) {
+	uid, exists := getUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "User belum login",
+			"error":   gin.H{"code": "AUTH_001", "detail": "Token tidak valid"},
+		})
+		return
+	}
+
+	fotoURL, err := utils.UploadFileToMinio(c, "foto", "profil")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Gagal mengunggah foto profil: " + err.Error(),
+		})
+		return
+	}
+
+	var admin models.User
+	if err := config.DB.Where("id_user = ?", uid).First(&admin).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Admin tidak ditemukan",
+		})
+		return
+	}
+
+	admin.FotoProfil = fotoURL
+	if err := config.DB.Save(&admin).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal menyimpan foto profil",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Foto profil berhasil diperbarui",
+		"data": gin.H{
+			"foto_profil": fotoURL,
+		},
+	})
+}
+
 // Helper: Format Nominal Rupiah
 func formatNominalRupiah(amount int64) string {
 	if amount >= 1000000000 {
@@ -202,17 +253,24 @@ func GetDashboardAdmin(c *gin.Context) {
 	now := time.Now()
 	startOfThisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 	startOfLastMonth := startOfThisMonth.AddDate(0, -1, 0)
-	
+
 	// 1. Total Revenue (Net vs Gross)
 	var penjualanHariIni, penjualanKotorHariIni int64
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
-	
-	// Net (Hanya Selesai)
+
+	// Net (Hanya Selesai Hari Ini)
+	selesaiID := utils.GetStatusPesananID("Selesai")
 	config.DB.Model(&models.Pesanan{}).
-		Where("status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", "Selesai", startOfDay, endOfDay).
+		Where("id_status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", selesaiID, startOfDay, endOfDay).
 		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&penjualanHariIni)
-		
+
+	// Net (Semua Waktu / All Time)
+	var totalRevenue int64
+	config.DB.Model(&models.Pesanan{}).
+		Where("id_status_pesanan = ?", selesaiID).
+		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&totalRevenue)
+
 	// Gross (Semua status)
 	config.DB.Model(&models.Pesanan{}).
 		Where("tanggal_pesanan >= ? AND tanggal_pesanan < ?", startOfDay, endOfDay).
@@ -223,10 +281,10 @@ func GetDashboardAdmin(c *gin.Context) {
 
 	// Net
 	config.DB.Model(&models.Pesanan{}).
-		Where("status_pesanan = ? AND tanggal_pesanan >= ?", "Selesai", startOfThisMonth).
+		Where("id_status_pesanan = ? AND tanggal_pesanan >= ?", selesaiID, startOfThisMonth).
 		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&revenueBulanIni)
 	config.DB.Model(&models.Pesanan{}).
-		Where("status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", "Selesai", startOfLastMonth, startOfThisMonth).
+		Where("id_status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", selesaiID, startOfLastMonth, startOfThisMonth).
 		Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&revenueBulanLalu)
 
 	// Gross
@@ -243,7 +301,7 @@ func GetDashboardAdmin(c *gin.Context) {
 	// 2. Total Orders
 	var totalPesanan, totalPesananSelesai int64
 	config.DB.Model(&models.Pesanan{}).Count(&totalPesanan)
-	config.DB.Model(&models.Pesanan{}).Where("status_pesanan = ?", "Selesai").Count(&totalPesananSelesai)
+	config.DB.Model(&models.Pesanan{}).Where("id_status_pesanan = ?", selesaiID).Count(&totalPesananSelesai)
 
 	var pesananBulanIni, pesananBulanLalu int64
 	config.DB.Model(&models.Pesanan{}).Where("tanggal_pesanan >= ?", startOfThisMonth).Count(&pesananBulanIni)
@@ -252,11 +310,11 @@ func GetDashboardAdmin(c *gin.Context) {
 
 	// 3. Active Customers
 	var totalCustomerAktif int64
-	config.DB.Model(&models.Pesanan{}).Where("status_pesanan = ?", "Selesai").Select("COUNT(DISTINCT id_customer)").Scan(&totalCustomerAktif)
+	config.DB.Model(&models.Pesanan{}).Where("id_status_pesanan = ?", selesaiID).Select("COUNT(DISTINCT id_customer)").Scan(&totalCustomerAktif)
 
 	var custBulanIni, custBulanLalu int64
-	config.DB.Model(&models.Pesanan{}).Where("status_pesanan = ? AND tanggal_pesanan >= ?", "Selesai", startOfThisMonth).Select("COUNT(DISTINCT id_customer)").Scan(&custBulanIni)
-	config.DB.Model(&models.Pesanan{}).Where("status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", "Selesai", startOfLastMonth, startOfThisMonth).Select("COUNT(DISTINCT id_customer)").Scan(&custBulanLalu)
+	config.DB.Model(&models.Pesanan{}).Where("id_status_pesanan = ? AND tanggal_pesanan >= ?", selesaiID, startOfThisMonth).Select("COUNT(DISTINCT id_customer)").Scan(&custBulanIni)
+	config.DB.Model(&models.Pesanan{}).Where("id_status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", selesaiID, startOfLastMonth, startOfThisMonth).Select("COUNT(DISTINCT id_customer)").Scan(&custBulanLalu)
 	trendCustomer := hitungTrendPersen(custBulanIni, custBulanLalu)
 
 	// 4. Low Stock Items
@@ -285,7 +343,7 @@ func GetDashboardAdmin(c *gin.Context) {
 		} else {
 			varianName = "Default"
 		}
-		
+
 		statusStok := "warning"
 		if s.Jumlah <= 5 {
 			statusStok = "kritis"
@@ -305,8 +363,9 @@ func GetDashboardAdmin(c *gin.Context) {
 	// 5. Transaksi Terbaru
 	var pesananTerbaru []models.Pesanan
 	config.DB.
-		Preload("Kasir.User").
+		Preload("Kasir.Karyawan.User").
 		Preload("Customer.User").
+		Preload("StatusPesanan").
 		Order("tanggal_pesanan DESC").
 		Limit(50).
 		Find(&pesananTerbaru)
@@ -323,21 +382,26 @@ func GetDashboardAdmin(c *gin.Context) {
 	var transaksiResponse []TransaksiData
 	for _, p := range pesananTerbaru {
 		kasirName := "-"
-		if p.Kasir.Karyawan.User.NamaLengkap != "" {
+		if p.Kasir != nil && p.Kasir.Karyawan.User.NamaLengkap != "" {
 			kasirName = p.Kasir.Karyawan.User.NamaLengkap
 		}
 		custName := "-"
-		if p.Customer.User.NamaLengkap != "" {
+		if p.Customer != nil && p.Customer.User.NamaLengkap != "" {
 			custName = p.Customer.User.NamaLengkap
 		}
-		
+
+		statusName := "-"
+		if p.StatusPesanan != nil {
+			statusName = p.StatusPesanan.NamaStatus
+		}
+
 		transaksiResponse = append(transaksiResponse, TransaksiData{
 			Id:        p.PublicId.String(),
 			Kasir:     kasirName,
 			Pelanggan: custName,
 			Tanggal:   p.TanggalPesanan.Format("02 Jan 2006, 15:04"),
 			Total:     formatNominalRupiah(int64(p.TotalPembayaran)),
-			Status:    p.StatusPesanan,
+			Status:    statusName,
 		})
 	}
 	if transaksiResponse == nil {
@@ -350,6 +414,7 @@ func GetDashboardAdmin(c *gin.Context) {
 		"data": gin.H{
 			"penjualan_hari_ini":       penjualanHariIni,
 			"penjualan_kotor_hari_ini": penjualanKotorHariIni,
+			"total_revenue":            totalRevenue,
 			"total_pesanan":            totalPesanan,
 			"total_pesanan_selesai":    totalPesananSelesai,
 			"total_customer_aktif":     totalCustomerAktif,
@@ -370,13 +435,15 @@ func GetDashboardAdmin(c *gin.Context) {
 func GetChartDashboardAdmin(c *gin.Context) {
 	periode := c.DefaultQuery("periode", "minggu")
 	tanggalStr := c.Query("tanggal")
-	
+
 	now := time.Now()
 	if tanggalStr != "" {
 		if parsedTime, err := time.Parse("2006-01-02", tanggalStr); err == nil {
 			now = parsedTime
 		}
 	}
+
+	selesaiID := utils.GetStatusPesananID("Selesai")
 
 	type BarData struct {
 		Name  string `json:"name"`
@@ -395,8 +462,8 @@ func GetChartDashboardAdmin(c *gin.Context) {
 		senin := now.AddDate(0, 0, -day+1)
 		minggu := senin.AddDate(0, 0, 6)
 
-		label = fmt.Sprintf("%d %s - %d %s %d", 
-			senin.Day(), monthNames[senin.Month()-1][:3], 
+		label = fmt.Sprintf("%d %s - %d %s %d",
+			senin.Day(), monthNames[senin.Month()-1][:3],
 			minggu.Day(), monthNames[minggu.Month()-1][:3], minggu.Year())
 
 		namaHari := []string{"Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"}
@@ -407,21 +474,21 @@ func GetChartDashboardAdmin(c *gin.Context) {
 
 			var total int64
 			config.DB.Model(&models.Pesanan{}).
-				Where("status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", "Selesai", startOfDay, endOfDay).
+				Where("id_status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", selesaiID, startOfDay, endOfDay).
 				Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&total)
 
 			bars = append(bars, BarData{Name: namaHari[i], Total: total})
 		}
 	} else if periode == "bulan" {
 		label = fmt.Sprintf("%s %d", monthNames[now.Month()-1], now.Year())
-		
+
 		// 5 minggu
 		startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		
+
 		for i := 0; i < 5; i++ {
 			startOfWeek := startOfMonth.AddDate(0, 0, i*7)
 			endOfWeek := startOfWeek.AddDate(0, 0, 7)
-			
+
 			// Jika startOfWeek sudah beda bulan, skip
 			if startOfWeek.Month() != now.Month() && i == 4 {
 				continue
@@ -429,14 +496,14 @@ func GetChartDashboardAdmin(c *gin.Context) {
 
 			var total int64
 			config.DB.Model(&models.Pesanan{}).
-				Where("status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", "Selesai", startOfWeek, endOfWeek).
+				Where("id_status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", selesaiID, startOfWeek, endOfWeek).
 				Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&total)
 
 			bars = append(bars, BarData{Name: fmt.Sprintf("Minggu %d", i+1), Total: total})
 		}
 	} else if periode == "tahun" {
 		label = fmt.Sprintf("%d", now.Year())
-		
+
 		shortMonthNames := []string{"Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"}
 		for i := 1; i <= 12; i++ {
 			startOfMonth := time.Date(now.Year(), time.Month(i), 1, 0, 0, 0, 0, now.Location())
@@ -444,7 +511,7 @@ func GetChartDashboardAdmin(c *gin.Context) {
 
 			var total int64
 			config.DB.Model(&models.Pesanan{}).
-				Where("status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", "Selesai", startOfMonth, endOfMonth).
+				Where("id_status_pesanan = ? AND tanggal_pesanan >= ? AND tanggal_pesanan < ?", selesaiID, startOfMonth, endOfMonth).
 				Select("COALESCE(SUM(total_pembayaran), 0)").Scan(&total)
 
 			bars = append(bars, BarData{Name: shortMonthNames[i-1], Total: total})
@@ -454,8 +521,60 @@ func GetChartDashboardAdmin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
 		"data": gin.H{
-			"bars": bars,
+			"bars":  bars,
 			"label": label,
 		},
+	})
+}
+
+// GetPengaturan mengambil semua pengaturan toko.
+// Dipakai oleh: admin (GET /admin/pengaturan)
+// Auth: Wajib login, role admin
+func GetPengaturan(c *gin.Context) {
+	var settings []models.PengaturanToko
+	if err := config.DB.Find(&settings).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengambil pengaturan"})
+		return
+	}
+
+	data := make(map[string]string)
+	for _, s := range settings {
+		data[s.Key] = s.Value
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   data,
+	})
+}
+
+// UpdatePengaturan memperbarui nilai pengaturan toko.
+// Dipakai oleh: admin (PUT /admin/pengaturan)
+// Auth: Wajib login, role admin
+func UpdatePengaturan(c *gin.Context) {
+	var input struct {
+		Key   string `json:"key" binding:"required"`
+		Value string `json:"value" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Input tidak valid"})
+		return
+	}
+
+	var setting models.PengaturanToko
+	if err := config.DB.Where("key = ?", input.Key).First(&setting).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Pengaturan tidak ditemukan"})
+		return
+	}
+
+	setting.Value = input.Value
+	if err := config.DB.Save(&setting).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan pengaturan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Pengaturan berhasil diperbarui",
 	})
 }

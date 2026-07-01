@@ -2,7 +2,7 @@ data "external_schema" "gorm" {
   program = [
     "go", "run", "-mod=mod",
     "ariga.io/atlas-provider-gorm", "load",
-    "--path", "./models", "--dialect", "postgres",
+    "--path", "models", "--dialect", "postgres",
   ]
 }
 

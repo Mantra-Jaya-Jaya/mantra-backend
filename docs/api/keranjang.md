@@ -1,14 +1,30 @@
-# Keranjang API
+# 🛒 Keranjang API Contract
 
-Auth (Customer). Semua endpoint keranjang untuk customer.
+---
+### 🧭 Navigasi Cepat
+[🏠 Utama](../README.md) | [🏛️ Arsitektur](../architecture.md) | [🛠️ Deployment](../deployment.md) | [💳 Midtrans](../pembayaran.md) | [📦 Biteship](../biteship.md) | [📡 API Contract](overview.md) | [🗄️ Database](../database/erd.md) | [🔒 Keamanan](../security/README.md)
+---
+
+Pusat kontrol dan manajemen keranjang belanjaan (Shopping Cart) pelanggan.
 
 ---
 
-## POST /customer/keranjang
+## 🧭 Daftar Endpoint Keranjang
 
-Tambah item ke keranjang.
+*   [**POST /api/v1/customer/keranjang**](#post-apiv1customerkeranjang) - Menambahkan item baru ke keranjang
+*   [**PATCH /api/v1/customer/keranjang/:public_id**](#patch-apiv1customerkeranjangpublic_id) - Memperbarui jumlah (quantity) barang
+*   [**DELETE /api/v1/customer/keranjang/:public_id**](#delete-apiv1customerkeranjangpublic_id) - Menghapus barang dari keranjang
 
-**Request:**
+---
+
+## POST /api/v1/customer/keranjang
+
+Menambahkan produk dengan spesifikasi tertentu ke keranjang belanja customer.
+
+*   **Autentikasi:** Wajib (Role: `Customer`)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
+
+### Request Payload
 ```json
 {
   "id_spesifikasi_barang": 1,
@@ -16,7 +32,7 @@ Tambah item ke keranjang.
 }
 ```
 
-**Response:**
+### Response (200 OK)
 ```json
 {
   "status": "success",
@@ -26,24 +42,40 @@ Tambah item ke keranjang.
 
 ---
 
-## PATCH /customer/keranjang/:id_keranjang
+## PATCH /api/v1/customer/keranjang/:public_id
 
-Update quantity item di keranjang.
+Memperbarui jumlah kuantitas (`quantity`) item yang sudah ada di dalam keranjang belanja.
 
-**Request:**
+*   **Autentikasi:** Wajib (Role: `Customer` & Verifikasi Kepemilikan Resource)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
+*   **Parameter URL:** `public_id` (UUID item keranjang)
+
+### Request Payload
 ```json
 {
   "quantity": 5
 }
 ```
 
+### Response (200 OK)
+```json
+{
+  "status": "success",
+  "message": "Jumlah item berhasil diperbarui"
+}
+```
+
 ---
 
-## DELETE /customer/keranjang/:id_keranjang
+## DELETE /api/v1/customer/keranjang/:public_id
 
-Hapus item dari keranjang.
+Menghapus salah satu item produk dari keranjang belanja.
 
-**Response:**
+*   **Autentikasi:** Wajib (Role: `Customer` & Verifikasi Kepemilikan Resource)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
+*   **Parameter URL:** `public_id` (UUID item keranjang)
+
+### Response (200 OK)
 ```json
 {
   "status": "success",

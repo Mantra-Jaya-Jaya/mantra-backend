@@ -1,0 +1,26 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/kasir/transaksi/bayar/non-tunai
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "id_pesanan": 2,
+    "metode" : "qris"
+  } 
+}

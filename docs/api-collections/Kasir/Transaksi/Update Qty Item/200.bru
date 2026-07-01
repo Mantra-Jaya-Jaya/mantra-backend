@@ -1,0 +1,27 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+patch {
+  url: {{baseUrl}}/kasir/transaksi/item/update
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "id_pesanan": 0,
+    "id_spesifikasi_barang": 1,
+    "jumlah": 1
+  }
+}

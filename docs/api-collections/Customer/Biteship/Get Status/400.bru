@@ -1,0 +1,23 @@
+meta {
+  name: 400
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/customer/pesanan/invalid-uuid/status-biteship
+  body: none
+  auth: bearer
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  bru.log(`Error message: ${res.body?.message}`);
+}

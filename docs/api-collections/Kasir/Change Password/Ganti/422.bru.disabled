@@ -1,0 +1,27 @@
+meta {
+  name: 422
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/change-password
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "password_lama": "Kasir#123",
+    "password_baru": "passwordbaru",
+    "konfirmasi_password": "berbedasemua"
+  }
+}

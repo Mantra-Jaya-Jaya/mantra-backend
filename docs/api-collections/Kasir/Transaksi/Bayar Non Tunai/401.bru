@@ -1,0 +1,26 @@
+meta {
+  name: 401
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/kasir/transaksi/bayar/non-tunai
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "payment_type": "qris",
+    "id_pesanan": 1
+  }
+}

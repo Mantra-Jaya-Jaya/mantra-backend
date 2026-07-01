@@ -11,6 +11,20 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// NormalizeRoleName membuat representasi role yang konsisten untuk JWT, context, dan handler.
+func NormalizeRoleName(role string) string {
+	return strings.ToLower(strings.TrimSpace(role))
+}
+
+// IsSecureCookie returns true only in production (HTTPS), false for local dev (HTTP)
+func IsSecureCookie(c *gin.Context) bool {
+	host := c.Request.Host
+	if strings.HasPrefix(host, "localhost:") || strings.HasPrefix(host, "127.0.0.1:") || host == "localhost" || host == "127.0.0.1" {
+		return false
+	}
+	return os.Getenv("MIDTRANS_ENVIRONMENT") == "production"
+}
+
 // GenerateJWT generates a real JWT token for a user
 func GenerateJWT(userID uint, publicID string, role string) (string, error) {
 	secret := os.Getenv("JWT_SECRET")
@@ -18,10 +32,12 @@ func GenerateJWT(userID uint, publicID string, role string) (string, error) {
 		secret = "rahasia_dapur_mantra" // Fallback
 	}
 
+	normalizedRole := NormalizeRoleName(role)
+
 	claims := jwt.MapClaims{
 		"user_id":   userID,
 		"public_id": publicID,
-		"role":      role,
+		"role":      normalizedRole,
 		"exp":       time.Now().Add(30 * time.Minute).Unix(), // 30 menit
 		"iat":       time.Now().Unix(),
 	}
@@ -32,13 +48,12 @@ func GenerateJWT(userID uint, publicID string, role string) (string, error) {
 
 // RespondWithSuccess handles the different response formats for Flutter and Next.js
 func RespondWithSuccess(c *gin.Context, clientType string, user models.User, roleName string, profileID uint, accessToken string, refreshToken string) {
-	lowerRole := strings.ToLower(roleName)
+	lowerRole := NormalizeRoleName(roleName)
 
 	if clientType == "nextjs" {
-		// Set cookie sesuai kontrak: HttpOnly; Secure; SameSite=Strict
-		// Gin SetCookie params: name, value string, maxAge int, path, domain string, secure, httpOnly bool
-		c.SetCookie("access_token", accessToken, 1800, "/", "", true, true)
-		c.SetCookie("refresh_token", refreshToken, 604800, "/", "", true, true)
+		isSecure := IsSecureCookie(c)
+		c.SetCookie("access_token", accessToken, 1800, "/", "", isSecure, true)
+		c.SetCookie("refresh_token", refreshToken, 604800, "/", "", isSecure, true)
 
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",

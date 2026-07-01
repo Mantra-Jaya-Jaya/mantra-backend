@@ -4,11 +4,12 @@ Auth (Kasir). Profil kasir.
 
 ---
 
-## GET /kasir/profil
+## GET /api/v1/kasir/profil
 
 Mendapatkan profil kasir yang login.
 
 **Response:**
+
 ```json
 {
   "status": "success",

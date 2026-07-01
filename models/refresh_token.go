@@ -14,6 +14,6 @@ type RefreshToken struct {
 	RevokedAt *time.Time `gorm:"column:revoked_at"` // Nullable — diisi saat logout, null berarti masih aktif
 
 	// Relasi ke User
-	UserID uint `gorm:"column:id_user"`
+	UserID uint `gorm:"column:id_user;not null"`
 	User   User `gorm:"foreignKey:UserID;references:IdUser"`
 }

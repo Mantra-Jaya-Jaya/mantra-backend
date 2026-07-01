@@ -6,13 +6,14 @@ meta {
 
 get {
   url: {{baseUrl}}/customer/profil
+  body: none
   auth: bearer
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 headers {
   X-Client-Type: flutter
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODE2MjMwMTEsImlhdCI6MTc4MTYyMTIxMSwicHVibGljX2lkIjoiMzg1YmVlYWEtNTM1ZS00YjNjLWJkYjYtODViMmViYzNlN2JlIiwicm9sZSI6IkN1c3RvbWVyIiwidXNlcl9pZCI6M30.siWf9sV4Z84SpwEEuK8P6LvZ_4wcX1b6Wc8K8tBRS6Q
 }

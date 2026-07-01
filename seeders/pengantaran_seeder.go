@@ -3,14 +3,16 @@ package seeders
 import (
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 	"fmt"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 func SeedPengantaran() {
 	fmt.Println("⏳ Menyiapkan data pengantaran...")
 
-	// 🚀 LOGIKA AMAN: Cek apakah tabel pengantaran udah ada isinya
 	var count int64
 	config.DB.Model(&models.Pengantaran{}).Count(&count)
 	if count > 0 {
@@ -18,68 +20,123 @@ func SeedPengantaran() {
 		return
 	}
 
+	dikirimID := utils.GetStatusPesananIDSafe("Dikirim")
+	selesaiPesananID := utils.GetStatusPesananIDSafe("Selesai")
+	if dikirimID == 0 || selesaiPesananID == 0 {
+		fmt.Println("Gagal: Status pesanan 'Dikirim'/'Selesai' belum ada!")
+		return
+	}
+
 	var daftarPesanan []models.Pesanan
-	if err := config.DB.Where("tipe_pesanan = ?", "Online").Find(&daftarPesanan).Error; err != nil || len(daftarPesanan) == 0 {
-		fmt.Println("Gagal: Data Pesanan Online masih kosong!")
+	if err := config.DB.
+		Where("id_tipe_pesanan = ?", utils.GetTipePesananID("Online")).
+		Where("id_status_pesanan IN ?", []uint{dikirimID, selesaiPesananID}).
+		Find(&daftarPesanan).Error; err != nil || len(daftarPesanan) == 0 {
+		fmt.Println("Gagal: Data pesanan online dengan status Dikirim/Selesai masih kosong!")
+		return
+	}
+
+	menungguID := utils.GetStatusPengantaranIDSafe("Menunggu Pickup")
+	jalanID := utils.GetStatusPengantaranIDSafe("Dalam Perjalanan")
+	selesaiPengID := utils.GetStatusPengantaranIDSafe("Selesai")
+	if menungguID == 0 || jalanID == 0 || selesaiPengID == 0 {
+		fmt.Println("Gagal: Setup status pengantaran belum lengkap!")
 		return
 	}
 
 	var kurir models.Kurir
-	if err := config.DB.First(&kurir).Error; err != nil {
-		fmt.Println("Gagal: Data Kurir masih kosong!")
-		return
-	}
+	adaKurir := config.DB.First(&kurir).Error == nil
 
 	var ekspedisi models.Ekspedisi
-	if err := config.DB.First(&ekspedisi).Error; err != nil {
-		fmt.Println("Gagal: Data Ekspedisi masih kosong!")
-		return
-	}
+	adaEkspedisi := config.DB.First(&ekspedisi).Error == nil
 
-	var statusSelesai models.StatusPengantaran
-	if err := config.DB.Where("nama_status = ?", "Selesai").First(&statusSelesai).Error; err != nil {
-		fmt.Println("Gagal: Status 'Selesai' belum ada!")
-		return
-	}
+	now := time.Now()
+	var pengantaranList []models.Pengantaran
 
-	var statusJalan models.StatusPengantaran
-	if err := config.DB.Where("nama_status = ?", "Dalam Perjalanan").First(&statusJalan).Error; err != nil {
-		fmt.Println("Gagal: Status 'Dalam Perjalanan' belum ada!")
-		return
+	type pesananStatusUpdate struct {
+		id     uint
+		status uint
 	}
+	var statusUpdates []pesananStatusUpdate
 
 	for i, pesanan := range daftarPesanan {
-		// 🚀 1. BIKIN VARIABEL PENAMPUNG BUAT POINTER SEBELUM STRUCT
-		waktuPickup := time.Now().Add(-2 * time.Hour)
-		waktuSampai := time.Now().Add(-1 * time.Hour)
-		idKurir := kurir.IdKurir
-		idEkspedisi := ekspedisi.IdEkspedisi
+		roll := i % 10
+		var (
+			statusPengID uint
+			waktuPickup  *time.Time
+			waktuSampai  *time.Time
+			updateStatus uint
+		)
 
-		statusID := statusSelesai.IdStatusPengantaran
-		var ptrWaktuSampai *time.Time = &waktuSampai // Default: Udah sampai
-
-		if i%2 != 0 {
-			statusID = statusJalan.IdStatusPengantaran
-			// 🚀 LOGIKA SAKTI: Kalau masih di jalan, waktu sampainya kita set NULL!
-			ptrWaktuSampai = nil 
+		switch {
+		case roll < 2:
+			// 20% — Menunggu Pickup (belum di-pickup kurir)
+			statusPengID = menungguID
+			waktuPickup = nil
+			waktuSampai = nil
+			updateStatus = dikirimID
+		case roll < 5:
+			// 30% — Dalam Perjalanan
+			statusPengID = jalanID
+			t := now.Add(-time.Duration(30+i) * time.Minute)
+			waktuPickup = &t
+			waktuSampai = nil
+			updateStatus = dikirimID
+		default:
+			// 50% — Selesai
+			statusPengID = selesaiPengID
+			tPickup := now.Add(-time.Duration(120+i) * time.Minute)
+			tSampai := now.Add(-time.Duration(60+i) * time.Minute)
+			waktuPickup = &tPickup
+			waktuSampai = &tSampai
+			updateStatus = selesaiPesananID
 		}
 
-		// 🚀 2. MASUKIN ALAMAT MEMORI (&) KE DALAM STRUCT PENGANTARAN
+		var idKurir *uint
+		if adaKurir {
+			idKurir = &kurir.IdKurir
+		}
+		var idEkspedisi *uint
+		if adaEkspedisi {
+			idEkspedisi = &ekspedisi.IdEkspedisi
+		}
+
 		pengantaran := models.Pengantaran{
-			WaktuPickup:         &waktuPickup,   // Pakai & (Pointer)
-			WaktuSampai:         ptrWaktuSampai, // Bisa terisi nilai pointer, atau nil (NULL)
+			WaktuPickup:         waktuPickup,
+			WaktuSampai:         waktuSampai,
 			LastLatitude:        -7.051410,
 			LastLongitude:       110.438125,
-			FotoBuktiPengiriman: "https://picsum.photos/400/400",
+			FotoBuktiPengiriman: "",
 			PesananID:           pesanan.IdPesanan,
-			KurirID:             &idKurir,       // Pakai & (Pointer)
-			StatusPengantaranID: statusID,
-			EkspedisiID:         &idEkspedisi,   // Pakai & (Pointer)
+			KurirID:             idKurir,
+			StatusPengantaranID: statusPengID,
+			EkspedisiID:         idEkspedisi,
 		}
 
-		if err := config.DB.Create(&pengantaran).Error; err != nil {
-			fmt.Println("Error insert pengantaran:", err)
-			continue
+		pengantaranList = append(pengantaranList, pengantaran)
+
+		if pesanan.StatusPesananID != updateStatus {
+			statusUpdates = append(statusUpdates, pesananStatusUpdate{id: pesanan.IdPesanan, status: updateStatus})
+		}
+	}
+
+	if len(pengantaranList) > 0 {
+		if err := config.DB.CreateInBatches(pengantaranList, 100).Error; err != nil {
+			fmt.Println("Error batch insert pengantaran:", err)
+		}
+	}
+
+	if len(statusUpdates) > 0 {
+		err := config.DB.Transaction(func(tx *gorm.DB) error {
+			for _, upd := range statusUpdates {
+				if err := tx.Model(&models.Pesanan{}).Where("id_pesanan = ?", upd.id).Update("id_status_pesanan", upd.status).Error; err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			fmt.Println("Error executing batch transaction updates for pesanan status:", err)
 		}
 	}
 

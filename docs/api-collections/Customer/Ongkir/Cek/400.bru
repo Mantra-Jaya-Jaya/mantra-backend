@@ -1,0 +1,26 @@
+meta {
+  name: 400
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/customer/ongkir/cek
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "id_alamat": "some-alamat-id"
+  }
+}

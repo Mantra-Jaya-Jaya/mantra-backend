@@ -1,0 +1,20 @@
+meta {
+  name: 200
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/kurir/pesanan/9fa4eb01-cf29-48c1-91d4-6417fce601b0/terima
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

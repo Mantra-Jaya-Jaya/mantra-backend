@@ -1,20 +1,43 @@
-# Transaksi — Pembayaran API
+# 💳 Transaksi — Pembayaran (POS Kasir) API Contract
 
-Seluruh endpoint Auth (Kasir). Digunakan untuk alur POS di aplikasi Kasir.
+---
+### 🧭 Navigasi Cepat
+[🏠 Utama](../../README.md) | [🏛️ Arsitektur](../../architecture.md) | [🛠️ Deployment](../../deployment.md) | [💳 Midtrans](../../pembayaran.md) | [📦 Biteship](../../biteship.md) | [📡 API Contract](../overview.md) | [🗄️ Database](../../database/erd.md) | [🔒 Keamanan](../../security/README.md)
+---
+
+Seluruh endpoint transaksi kasir offline/Point of Sales (POS) untuk mengelola checkout, pembayaran tunai/non-tunai, dan laporan ringkasan kasir.
 
 ---
 
-## GET /kasir/transaksi/checkout
+## 🧭 Daftar Endpoint Pembayaran Kasir
 
-Mendapatkan ringkasan checkout pesanan offline.
+*   [**GET /api/v1/kasir/transaksi/checkout**](#get-apiv1kasirtransaksicheckout) - Mengambil rincian checkout POS
+*   [**POST /api/v1/kasir/transaksi/bayar/tunai**](#post-apiv1kasirtransaksibayartunai) - Memproses transaksi tunai (Cash)
+*   [**POST /api/v1/kasir/transaksi/bayar/non-tunai**](#post-apiv1kasirtransaksibayarnon-tunai) - Memproses transaksi non-tunai (Midtrans)
+*   [**PATCH /api/v1/kasir/transaksi/item/update**](#patch-apiv1kasirtransaksiitemupdate) - Memperbarui kuantitas item keranjang kasir
+*   [**GET /api/v1/kasir/dashboard**](#get-apiv1kasirdashboard) - Mengambil ringkasan penjualan kasir hari ini
+*   [**GET /api/v1/kasir/laporan**](#get-apiv1kasirlaporan) - Mengambil ringkasan laporan performa produk
+*   [**GET /api/v1/kasir/laporan/produk/:public_id**](#get-apiv1kasirlaporanprodukpublic_id) - Detail laporan penjualan per produk
+*   [**GET /api/v1/kasir/laporan/produk/:public_id/:pesanan_id**](#get-apiv1kasirlaporanprodukpublic_idpesanan_id) - Detail pesanan terkait dari laporan produk
 
 ---
 
-## POST /kasir/transaksi/bayar/tunai
+## GET /api/v1/kasir/transaksi/checkout
 
-Memproses pembayaran tunai.
+Mengambil ringkasan pesanan offline Point of Sale (POS) yang sedang aktif sebelum dibayarkan.
 
-**Request:**
+*   **Autentikasi:** Wajib (Role: `Kasir`)
+*   **Header Wajib:** `Authorization: Bearer <access_token>`
+
+---
+
+## POST /api/v1/kasir/transaksi/bayar/tunai
+
+Memproses pembayaran fisik menggunakan uang tunai (cash) di meja kasir.
+
+*   **Autentikasi:** Wajib (Role: `Kasir`)
+
+### Request Payload
 ```json
 {
   "total_bayar": 200000,
@@ -22,7 +45,7 @@ Memproses pembayaran tunai.
 }
 ```
 
-**Response:**
+### Response (200 OK)
 ```json
 {
   "status": "success",
@@ -35,11 +58,13 @@ Memproses pembayaran tunai.
 
 ---
 
-## POST /kasir/transaksi/bayar/non-tunai
+## POST /api/v1/kasir/transaksi/bayar/non-tunai
 
-Memproses pembayaran non-tunai (QRIS, E-Wallet, VA, Kartu).
+Memproses pembayaran non-tunai (seperti QRIS, E-Wallet, Kartu Kredit, atau Virtual Account) melalui integrasi Midtrans Core API.
 
-**Request:**
+*   **Autentikasi:** Wajib (Role: `Kasir`)
+
+### Request Payload
 ```json
 {
   "payment_type": "qris",
@@ -47,13 +72,13 @@ Memproses pembayaran non-tunai (QRIS, E-Wallet, VA, Kartu).
 }
 ```
 
-**Response:**
+### Response (200 OK)
 ```json
 {
   "status": "success",
   "message": "Pembayaran non-tunai berhasil diproses",
   "data": {
-    "order_id_midtrans": "ORDER-123",
+    "order_id_midtrans": "MNT-POS-10-178000000",
     "payment_type": "qris",
     "status_transaksi": "pending"
   }
@@ -62,11 +87,13 @@ Memproses pembayaran non-tunai (QRIS, E-Wallet, VA, Kartu).
 
 ---
 
-## PATCH /kasir/transaksi/item/update
+## PATCH /api/v1/kasir/transaksi/item/update
 
-Mengupdate quantity item di pesanan offline sebelum checkout.
+Mengubah kuantitas item produk yang dimasukkan ke keranjang kasir POS sebelum checkout.
 
-**Request:**
+*   **Autentikasi:** Wajib (Role: `Kasir`)
+
+### Request Payload
 ```json
 {
   "id_detail_pesanan": 1,
@@ -76,24 +103,32 @@ Mengupdate quantity item di pesanan offline sebelum checkout.
 
 ---
 
-## GET /kasir/dashboard
+## GET /api/v1/kasir/dashboard
 
-Mendapatkan data dashboard kasir (ringkasan penjualan hari ini).
+Mengambil total omset harian, jumlah transaksi sukses, dan data ringkasan kinerja kasir hari ini.
 
----
-
-## GET /kasir/laporan
-
-Mendapatkan laporan ringkasan.
+*   **Autentikasi:** Wajib (Role: `Kasir`)
 
 ---
 
-## GET /kasir/laporan/produk/:id_produk
+## GET /api/v1/kasir/laporan
 
-Mendapatkan detail laporan per produk.
+Mengambil ringkasan laporan produk terlaris (top selling products) dan data statistik performa produk.
+
+*   **Autentikasi:** Wajib (Role: `Kasir`)
 
 ---
 
-## GET /kasir/laporan/produk/:id_produk/:id_pesanan
+## GET /api/v1/kasir/laporan/produk/:public_id
 
-Mendapatkan detail pesanan dari laporan produk.
+Mengambil laporan statistik penjualan mendalam untuk satu produk spesifik berdasarkan `public_id`.
+
+*   **Autentikasi:** Wajib (Role: `Kasir`)
+
+---
+
+## GET /api/v1/kasir/laporan/produk/:public_id/:pesanan_id
+
+Mengambil detail faktur pesanan offline berdasarkan ID pesanan yang terdaftar pada riwayat laporan produk.
+
+*   **Autentikasi:** Wajib (Role: `Kasir`)

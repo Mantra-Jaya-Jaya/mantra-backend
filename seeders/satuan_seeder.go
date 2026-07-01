@@ -12,6 +12,10 @@ func SeedSatuan() {
 		{NamaSatuan: "Pcs"},
 		{NamaSatuan: "Kg"},
 		{NamaSatuan: "Gram"},
+		{NamaSatuan: "Lusin"},
+		{NamaSatuan: "Box"},
+		{NamaSatuan: "Pack"},
+		{NamaSatuan: "Set"},
 	}
 
 	// Looping untuk masukin ke database

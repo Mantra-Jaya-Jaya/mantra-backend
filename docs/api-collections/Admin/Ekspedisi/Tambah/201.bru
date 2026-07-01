@@ -1,0 +1,39 @@
+meta {
+  name: 201
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/admin/ekspedisi
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_ekspedisi": "JNE",
+    "kode_api": "jne",
+    "deskripsi": "JNE adalah perusahaan ekspedisi terkemuka di Indonesia",
+    "logo": "https://minio.mantra.com/logo/jne.png",
+    "is_active": true
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.data && body.data.public_id) {
+    bru.setVar("ekspedisi_public_id", body.data.public_id);
+  }
+  if (body && body.data && body.data.id_ekspedisi) {
+    bru.setVar("ekspedisi_id", String(body.data.id_ekspedisi));
+  }
+}

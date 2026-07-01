@@ -11,16 +11,17 @@ func (Alamat) TableName() string {
 type Alamat struct {
 	IdAlamat       uint      `gorm:"primaryKey;column:id_alamat" json:"id_alamat"`
 	PublicId       uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
-	CustomerId     uint    `gorm:"column:id_customer" json:"id_customer"`
-	NamaPenerima   string  `gorm:"column:nama_penerima" json:"nama_penerima"`
-	LabelAlamat    string  `gorm:"column:label_alamat" json:"label_alamat"`
-	NoTelpPenerima string  `gorm:"column:no_telp_penerima" json:"no_telp_penerima"`
-	AlamatLengkap  string  `gorm:"column:alamat_lengkap" json:"alamat_lengkap"`
-	Latitude       float64 `gorm:"column:latitude" json:"latitude"`
-	Longitude      float64 `gorm:"column:longitude" json:"longitude"`
-	CatatanLokasi  string  `gorm:"column:catatan_lokasi" json:"catatan_lokasi"`
-	IsUtama        bool    `gorm:"column:is_utama" json:"is_utama"`
+	CustomerID     uint      `gorm:"column:id_customer;not null" json:"id_customer"`
+	NamaPenerima   string    `gorm:"column:nama_penerima" json:"nama_penerima"`
+	LabelAlamat    string    `gorm:"column:label_alamat" json:"label_alamat"`
+	NoTelpPenerima string    `gorm:"column:no_telp_penerima" json:"no_telp_penerima"`
+	AlamatLengkap  string    `gorm:"column:alamat_lengkap" json:"alamat_lengkap"`
+	KodePos        string    `gorm:"column:kode_pos" json:"kode_pos"`
+	Latitude       float64   `gorm:"column:latitude" json:"latitude"`
+	Longitude      float64   `gorm:"column:longitude" json:"longitude"`
+	CatatanLokasi  string    `gorm:"column:catatan_lokasi" json:"catatan_lokasi"`
+	IsUtama        bool      `gorm:"column:is_utama" json:"is_utama"`
 
 	// Relasi ke tabel customer
-	Customer Customer `gorm:"foreignKey:CustomerId;references:IdCustomer" json:"customer"`
+	Customer Customer `gorm:"foreignKey:CustomerID;references:IdCustomer" json:"customer"`
 }

@@ -1,0 +1,27 @@
+meta {
+  name: 401
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/change-password
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "password_lama": "Kasir#123",
+    "password_baru": "passwordbaru",
+    "konfirmasi_password": "passwordbaru"
+  }
+}

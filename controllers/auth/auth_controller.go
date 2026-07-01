@@ -3,13 +3,13 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"net/http"
 	"net/mail"
 	"time"
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -35,21 +35,15 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("[DEBUG] Login Attempt - Username: '%s', Password: '%s'\n", req.Username, req.Password)
-
 	var user models.User
 	// Cari user berdasarkan username atau email
 	if err := config.DB.Preload("Role").Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error; err != nil {
-		fmt.Printf("[DEBUG] User not found: %v\n", err)
 		RespondWithError(c, http.StatusUnauthorized, "Username/Email atau password salah", "AUTH_001", "Credential tidak valid")
 		return
 	}
 
-	fmt.Printf("[DEBUG] User Found - Stored Hash: '%s'\n", user.Password)
-
 	// Cek password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		fmt.Printf("[DEBUG] Password Mismatch: %v\n", err)
 		RespondWithError(c, http.StatusUnauthorized, "Username/Email atau password salah", "AUTH_001", "Credential tidak valid")
 		return
 	}
@@ -73,6 +67,19 @@ func Login(c *gin.Context) {
 		var kurir models.Kurir
 		if err := config.DB.Joins("JOIN karyawan ON karyawan.id_karyawan = kurir.id_karyawan").Where("karyawan.id_user = ?", user.IdUser).First(&kurir).Error; err == nil {
 			profileID = kurir.IdKurir
+		}
+	}
+
+	// Cek status untuk Kasir dan Kurir (karyawan)
+	if roleName == "Kasir" || roleName == "Kurir" {
+		var karyawan models.Karyawan
+		if err := config.DB.Preload("StatusKaryawanRel").
+			Where("id_user = ?", user.IdUser).
+			First(&karyawan).Error; err == nil {
+			if karyawan.StatusKaryawanRel.NamaStatus == "Nonaktif" {
+				RespondWithError(c, http.StatusUnauthorized, "Akun Anda telah dinonaktifkan. Silakan hubungi admin.", "AUTH_006", "Karyawan dengan status Nonaktif mencoba login")
+				return
+			}
 		}
 	}
 
@@ -151,6 +158,10 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
+	// Perbarui CreatedAt sebagai penanda waktu aktivitas/login terakhir
+	storedToken.CreatedAt = time.Now()
+	config.DB.Save(&storedToken)
+
 	// Cari user dan role
 	var user models.User
 	if err := config.DB.Preload("Role").First(&user, storedToken.UserID).Error; err != nil {
@@ -166,7 +177,8 @@ func RefreshToken(c *gin.Context) {
 	}
 
 	if clientType == "nextjs" {
-		c.SetCookie("access_token", newAccessToken, 1800, "/", "", true, true)
+		isSecure := IsSecureCookie(c)
+		c.SetCookie("access_token", newAccessToken, 1800, "/", "", isSecure, true)
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
 			"message": "Token berhasil diperbarui",
@@ -220,16 +232,18 @@ func Logout(c *gin.Context) {
 		return
 	}
 
-	uid, ok := userID.(uint)
-	if !ok {
-		if uidFloat, ok := userID.(float64); ok {
-			uid = uint(uidFloat)
-		} else {
-			RespondWithError(c, http.StatusInternalServerError, "Kesalahan sistem", "SERVER_001", "Format ID user tidak valid")
-			return
-		}
+	var uid uint
+	switch v := userID.(type) {
+	case uint:
+		uid = v
+	case int64:
+		uid = uint(v)
+	case float64:
+		uid = uint(v)
+	default:
+		RespondWithError(c, http.StatusInternalServerError, "Kesalahan sistem", "SERVER_001", "Format ID user tidak valid")
+		return
 	}
-
 	if tokenStr != "" {
 		now := time.Now()
 		// Update RevokedAt untuk token yang bersangkutan & milik user tsb
@@ -244,10 +258,11 @@ func Logout(c *gin.Context) {
 	}
 
 	if clientType == "nextjs" {
-		c.SetCookie("access_token", "", -1, "/", "", true, true)
-		c.SetCookie("refresh_token", "", -1, "/", "", true, true)
+		isSecure := IsSecureCookie(c)
+		c.SetCookie("access_token", "", -1, "/", "", isSecure, true)
+		c.SetCookie("refresh_token", "", -1, "/", "", isSecure, true)
 		// Juga bersihkan path lama jika user masih menyimpannya
-		c.SetCookie("refresh_token", "", -1, "/api/v1/auth/refresh", "", true, true)
+		c.SetCookie("refresh_token", "", -1, "/api/v1/auth/refresh", "", isSecure, true)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -262,8 +277,12 @@ type RegisterCustomerInput struct {
 	Email              string `json:"email" binding:"required"`
 	Password           string `json:"password" binding:"required"`
 	KonfirmasiPassword string `json:"konfirmasi_password" binding:"required"`
-	NamaLengkap        string `json:"nama_lengkap" binding:"required"`
-	NoTelp             string `json:"no_telp" binding:"required"`
+	NamaLengkap        string  `json:"nama_lengkap" binding:"required"`
+	NoTelp             string  `json:"no_telp" binding:"required"`
+	AlamatLengkap      string  `json:"alamat_lengkap" binding:"required"`
+	Latitude           float64 `json:"latitude" binding:"required"`
+	Longitude          float64 `json:"longitude" binding:"required"`
+	CatatanLokasi      string  `json:"catatan_lokasi"`
 }
 
 // RegisterCustomer handles customer registration
@@ -335,12 +354,30 @@ func RegisterCustomer(c *gin.Context) {
 
 	newCustomer := models.Customer{
 		NoTelp: req.NoTelp,
-		UserId: newUser.IdUser,
+		UserID: newUser.IdUser,
 	}
 
 	if err := tx.Create(&newCustomer).Error; err != nil {
 		tx.Rollback()
 		RespondWithError(c, http.StatusInternalServerError, "Gagal membuat data customer", "SERVER_001", err.Error())
+		return
+	}
+
+	newAlamat := models.Alamat{
+		CustomerID:     newCustomer.IdCustomer,
+		NamaPenerima:   req.NamaLengkap,
+		LabelAlamat:    "Rumah",
+		NoTelpPenerima: req.NoTelp,
+		AlamatLengkap:  req.AlamatLengkap,
+		Latitude:       req.Latitude,
+		Longitude:      req.Longitude,
+		CatatanLokasi:  req.CatatanLokasi,
+		IsUtama:        true,
+	}
+
+	if err := tx.Create(&newAlamat).Error; err != nil {
+		tx.Rollback()
+		RespondWithError(c, http.StatusInternalServerError, "Gagal membuat data alamat default", "SERVER_001", err.Error())
 		return
 	}
 
@@ -387,18 +424,17 @@ func ChangePassword(c *gin.Context) {
 		return
 	}
 
-	// Convert userID to uint
-	uid, ok := userID.(uint)
-	if !ok {
-		// Sometimes numbers from context/json are float64 if not parsed explicitly as uint,
-		// but since we parse it in middleware as uint or float64 from JWT, we need to handle it.
-		// In jwt-go, standard parsing returns float64 for numbers.
-		if uidFloat, ok := userID.(float64); ok {
-			uid = uint(uidFloat)
-		} else {
-			RespondWithError(c, http.StatusInternalServerError, "Kesalahan sistem", "SERVER_001", "Format ID user tidak valid")
-			return
-		}
+	var uid uint
+	switch v := userID.(type) {
+	case uint:
+		uid = v
+	case int64:
+		uid = uint(v)
+	case float64:
+		uid = uint(v)
+	default:
+		RespondWithError(c, http.StatusInternalServerError, "Kesalahan sistem", "SERVER_001", "Format ID user tidak valid")
+		return
 	}
 
 	var user models.User
@@ -430,21 +466,137 @@ func ChangePassword(c *gin.Context) {
 		RespondWithError(c, http.StatusInternalServerError, "Gagal mengubah password", "SERVER_001", err.Error())
 		return
 	}
+	tx.Commit()
 
-	// Revoke seluruh refresh token user (logout semua device)
-	now := time.Now()
-	if err := tx.Model(&models.RefreshToken{}).
-		Where("id_user = ? AND revoked_at IS NULL", uid).
-		Update("revoked_at", &now).Error; err != nil {
-		tx.Rollback()
-		RespondWithError(c, http.StatusInternalServerError, "Gagal me-revoke sesi lama", "SERVER_001", err.Error())
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Password berhasil diubah",
+	})
+}
+
+// ForgotPassword handles initiating password reset
+func ForgotPassword(c *gin.Context) {
+	var req struct {
+		Username string `json:"username" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondWithError(c, http.StatusBadRequest, "Username diperlukan", "VAL_001", "Format request tidak sesuai")
 		return
 	}
 
-	tx.Commit()
+	var user models.User
+	if err := config.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
+		RespondWithError(c, http.StatusNotFound, "Username tidak ditemukan", "REQ_004", "Username tidak ada di database")
+		return
+	}
+
+	if user.Email == "" {
+		RespondWithError(c, http.StatusBadRequest, "User ini belum mendaftarkan email", "REQ_005", "Email kosong")
+		return
+	}
+
+	// Generate 6 digit OTP
+	otp := ""
+	for i := 0; i < 6; i++ {
+		b := make([]byte, 1)
+		rand.Read(b)
+		otp += string("0123456789"[int(b[0])%10])
+	}
+
+	// Save OTP
+	exp := time.Now().Add(10 * time.Minute)
+	user.ResetPasswordOtp = &otp
+	user.ResetPasswordExpiredAt = &exp
+	config.DB.Save(&user)
+
+	// Send Email
+	utils.SendOTPEmail(user.Email, otp, user.NamaLengkap)
+
+	// Sensor email for response
+	emailMasked := ""
+	if len(user.Email) > 3 {
+		emailMasked = user.Email[0:1] + "***" + user.Email[len(user.Email)-3:]
+	} else {
+		emailMasked = "***"
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "OTP terkirim",
+		"email":   emailMasked,
+	})
+}
+
+// VerifyOTP handles OTP validation
+func VerifyOTP(c *gin.Context) {
+	var req struct {
+		Username string `json:"username" binding:"required"`
+		Otp      string `json:"otp" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondWithError(c, http.StatusBadRequest, "Input tidak valid", "VAL_001", "Format request tidak sesuai")
+		return
+	}
+
+	var user models.User
+	if err := config.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
+		RespondWithError(c, http.StatusNotFound, "Username tidak ditemukan", "REQ_004", "User tidak ada")
+		return
+	}
+
+	if user.ResetPasswordOtp == nil || *user.ResetPasswordOtp != req.Otp || user.ResetPasswordExpiredAt == nil || time.Now().After(*user.ResetPasswordExpiredAt) {
+		RespondWithError(c, http.StatusBadRequest, "Kode OTP salah atau sudah kadaluarsa", "REQ_006", "OTP invalid/expired")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "OTP valid",
+	})
+}
+
+// ResetPassword handles saving the new password
+func ResetPassword(c *gin.Context) {
+	var req struct {
+		Username           string `json:"username" binding:"required"`
+		Otp                string `json:"otp" binding:"required"`
+		PasswordBaru       string `json:"password_baru" binding:"required"`
+		KonfirmasiPassword string `json:"konfirmasi_password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondWithError(c, http.StatusBadRequest, "Input tidak valid", "VAL_001", "Format request tidak sesuai")
+		return
+	}
+
+	if req.PasswordBaru != req.KonfirmasiPassword {
+		RespondWithError(c, http.StatusBadRequest, "Konfirmasi password tidak cocok", "VAL_002", "password tidak match")
+		return
+	}
+
+	var user models.User
+	if err := config.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
+		RespondWithError(c, http.StatusNotFound, "Username tidak ditemukan", "REQ_004", "User tidak ada")
+		return
+	}
+
+	if user.ResetPasswordOtp == nil || *user.ResetPasswordOtp != req.Otp || user.ResetPasswordExpiredAt == nil || time.Now().After(*user.ResetPasswordExpiredAt) {
+		RespondWithError(c, http.StatusBadRequest, "Kode OTP salah atau sudah kadaluarsa", "REQ_006", "OTP invalid/expired")
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.PasswordBaru), 12)
+	if err != nil {
+		RespondWithError(c, http.StatusInternalServerError, "Gagal memproses password", "SERVER_001", err.Error())
+		return
+	}
+
+	user.Password = string(hashedPassword)
+	user.ResetPasswordOtp = nil
+	user.ResetPasswordExpiredAt = nil
+	config.DB.Save(&user)
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Password berhasil diubah",
 	})
 }
+

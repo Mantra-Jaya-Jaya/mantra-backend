@@ -59,6 +59,7 @@ func GetPromo(c *gin.Context) {
 func TambahDiskon(c *gin.Context) {
 	var input struct {
 		NamaDiskon   string `json:"nama_diskon" binding:"required"`
+		TipeDiskon   string `json:"tipe_diskon" binding:"required"` // "persen" atau "nominal"
 		BesarDiskon  int    `json:"besar_diskon" binding:"required"`
 		BannerDiskon string `json:"banner_diskon"`
 		TglMulai     string `json:"tgl_mulai" binding:"required"` // Format: YYYY-MM-DD
@@ -70,6 +71,15 @@ func TambahDiskon(c *gin.Context) {
 			"status":  "error",
 			"message": "Validasi gagal",
 			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Validasi tipe_diskon
+	if input.TipeDiskon != "persen" && input.TipeDiskon != "nominal" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "tipe_diskon harus 'persen' atau 'nominal'",
 		})
 		return
 	}
@@ -94,6 +104,7 @@ func TambahDiskon(c *gin.Context) {
 
 	diskon := models.Diskon{
 		NamaDiskon:   input.NamaDiskon,
+		TipeDiskon:   input.TipeDiskon,
 		BesarDiskon:  input.BesarDiskon,
 		BannerDiskon: input.BannerDiskon,
 		TglMulai:     tglMulai,
@@ -115,6 +126,7 @@ func TambahDiskon(c *gin.Context) {
 			"id_diskon":    diskon.IdDiskon,
 			"public_id":    diskon.PublicId,
 			"nama_diskon":  diskon.NamaDiskon,
+			"tipe_diskon":  diskon.TipeDiskon,
 			"besar_diskon": diskon.BesarDiskon,
 			"tgl_mulai":    diskon.TglMulai.Format(layoutDate),
 			"tgl_selesai":  diskon.TglSelesai.Format(layoutDate),
@@ -154,6 +166,7 @@ func GetAllDiskon(c *gin.Context) {
 			"id_diskon":    d.IdDiskon,
 			"public_id":    d.PublicId,
 			"nama_diskon":  d.NamaDiskon,
+			"tipe_diskon":  d.TipeDiskon,
 			"besar_diskon": d.BesarDiskon,
 			"banner_url":   d.BannerDiskon,
 			"tgl_mulai":    d.TglMulai,
