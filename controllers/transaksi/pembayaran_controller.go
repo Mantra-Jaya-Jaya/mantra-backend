@@ -351,6 +351,18 @@ func BayarTunai(c *gin.Context) {
 		return
 	}
 
+	// 🚀 KURANGI STOK BARANG
+	var details []models.DetailPesanan
+	if err := tx.Where("id_pesanan = ?", input.IdPesanan).Find(&details).Error; err == nil {
+		for _, d := range details {
+			if err := tx.Exec("UPDATE spesifikasi_barang SET jumlah = jumlah - ? WHERE id_spesifikasi_barang = ?", d.Jumlah, d.SpesifikasiBarangID).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengurangi stok barang"})
+				return
+			}
+		}
+	}
+
 	pembayaran := models.Pembayaran{
 		PesananID:         pesanan.IdPesanan,
 		TipePembayaranID:  utils.GetTipePembayaranID("cash"),
@@ -503,6 +515,18 @@ func BayarNonTunai(c *gin.Context) {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal update pesanan"})
 		return
+	}
+
+	// 🚀 KURANGI STOK BARANG
+	var details []models.DetailPesanan
+	if err := tx.Where("id_pesanan = ?", pesanan.IdPesanan).Find(&details).Error; err == nil {
+		for _, d := range details {
+			if err := tx.Exec("UPDATE spesifikasi_barang SET jumlah = jumlah - ? WHERE id_spesifikasi_barang = ?", d.Jumlah, d.SpesifikasiBarangID).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal mengurangi stok barang"})
+				return
+			}
+		}
 	}
 
 	// 🚀 8. SIAPIN DATA UNTUK TABEL PEMBAYARAN YANG SUPER NORMALISASI
