@@ -493,7 +493,7 @@ Ref: kurir.id_karyawan - karyawan.id_karyawan
 Ref: alamat.id_customer > customer.id_customer
 
 // Katalog & Produk
-Ref: barang.id_diskon ?> diskon.id_diskon
+Ref: barang.id_diskon > diskon.id_diskon
 Ref: barang.id_satuan > satuan.id_satuan
 Ref: barang.id_kategori > kategori.id_kategori
 Ref: detail_spesifikasi.id_spesifikasi > spesifikasi.id_spesifikasi
@@ -517,7 +517,7 @@ Ref: detail_pesanan.id_pesanan > pesanan.id_pesanan
 Ref: detail_pesanan.id_spesifikasi_barang > spesifikasi_barang.id_spesifikasi_barang
 Ref: pembayaran.id_pesanan > pesanan.id_pesanan
 Ref: pembayaran.id_tipe_pembayaran > tipe_pembayaran.id
-Ref: pembayaran.id_metode_pembayaran ?> metode_pembayaran.id_metode_pembayaran
+Ref: pembayaran.id_metode_pembayaran > metode_pembayaran.id_metode_pembayaran
 Ref: pembayaran.id_status_transaksi > status_transaksi.id
 Ref: pembayaran.id_fraud_status > fraud_status.id
 Ref: detail_pembayaran.id_pembayaran > pembayaran.id_pembayaran
