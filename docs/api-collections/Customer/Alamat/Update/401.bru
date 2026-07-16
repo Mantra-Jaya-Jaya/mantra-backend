@@ -1,0 +1,32 @@
+meta {
+  name: 401
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/customer/alamat/:publicId
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: token-palsu-123
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+params:path {
+  publicId: 123e4567-e89b-12d3-a456-426614174000
+}
+
+body:json {
+  {
+    "nama_penerima": "John Updated",
+    "label_alamat": "Kantor",
+    "is_utama": false
+  }
+}

@@ -1,0 +1,39 @@
+meta {
+  name: MANTRA Backend API
+  type: http
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080/api/v1
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:pre-request {
+  // Auto-refresh logic dapat ditambahkan di sini
+  // Jika response 401, call /auth/refresh dan set token baru
+}
+
+docs {
+  # MANTRA Backend API
+
+  API Collection untuk backend service MANTRA.
+
+  ## Setup
+
+  1. Aktifkan environment `local`
+  2. Login via `Login` di folder aktor (Customer/Kasir/Admin)
+  3. Access token otomatis terisi di collection-level auth
+  4. Refresh token otomatis tersimpan untuk Logout & Refresh Token
+
+  ## Base URL
+
+  Semua request menggunakan variable `{{baseUrl}}`:
+  - Local: http://localhost:8080/api/v1
+}

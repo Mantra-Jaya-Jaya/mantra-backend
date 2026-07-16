@@ -6,17 +6,52 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // GetKategori mengambil semua kategori barang.
 // Dipakai oleh: customer (GET /customer/katalog/kategori), kasir (GET /kasir/katalog/kategori), admin (GET /admin/katalog/kategori)
 // Auth: Wajib login, semua role boleh akses (dikontrol di route)
 func GetKategori(c *gin.Context) {
+	// 🚀 1. PENJINAK TOKEN (Ambil user_id dengan aman)
+	val, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "User belum login"})
+		return
+	}
+
+	var userID int64
+	switch v := val.(type) {
+	case float64:
+		userID = int64(v)
+	case int64:
+		userID = v
+	case int:
+		userID = int64(v)
+	case uint:
+		userID = int64(v)
+	default:
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "Format token tidak valid"})
+		return
+	}
+
+	// 🚀 2. INTELIJEN DATABASE: Cari Role User Langsung dari Tabel Master!
+	var namaRole string
+	// Asumsi tabel user lu namanya 'user' atau 'users', sesuaikan kalau beda ya bosku!
+	errRole := config.DB.Raw("SELECT role.nama_role FROM \"user\" JOIN role ON role.id_role = \"user\".id_role WHERE \"user\".id_user = ?", userID).Scan(&namaRole).Error
+
+	if errRole != nil || namaRole == "" {
+		// Fallback (Jaga-jaga kalau query gagal, kita tetep coba ambil dari token JWT)
+		namaRole = c.GetString("role")
+	}
+
 	kategori := []models.Kategori{}
 
-	query := config.DB.Order("id_kategori ASC")
+	query := config.DB.
+		Order("id_kategori ASC")
 
 	limitStr := c.Query("limit")
 	if limitStr != "" {
@@ -26,6 +61,7 @@ func GetKategori(c *gin.Context) {
 		}
 	}
 
+	// 7. EKSEKUSI QUERY
 	if err := query.Find(&kategori).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -34,10 +70,23 @@ func GetKategori(c *gin.Context) {
 		return
 	}
 
+	type KategoriWithCount struct {
+		models.Kategori
+		JumlahBarang int64 `json:"jumlah_barang"`
+	}
+
+	result := make([]KategoriWithCount, len(kategori))
+	for i, k := range kategori {
+		var count int64
+		config.DB.Model(&models.Barang{}).Where("id_kategori = ?", k.IdKategori).Count(&count)
+		result[i] = KategoriWithCount{Kategori: k, JumlahBarang: count}
+	}
+
+	// Bungkus dan kirim
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Berhasil mengambil daftar kategori",
-		"data":    kategori,
+		"data":    result,
 	})
 }
 
@@ -79,21 +128,21 @@ func TambahKategori(c *gin.Context) {
 }
 
 // UpdateKategori memperbarui data kategori berdasarkan ID.
-// Dipakai oleh: admin (PUT /admin/katalog/kategori/:id_kategori)
+// Dipakai oleh: admin (PUT /admin/katalog/kategori/:public_id)
 // Auth: Wajib login, role admin
 func UpdateKategori(c *gin.Context) {
-	idStr := c.Param("id_kategori")
-	idKategori, err := strconv.Atoi(idStr)
+	publicIdStr := c.Param("public_id")
+	publicId, err := uuid.Parse(publicIdStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
-			"message": "ID kategori tidak valid",
+			"message": "ID kategori tidak valid (harus UUID)",
 		})
 		return
 	}
 
 	var kategori models.Kategori
-	if err := config.DB.First(&kategori, "id_kategori = ?", idKategori).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", publicId).First(&kategori).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Kategori tidak ditemukan",
@@ -146,21 +195,21 @@ func UpdateKategori(c *gin.Context) {
 }
 
 // HapusKategori menghapus kategori berdasarkan ID.
-// Dipakai oleh: admin (DELETE /admin/katalog/kategori/:id_kategori)
+// Dipakai oleh: admin (DELETE /admin/katalog/kategori/:public_id)
 // Auth: Wajib login, role admin
 func HapusKategori(c *gin.Context) {
-	idStr := c.Param("id_kategori")
-	idKategori, err := strconv.Atoi(idStr)
+	publicIdStr := c.Param("public_id")
+	publicId, err := uuid.Parse(publicIdStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
-			"message": "ID kategori tidak valid",
+			"message": "ID kategori tidak valid (harus UUID)",
 		})
 		return
 	}
 
 	var kategori models.Kategori
-	if err := config.DB.First(&kategori, "id_kategori = ?", idKategori).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", publicId).First(&kategori).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Kategori tidak ditemukan",
@@ -170,7 +219,7 @@ func HapusKategori(c *gin.Context) {
 
 	// Cek apakah kategori masih digunakan oleh barang
 	var count int64
-	if err := config.DB.Model(&models.Barang{}).Where("id_kategori = ?", idKategori).Count(&count).Error; err != nil {
+	if err := config.DB.Model(&models.Barang{}).Where("id_kategori = ?", kategori.IdKategori).Count(&count).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Gagal memeriksa keterkaitan barang dengan kategori",
@@ -197,5 +246,26 @@ func HapusKategori(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Kategori berhasil dihapus",
+	})
+}
+
+// UploadIconKategori mengunggah gambar/icon kategori ke MinIO.
+// Dipakai oleh: admin (POST /admin/kategori/upload)
+// Auth: Wajib login, role admin
+func UploadIconKategori(c *gin.Context) {
+	fileUrl, err := utils.UploadFileToMinio(c, "icon", "kategori")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Gagal mengunggah icon kategori: " + err.Error(),
+		})
+		return
+	}
+
+	// 2. Kembalikan URL publik MinIO ke Next.js
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Icon berhasil diunggah ke server storage",
+		"url":     fileUrl, // URL ini yang nanti dikirim Next.js
 	})
 }

@@ -1,0 +1,28 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/customer/akun
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODE2MjMwMTEsImlhdCI6MTc4MTYyMTIxMSwicHVibGljX2lkIjoiMzg1YmVlYWEtNTM1ZS00YjNjLWJkYjYtODViMmViYzNlN2JlIiwicm9sZSI6IkN1c3RvbWVyIiwidXNlcl9pZCI6M30.siWf9sV4Z84SpwEEuK8P6LvZ_4wcX1b6Wc8K8tBRS6Q
+}
+
+body:json {
+  {
+    "nama_lengkap": "John Updated",
+    "email": "john.baru@example.com",
+    "no_telp": "08123456780"
+  }
+}

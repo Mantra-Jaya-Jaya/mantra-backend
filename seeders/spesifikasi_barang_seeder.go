@@ -34,16 +34,17 @@ func SeedSpesifikasiBarang() {
 	for _, barang := range daftarBarang {
 		baseMin, baseMax := 10000, 100000
 		kat := barang.Kategori.NamaKategori
-		
-		if kat == "Elektronik" {
+
+		switch kat {
+		case "Elektronik":
 			baseMin, baseMax = 1500000, 15000000
-		} else if kat == "Fashion" {
+		case "Fashion":
 			baseMin, baseMax = 150000, 800000
-		} else if kat == "Makanan & Minuman" {
+		case "Makanan & Minuman":
 			baseMin, baseMax = 5000, 200000
-		} else if kat == "Kesehatan" {
+		case "Kesehatan":
 			baseMin, baseMax = 15000, 150000
-		} else if kat == "Olahraga" {
+		case "Olahraga":
 			baseMin, baseMax = 50000, 500000
 		}
 

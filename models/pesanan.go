@@ -11,17 +11,34 @@ func (Pesanan) TableName() string {
 }
 
 type Pesanan struct {
-	IdPesanan       uint      `gorm:"primaryKey;column:id_pesanan" json:"id_pesanan"`
-	PublicId        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
-	TotalPembayaran int       `gorm:"column:total_pembayaran" json:"total_pembayaran"`
-	TanggalPesanan  time.Time `gorm:"column:tanggal_pesanan" json:"tanggal_pesanan"`
-	TipePesanan     string    `gorm:"column:tipe_pesanan" json:"tipe_pesanan"`     // Online / Offline
-	StatusPesanan   string    `gorm:"column:status_pesanan" json:"status_pesanan"` // Dikemas, Dikirim, Selesai, dll
+	IdPesanan       uint           `gorm:"primaryKey;column:id_pesanan" json:"id_pesanan"`
+	PublicId        uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();column:public_id;uniqueIndex" json:"public_id"`
+	TotalPembayaran int            `gorm:"column:total_pembayaran" json:"total_pembayaran"`
+	TanggalPesanan  time.Time      `gorm:"column:tanggal_pesanan" json:"tanggal_pesanan"`
+	UpdatedAt       time.Time      `gorm:"autoUpdateTime;column:updated_at" json:"updated_at"`
+	TipePesananID   uint           `gorm:"column:id_tipe_pesanan;not null" json:"id_tipe_pesanan"`
+	TipePesananRel  *TipePesanan   `gorm:"foreignKey:TipePesananID;references:IdTipePesanan" json:"tipe_pesanan,omitempty"`
+	StatusPesananID uint           `gorm:"column:id_status_pesanan;not null" json:"id_status_pesanan"`
+	StatusPesanan   *StatusPesanan `gorm:"foreignKey:StatusPesananID;references:IdStatusPesanan" json:"status_pesanan,omitempty"`
+	TipeKurirID     uint           `gorm:"column:id_tipe_kurir;not null;default:1" json:"id_tipe_kurir"`
+	TipeKurir       *TipeKurir     `gorm:"foreignKey:TipeKurirID;references:IdTipeKurir" json:"tipe_kurir,omitempty"`
 
-	CustomerId uint     `gorm:"column:id_customer" json:"id_customer"`
-	KasirId    uint     `gorm:"column:id_kasir" json:"id_kasir"`
-	AlamatId   *uint    `gorm:"column:id_alamat" json:"id_alamat"` // Pake pointer karena bisa NULL (jika takeaway/offline)\
-	Customer   Customer `gorm:"foreignKey:CustomerId;references:IdCustomer" json:"customer"`
-	Kasir      Kasir    `gorm:"foreignKey:KasirId;references:IdKasir" json:"kasir"`
-	Alamat     *Alamat  `gorm:"foreignKey:AlamatId;references:IdAlamat" json:"alamat"` // Pake pointer karena bisa NULL (jika takeaway/offline)
+	CustomerID *uint    `gorm:"column:id_customer" json:"id_customer,omitempty"`
+	KasirID    *uint    `gorm:"column:id_kasir" json:"id_kasir"`
+	AlamatID   *uint    `gorm:"column:id_alamat" json:"id_alamat"`
+	Customer   *Customer `gorm:"foreignKey:CustomerID;references:IdCustomer" json:"customer,omitempty"`
+	Kasir      *Kasir   `gorm:"foreignKey:KasirID;references:IdKasir" json:"kasir,omitempty"`
+	Alamat     *Alamat  `gorm:"foreignKey:AlamatID;references:IdAlamat" json:"alamat"`
+
+	EkspedisiID        *uint             `gorm:"column:id_ekspedisi" json:"id_ekspedisi,omitempty"`
+	Ekspedisi          *Ekspedisi        `gorm:"foreignKey:EkspedisiID;references:IdEkspedisi" json:"ekspedisi,omitempty"`
+	LayananEkspedisiID *uint             `gorm:"column:id_layanan_ekspedisi" json:"id_layanan_ekspedisi,omitempty"`
+	LayananEkspedisi   *EkspedisiLayanan `gorm:"foreignKey:LayananEkspedisiID;references:IdEkspedisiLayanan" json:"layanan_ekspedisi,omitempty"`
+	OngkosKirim        int               `gorm:"column:ongkos_kirim;default:0" json:"ongkos_kirim"`
+	Catatan            string            `gorm:"column:catatan" json:"catatan"`
+	NomorResi          *string           `gorm:"column:nomor_resi" json:"nomor_resi,omitempty"`
+	BiteshipOrderID    *string           `gorm:"column:biteship_order_id" json:"biteship_order_id,omitempty"`
+
+	DetailPesanan []DetailPesanan `gorm:"foreignKey:PesananID;references:IdPesanan" json:"detail_pesanan,omitempty"`
+	Pembayaran    *Pembayaran     `gorm:"foreignKey:PesananID" json:"pembayaran,omitempty"`
 }

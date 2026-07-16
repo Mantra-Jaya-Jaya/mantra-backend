@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	fake "github.com/brianvoe/gofakeit/v7"
+	"gorm.io/gorm"
 )
 
 func SeedDetailPesanan() {
@@ -24,10 +25,24 @@ func SeedDetailPesanan() {
 	}
 
 	totalDetailDibuat := 0
+	var detailList []models.DetailPesanan
+
+	// Pre-fetch which pesanan already have details
+	var existingPesananIDs []uint
+	config.DB.Model(&models.DetailPesanan{}).Distinct("id_pesanan").Pluck("id_pesanan", &existingPesananIDs)
+	existingMap := make(map[uint]bool)
+	for _, id := range existingPesananIDs {
+		existingMap[id] = true
+	}
+
+	type pesananUpdate struct {
+		id    uint
+		total int
+	}
+	var updates []pesananUpdate
+
 	for _, pesanan := range daftarPesanan {
-		var count int64
-		config.DB.Model(&models.DetailPesanan{}).Where("id_pesanan = ?", pesanan.IdPesanan).Count(&count)
-		if count > 0 {
+		if existingMap[pesanan.IdPesanan] {
 			continue // Lewati jika pesanan sudah memiliki detail
 		}
 
@@ -44,17 +59,35 @@ func SeedDetailPesanan() {
 				Jumlah:              qty,
 				HargaSatuan:         hargaSatuan,
 				Subtotal:            subtotal,
-				PesananId:           pesanan.IdPesanan,
-				SpesifikasiBarangId: varian.IdSpesifikasiBarang,
+				PesananID:           pesanan.IdPesanan,
+				SpesifikasiBarangID: varian.IdSpesifikasiBarang,
 			}
-
-			if err := config.DB.Where("id_pesanan = ? AND id_spesifikasi_barang = ?", detail.PesananId, detail.SpesifikasiBarangId).FirstOrCreate(&detail).Error; err == nil {
-				totalDetailDibuat++
-			}
+			detailList = append(detailList, detail)
 		}
 
-		// Update total_pembayaran pesanan dari akumulasi subtotal
-		config.DB.Model(&pesanan).Update("total_pembayaran", subtotalPesanan)
+		updates = append(updates, pesananUpdate{id: pesanan.IdPesanan, total: subtotalPesanan})
+	}
+
+	if len(updates) > 0 {
+		err := config.DB.Transaction(func(tx *gorm.DB) error {
+			for _, upd := range updates {
+				if err := tx.Model(&models.Pesanan{}).Where("id_pesanan = ?", upd.id).Update("total_pembayaran", upd.total).Error; err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			fmt.Println("Error executing batch transaction updates:", err)
+		}
+	}
+
+	if len(detailList) > 0 {
+		if err := config.DB.CreateInBatches(detailList, 100).Error; err == nil {
+			totalDetailDibuat = len(detailList)
+		} else {
+			fmt.Println("Error batch insert detail pesanan:", err)
+		}
 	}
 
 	fmt.Printf("Yeyy, Berhasil seed %d detail pesanan!\n", totalDetailDibuat)

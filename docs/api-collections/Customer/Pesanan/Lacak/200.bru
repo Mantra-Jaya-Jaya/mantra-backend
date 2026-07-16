@@ -1,0 +1,23 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/customer/pesanan/:publicId/lacak
+  body: none
+  auth: bearer
+}
+
+params:path {
+  publicId: 123e4567-e89b-12d3-a456-426614174000
+}
+
+headers {
+  X-Client-Type: flutter
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODE2MjMxNjEsImlhdCI6MTc4MTYyMTM2MSwicHVibGljX2lkIjoiMjYwOWQyMjYtMzYwOC00YzM2LWIxMjktNzYwYTc3NTI3ZjlhIiwicm9sZSI6IkN1c3RvbWVyIiwidXNlcl9pZCI6Mn0.y6pFlOZMsMgSMGTo5XZurQWR_xSRvewe7m0qT1-f8jk
+}

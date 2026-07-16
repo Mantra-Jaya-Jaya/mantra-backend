@@ -1,0 +1,54 @@
+meta {
+  name: 201
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/admin/barang
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "media": "https://minio.mantra.com/gambar/produk.jpg",
+    "informasi_barang": {
+      "nama": "Kopi Susu Gula Aren",
+      "hargaBeli": "12000",
+      "kategori": "Minuman",
+      "diskon": "1",
+      "satuan": "Cup",
+      "deskripsi": "Kopi susu dengan gula aren asli yang menyegarkan"
+    },
+    "spesifikasi": [
+      {
+        "atribut": "Ukuran",
+        "nilai": "Large",
+        "stok": "50",
+        "hargaJual": "18000",
+        "barcodes": [
+          { "code": "899123456001", "qty": "1" }
+        ]
+      }
+    ]
+  }
+}
+
+
+script:post-response {
+  const body = res.getBody();
+  if(body && body.data && body.data.public_id) {
+    // 100% DIJAMIN AMAN: Tangkap ID yang BARU SAJA dibuat
+    bru.setVar("barang_tester_id", body.data.public_id);
+    bru.setEnvVar("barang_tester_id", body.data.public_id);
+  }
+}

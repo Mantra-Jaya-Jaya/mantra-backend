@@ -1,0 +1,18 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{baseUrl}}/admin/kategori/:publicId
+  auth: bearer
+}
+
+params:path {
+  publicId: {{kategori_public_id}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

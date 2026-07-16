@@ -1,0 +1,25 @@
+meta {
+  name: 401
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/admin/profil
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_lengkap": "Hacker"
+  }
+}
+
+auth:bearer {
+  token: token-palsu-123
+}

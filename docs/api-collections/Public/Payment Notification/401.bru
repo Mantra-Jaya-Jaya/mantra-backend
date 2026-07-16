@@ -1,0 +1,26 @@
+meta {
+  name: 401
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/payment/notification
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "transaction_id": "trx-test",
+    "transaction_status": "settlement",
+    "order_id": "ORDER-INVALID",
+    "gross_amount": "10000.00",
+    "signature_key": "invalid-signature",
+    "status_code": "200"
+  }
+}

@@ -1,0 +1,29 @@
+meta {
+  name: 422
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/customer/alamat
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "nama_penerima": "",
+    "label_alamat": "",
+    "no_telp_penerima": "",
+    "alamat_lengkap": ""
+  }
+}

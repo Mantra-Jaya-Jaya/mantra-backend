@@ -9,6 +9,6 @@ type DetailSpesifikasi struct {
 	NamaDetailSpesifikasi string `gorm:"type:text;column:nama_detail_spesifikasi" json:"nama_detail_spesifikasi"` // Hitam, Merah, XL, 16GB, dll
 
 	// Relasi ke master tipe spesifikasi (Warna, Ukuran, RAM, dll)
-	SpesifikasiID uint        `gorm:"column:id_spesifikasi" json:"spesifikasi_id"`
+	SpesifikasiID uint        `gorm:"column:id_spesifikasi;not null" json:"spesifikasi_id"`
 	Spesifikasi   Spesifikasi `gorm:"foreignKey:SpesifikasiID;references:IdSpesifikasi" json:"spesifikasi"`
 }

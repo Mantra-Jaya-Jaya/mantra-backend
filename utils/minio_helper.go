@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"backend-mantra/config" 
+	"backend-mantra/config"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

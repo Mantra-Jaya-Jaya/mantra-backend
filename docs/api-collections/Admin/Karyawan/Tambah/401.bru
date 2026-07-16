@@ -1,0 +1,29 @@
+meta {
+  name: 401
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/admin/karyawan
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: token-palsu-yang-salah-123
+}
+
+body:json {
+  {
+    "nama_lengkap": "Hacker",
+    "username": "hacker123",
+    "email": "hacker@mantra.web.id",
+    "password": "password123",
+    "role": "Kasir"
+  }
+}

@@ -1,0 +1,23 @@
+meta {
+  name: 401
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "username": "hamim_customer",
+    "password": "WrongPassword#999"
+  }
+}

@@ -17,11 +17,11 @@ require (
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
+	github.com/midtrans/midtrans-go v1.3.8
 	github.com/minio/minio-go/v7 v7.1.0
 )
 
 require (
-	ariga.io/atlas-provider-gorm v0.6.0 // indirect
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

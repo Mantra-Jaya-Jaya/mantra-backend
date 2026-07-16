@@ -1,0 +1,43 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/admin/barang
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if(body && body.data && body.data.length > 0) {
+    let safe_ids = [];
+    let unsafe_ids = [];
+
+    body.data.forEach(item => {
+      if (item.id_barang <= 20) {
+        unsafe_ids.push(item.public_id);
+      } else {
+        safe_ids.push(item.public_id);
+      }
+    });
+
+    if (unsafe_ids.length > 0) {
+      bru.setVar("barang_seed_id", unsafe_ids[0]);
+      bru.setEnvVar("barang_seed_id", unsafe_ids[0]);
+    }
+    
+    if (safe_ids.length > 0) {
+      // Jika ada data baru di halaman ini, ambil yang terbaru
+      bru.setVar("barang_tester_id", safe_ids[safe_ids.length - 1]);
+      bru.setEnvVar("barang_tester_id", safe_ids[safe_ids.length - 1]);
+    }
+    // Jika tidak ada data aman di halaman ini, KITA TIDAK TIMPA barang_tester_id
+    // agar nilai dari Tambah/201.bru tetap bertahan!
+  }
+}

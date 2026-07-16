@@ -1,0 +1,36 @@
+meta {
+  name: 201
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/admin/diskon
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nama_diskon": "Diskon Akhir Tahun",
+    "besar_diskon": 20,
+    "tgl_mulai": "2026-12-01",
+    "tgl_selesai": "2026-12-31"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if(body && body.data && body.data.public_id) {
+    bru.setVar("diskon_public_id", body.data.public_id);
+    bru.setEnvVar("diskon_public_id", body.data.public_id);
+  }
+}

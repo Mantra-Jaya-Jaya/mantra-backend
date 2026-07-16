@@ -130,7 +130,7 @@ func TambahAlamat(c *gin.Context) {
 	}
 
 	newAlamat := models.Alamat{
-		CustomerId:     customerID,
+		CustomerID:     customerID,
 		LabelAlamat:    input.LabelAlamat,
 		NamaPenerima:   input.NamaPenerima,
 		NoTelpPenerima: input.NoTelpPenerima,
@@ -168,7 +168,7 @@ func TambahAlamat(c *gin.Context) {
 // Dipakai oleh: customer (PUT /customer/alamat/:id_alamat)
 // Auth: Wajib login, role customer
 func UpdateAlamat(c *gin.Context) {
-	idAlamat := c.Param("id_alamat")
+	idAlamat := c.Param("public_id")
 
 	type UpdateAlamatInput struct {
 		LabelAlamat    string  `json:"label_alamat"`
@@ -231,7 +231,7 @@ func UpdateAlamat(c *gin.Context) {
 	tx := config.DB.Begin()
 
 	if input.IsUtama && !alamat.IsUtama {
-		if err := tx.Model(&models.Alamat{}).Where("id_customer = ?", alamat.CustomerId).Update("is_utama", false).Error; err != nil {
+		if err := tx.Model(&models.Alamat{}).Where("id_customer = ?", alamat.CustomerID).Update("is_utama", false).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "error",
@@ -292,7 +292,7 @@ func UpdateAlamat(c *gin.Context) {
 // Dipakai oleh: customer (DELETE /customer/alamat/:id_alamat)
 // Auth: Wajib login, role customer
 func HapusAlamat(c *gin.Context) {
-	idAlamat := c.Param("id_alamat")
+	idAlamat := c.Param("public_id")
 
 	uid, exists := getUserIDFromContext(c)
 	if !exists {

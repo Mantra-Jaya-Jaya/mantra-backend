@@ -1,11 +1,11 @@
 package config
 
 import (
-	"log"
-	"os"
 	"github.com/joho/godotenv"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"log"
+	"os"
 )
 
 var MinioClient *minio.Client
@@ -25,9 +25,9 @@ func InitMinio() {
 	var err error
 	MinioClient, err = minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
-		Secure: false, 
+		Secure: false,
 	})
-	
+
 	if err != nil {
 		log.Fatalln("Gagal inisialisasi MinIO:", err)
 	}

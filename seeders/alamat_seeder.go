@@ -26,35 +26,76 @@ func SeedAlamat() {
 		return
 	}
 
-	// 3. Kita racik 2 alamat sakti (Kost & Rumah)
+	// 3. Kita racik 5 alamat: dalam radius, luar kota, luar negeri
 	daftarAlamat := []models.Alamat{
 		{
-			CustomerId:     customer.IdCustomer,
+			CustomerID:     customer.IdCustomer,
 			NamaPenerima:   user.NamaLengkap,
 			LabelAlamat:    "Kost",
 			NoTelpPenerima: "08" + gofakeit.DigitN(10),
 			AlamatLengkap:  "Jl. Banjarsari Selatan, Tembalang, Kota Semarang",
+			KodePos:        "50275",
 			Latitude:       -7.051410,
 			Longitude:      110.438125,
-			CatatanLokasi:  "Pagar hitam, samping warung burjo",
+			CatatanLokasi:  "Pagar hitam, samping warung burjo — dekat Polines",
 			IsUtama:        true,
 		},
 		{
-			CustomerId:     customer.IdCustomer,
+			CustomerID:     customer.IdCustomer,
+			NamaPenerima:   user.NamaLengkap,
+			LabelAlamat:    "Kontrakan",
+			NoTelpPenerima: "08" + gofakeit.DigitN(10),
+			AlamatLengkap:  "Perumahan Sambiroto Indah, Sambiroto, Tembalang, Semarang",
+			KodePos:        "50276",
+			Latitude:       -7.041000,
+			Longitude:      110.442000,
+			CatatanLokasi:  "Perumahan, blok C nomor 5",
+			IsUtama:        false,
+		},
+		{
+			CustomerID:     customer.IdCustomer,
 			NamaPenerima:   user.NamaLengkap,
 			LabelAlamat:    "Rumah",
 			NoTelpPenerima: "08" + gofakeit.DigitN(10),
 			AlamatLengkap:  "Kecamatan Selogiri, Kabupaten Wonogiri",
+			KodePos:        "57612",
 			Latitude:       -7.816667,
 			Longitude:      110.916667,
 			CatatanLokasi:  "Rumah cat hijau dekat pertigaan balai desa",
 			IsUtama:        false,
 		},
+		{
+			CustomerID:     customer.IdCustomer,
+			NamaPenerima:   "Budi Santoso",
+			LabelAlamat:    "Cabang",
+			NoTelpPenerima: "08" + gofakeit.DigitN(10),
+			AlamatLengkap:  "Jl. Soekarno-Hatta No. 123, Kaliwungu, Kabupaten Kendal",
+			KodePos:        "51351",
+			Latitude:       -6.983333,
+			Longitude:      110.409722,
+			CatatanLokasi:  "Sebelah utara pasar Kaliwungu",
+			IsUtama:        false,
+		},
+		{
+			CustomerID:     customer.IdCustomer,
+			NamaPenerima:   user.NamaLengkap,
+			LabelAlamat:    "Kantor",
+			NoTelpPenerima: "08" + gofakeit.DigitN(10),
+			AlamatLengkap:  "Kedutaan Besar RI, Jalan Tun Razak, Kuala Lumpur, Malaysia",
+			KodePos:        "50450",
+			Latitude:       3.139003,
+			Longitude:      101.686855,
+			CatatanLokasi:  "Gedung KBRI, lantai 2",
+			IsUtama:        false,
+		},
 	}
 
-	// 4. Looping buat masukin ke database
+	// 4. Hapus alamat lama customer ini, biar bisa di-create ulang
+	config.DB.Where("id_customer = ?", customer.IdCustomer).Delete(&models.Alamat{})
+
+	// 5. Looping buat masukin ke database
 	for _, alamat := range daftarAlamat {
-		if err := config.DB.Where("id_customer = ? AND label_alamat = ?", alamat.CustomerId, alamat.LabelAlamat).FirstOrCreate(&alamat).Error; err != nil {
+		if err := config.DB.Create(&alamat).Error; err != nil {
 			fmt.Println("Error insert alamat", alamat.LabelAlamat, ":", err)
 			continue
 		}

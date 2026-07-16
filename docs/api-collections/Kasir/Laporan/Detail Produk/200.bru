@@ -1,0 +1,20 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/kasir/laporan/produk/:publicId/:pesananId
+  body: none
+  auth: bearer
+}
+
+params:path {
+  publicId: bfdaa4f0-a8c0-41f5-b84b-1b612ae37490
+  pesananId: bfdaa4f0-a8c0-41f5-b84b-1b612ae37490
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

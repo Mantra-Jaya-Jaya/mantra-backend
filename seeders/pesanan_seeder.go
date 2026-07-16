@@ -3,10 +3,12 @@ package seeders
 import (
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 	"fmt"
 	"time"
 
 	fake "github.com/brianvoe/gofakeit/v7"
+	"github.com/google/uuid"
 )
 
 func SeedPesanan() {
@@ -14,8 +16,8 @@ func SeedPesanan() {
 
 	var count int64
 	config.DB.Model(&models.Pesanan{}).Count(&count)
-	if count >= 400 {
-		fmt.Println("Tabel pesanan udah punya minimal 400 data, proses seeding dilewati.")
+	if count >= 800 {
+		fmt.Println("Tabel pesanan udah punya minimal 800 data, proses seeding dilewati.")
 		return
 	}
 
@@ -37,27 +39,21 @@ func SeedPesanan() {
 	now := time.Now()
 	var datesToGenerate []time.Time
 
-	// Per hari dalam 30 hari terakhir: 3-8 pesanan per hari
-	for d := 0; d < 30; d++ {
-		ordersPerDay := fake.IntRange(3, 8)
+	// Per hari selama 1 tahun terakhir: density makin jarak ke belakang makin kecil
+	for d := 0; d < 365; d++ {
+		var ordersPerDay int
+		switch {
+		case d < 30: // 30 hari terakhir: 4-8 per hari
+			ordersPerDay = fake.IntRange(4, 8)
+		case d < 90: // 31-90 hari lalu: 3-5 per hari
+			ordersPerDay = fake.IntRange(3, 5)
+		case d < 180: // 91-180 hari lalu: 2-4 per hari
+			ordersPerDay = fake.IntRange(2, 4)
+		default: // 181-365 hari lalu: 1-3 per hari
+			ordersPerDay = fake.IntRange(1, 3)
+		}
 		for i := 0; i < ordersPerDay; i++ {
 			datesToGenerate = append(datesToGenerate, now.AddDate(0, 0, -d))
-		}
-	}
-
-	// Per bulan dalam 12 bulan terakhir (bulan 1 s/d 12 lalu): 15-30 pesanan per bulan
-	for m := 1; m <= 12; m++ {
-		ordersPerMonth := fake.IntRange(15, 30)
-		for i := 0; i < ordersPerMonth; i++ {
-			datesToGenerate = append(datesToGenerate, now.AddDate(0, -m, -fake.IntRange(0, 28)))
-		}
-	}
-
-	// Per bulan dalam tahun sebelumnya (bulan 13 s/d 24 lalu): 10-20 pesanan per bulan
-	for m := 13; m <= 24; m++ {
-		ordersPerMonth := fake.IntRange(10, 20)
-		for i := 0; i < ordersPerMonth; i++ {
-			datesToGenerate = append(datesToGenerate, now.AddDate(0, -m, -fake.IntRange(0, 28)))
 		}
 	}
 
@@ -66,21 +62,9 @@ func SeedPesanan() {
 	custLen := len(customers)
 	alamatLen := len(alamats)
 
-	for idx, tglPesanan := range datesToGenerate {
-		randStatus := fake.IntRange(1, 100)
-		var status string
-		if randStatus <= 70 {
-			status = "Selesai"
-		} else if randStatus <= 80 {
-			status = "Dikirim"
-		} else if randStatus <= 90 {
-			status = "Dikemas"
-		} else if randStatus <= 95 {
-			status = "Diproses"
-		} else {
-			status = "Dibatalkan"
-		}
+	var pesananList []models.Pesanan
 
+	for idx, tglPesanan := range datesToGenerate {
 		randType := fake.IntRange(1, 100)
 		tipePesanan := "Offline"
 		var alamatId *uint = nil
@@ -93,22 +77,99 @@ func SeedPesanan() {
 			}
 		}
 
-		kId := kasirs[idx%kasirLen].IdKasir
-		cId := customers[idx%custLen].IdCustomer
+		// Pilih status berdasarkan tipe pesanan
+		randStatus := fake.IntRange(1, 100)
+		var statusName string
+		if tipePesanan == "Offline" {
+			switch {
+			case randStatus <= 80:
+				statusName = "Selesai"
+			case randStatus <= 93:
+				statusName = "Dikemas"
+			default:
+				statusName = "Dibatalkan"
+			}
+		} else {
+			switch {
+			case randStatus <= 65:
+				statusName = "Selesai"
+			case randStatus <= 77:
+				statusName = "Dikirim"
+			case randStatus <= 90:
+				statusName = "Dikemas"
+			default:
+				statusName = "Dibatalkan"
+			}
+		}
+
+		// Tentukan tipe kurir
+		tipeKurir := "internal"
+		var ekspedisiID *uint = nil
+		var layananEkspedisiID *uint = nil
+		ongkir := 0
+		var nomorResi *string = nil
+		if tipePesanan == "Online" {
+			if fake.IntRange(1, 100) <= 50 {
+				tipeKurir = "external"
+				// Ambil random ekspedisi
+				var ekspedisi models.Ekspedisi
+				if err := config.DB.Where("is_active = ?", true).Order("RANDOM()").First(&ekspedisi).Error; err == nil {
+					ekspedisiID = &ekspedisi.IdEkspedisi
+					var layanan models.EkspedisiLayanan
+					if err := config.DB.Where("id_ekspedisi = ?", ekspedisi.IdEkspedisi).Order("RANDOM()").First(&layanan).Error; err == nil {
+						layananEkspedisiID = &layanan.IdEkspedisiLayanan
+					}
+					ongkir = fake.IntRange(5000, 50000)
+				}
+				// External yang Dikirim/Selesai set nomor resi
+				if statusName == "Dikirim" || statusName == "Selesai" {
+					nr := fmt.Sprintf("%s-%d-%d", ekspedisi.KodeApi, fake.IntRange(100000, 999999), fake.IntRange(1000, 9999))
+					nomorResi = &nr
+				}
+			} else {
+				tipeKurir = "internal"
+			}
+		}
+		// Tentukan kasir
+		var kasirIdPtr *uint = nil
+		setButuhKasir := map[string]bool{
+			"Dikemas": true, "Dikirim": true, "Selesai": true,
+		}
+		if tipePesanan == "Offline" {
+			kId := kasirs[fake.IntRange(0, kasirLen-1)].IdKasir
+			kasirIdPtr = &kId
+		} else if setButuhKasir[statusName] {
+			kId := kasirs[fake.IntRange(0, kasirLen-1)].IdKasir
+			kasirIdPtr = &kId
+		}
+
+		cId := customers[fake.IntRange(0, custLen-1)].IdCustomer
 		totalPembayaran := fake.IntRange(50000, 5000000)
 
 		pesanan := models.Pesanan{
-			TotalPembayaran: totalPembayaran,
-			TanggalPesanan:  tglPesanan,
-			TipePesanan:     tipePesanan,
-			StatusPesanan:   status,
-			CustomerId:      cId,
-			KasirId:         kId,
-			AlamatId:        alamatId,
+			PublicId:           uuid.New(),
+			TotalPembayaran:    totalPembayaran,
+			TanggalPesanan:     tglPesanan,
+			TipePesananID:      utils.GetTipePesananID(tipePesanan),
+			StatusPesananID:    utils.GetStatusPesananID(statusName),
+			TipeKurirID:        utils.GetTipeKurirID(tipeKurir),
+			CustomerID:         &cId,
+			KasirID:            kasirIdPtr,
+			AlamatID:           alamatId,
+			EkspedisiID:        ekspedisiID,
+			LayananEkspedisiID: layananEkspedisiID,
+			OngkosKirim:        ongkir,
+			NomorResi:          nomorResi,
 		}
 
-		if err := config.DB.Create(&pesanan).Error; err == nil {
-			totalCreated++
+		pesananList = append(pesananList, pesanan)
+	}
+
+	if len(pesananList) > 0 {
+		if err := config.DB.CreateInBatches(pesananList, 100).Error; err == nil {
+			totalCreated = len(pesananList)
+		} else {
+			fmt.Println("Error batch insert pesanan:", err)
 		}
 	}
 

@@ -7,8 +7,11 @@ import (
 
 	"backend-mantra/config"
 	"backend-mantra/models"
+	"backend-mantra/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // GetPromo mengambil semua diskon/promo yang sedang aktif.
@@ -31,6 +34,7 @@ func GetPromo(c *gin.Context) {
 	for _, d := range diskons {
 		responseData = append(responseData, gin.H{
 			"id_diskon":   d.IdDiskon,
+			"public_id":   d.PublicId,
 			"nama_diskon": d.NamaDiskon,
 			"banner_url":  d.BannerDiskon,
 			"tgl_selesai": d.TglSelesai,
@@ -55,6 +59,7 @@ func GetPromo(c *gin.Context) {
 func TambahDiskon(c *gin.Context) {
 	var input struct {
 		NamaDiskon   string `json:"nama_diskon" binding:"required"`
+		TipeDiskon   string `json:"tipe_diskon" binding:"required"` // "persen" atau "nominal"
 		BesarDiskon  int    `json:"besar_diskon" binding:"required"`
 		BannerDiskon string `json:"banner_diskon"`
 		TglMulai     string `json:"tgl_mulai" binding:"required"` // Format: YYYY-MM-DD
@@ -62,9 +67,19 @@ func TambahDiskon(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{
+			"status":  "error",
+			"message": "Validasi gagal",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Validasi tipe_diskon
+	if input.TipeDiskon != "persen" && input.TipeDiskon != "nominal" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
-			"message": "Format inputan salah: " + err.Error(),
+			"message": "tipe_diskon harus 'persen' atau 'nominal'",
 		})
 		return
 	}
@@ -89,6 +104,7 @@ func TambahDiskon(c *gin.Context) {
 
 	diskon := models.Diskon{
 		NamaDiskon:   input.NamaDiskon,
+		TipeDiskon:   input.TipeDiskon,
 		BesarDiskon:  input.BesarDiskon,
 		BannerDiskon: input.BannerDiskon,
 		TglMulai:     tglMulai,
@@ -108,7 +124,9 @@ func TambahDiskon(c *gin.Context) {
 		"message": "Diskon berhasil ditambahkan",
 		"data": gin.H{
 			"id_diskon":    diskon.IdDiskon,
+			"public_id":    diskon.PublicId,
 			"nama_diskon":  diskon.NamaDiskon,
+			"tipe_diskon":  diskon.TipeDiskon,
 			"besar_diskon": diskon.BesarDiskon,
 			"tgl_mulai":    diskon.TglMulai.Format(layoutDate),
 			"tgl_selesai":  diskon.TglSelesai.Format(layoutDate),
@@ -146,7 +164,9 @@ func GetAllDiskon(c *gin.Context) {
 		aktif := d.TglMulai.Before(now) && d.TglSelesai.After(now)
 		responseData = append(responseData, gin.H{
 			"id_diskon":    d.IdDiskon,
+			"public_id":    d.PublicId,
 			"nama_diskon":  d.NamaDiskon,
+			"tipe_diskon":  d.TipeDiskon,
 			"besar_diskon": d.BesarDiskon,
 			"banner_url":   d.BannerDiskon,
 			"tgl_mulai":    d.TglMulai,
@@ -178,21 +198,21 @@ func GetAllDiskon(c *gin.Context) {
 }
 
 // HapusDiskon menghapus diskon berdasarkan ID.
-// Dipakai oleh: admin (DELETE /admin/katalog/diskon/:id_diskon)
+// Dipakai oleh: admin (DELETE /admin/diskon/:public_id)
 // Auth: Wajib login, role admin
 func HapusDiskon(c *gin.Context) {
-	idDiskonStr := c.Param("id_diskon")
-	idDiskon, err := strconv.Atoi(idDiskonStr)
+	publicIdStr := c.Param("public_id")
+	publicId, err := uuid.Parse(publicIdStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
-			"message": "ID diskon tidak valid",
+			"message": "ID diskon tidak valid (harus UUID)",
 		})
 		return
 	}
 
 	var diskon models.Diskon
-	if err := config.DB.First(&diskon, "id_diskon = ?", idDiskon).Error; err != nil {
+	if err := config.DB.Where("public_id = ?", publicId).First(&diskon).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"status":  "error",
 			"message": "Diskon tidak ditemukan",
@@ -200,6 +220,21 @@ func HapusDiskon(c *gin.Context) {
 		return
 	}
 
+	// PUTUS HUBUNGAN DULU (SET NULL)
+	// Biar barang yang tadinya dapet diskon ini, balik ke harga normal, dan database gak error
+	errLepasRelasi := config.DB.Model(&models.Barang{}).
+		Where("id_diskon = ?", diskon.IdDiskon).
+		Update("id_diskon", gorm.Expr("NULL")).Error
+
+	if errLepasRelasi != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal melepaskan relasi promo dari barang",
+		})
+		return
+	}
+
+	// 🚀 BARU HAPUS DISKONNYA DENGAN AMAN
 	if err := config.DB.Delete(&diskon).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -210,6 +245,27 @@ func HapusDiskon(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Diskon berhasil dihapus",
+		"message": "Diskon berhasil dihapus dan barang terkait kembali ke harga normal",
+	})
+}
+
+// UploadBannerDiskon mengunggah gambar banner promo/diskon ke MinIO.
+// Dipakai oleh: admin (POST /admin/diskon/upload)
+// Auth: Wajib login, role admin
+func UploadBannerDiskon(c *gin.Context) {
+	fileUrl, err := utils.UploadFileToMinio(c, "banner", "diskon")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Gagal mengunggah banner diskon: " + err.Error(),
+		})
+		return
+	}
+
+	// 2. Kembalikan URL publik MinIO ke Next.js
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Banner diskon berhasil diunggah ke server storage",
+		"url":     fileUrl, // URL ini yang nanti disisipkan ke JSON TambahDiskon
 	})
 }

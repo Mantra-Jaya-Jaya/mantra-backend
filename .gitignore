@@ -7,6 +7,7 @@
 # 🗑️ FILE HASIL BUILD / COMPILE GOLANG
 # ==========================================
 backend-mantra
+mantra-backend
 *.exe
 *.exe~
 *.dll
@@ -40,3 +41,7 @@ vendor/
 Thumbs.db
 .vscode/
 .idea/
+
+# Mengabaikan file konfigurasi Atlas dan Makefile
+atlas.hcl
+Makefile

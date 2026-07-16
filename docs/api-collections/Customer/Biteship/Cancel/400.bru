@@ -1,0 +1,20 @@
+meta {
+  name: 400
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/customer/pesanan/invalid-uuid/cancel-shipment
+  body: json
+  auth: bearer
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

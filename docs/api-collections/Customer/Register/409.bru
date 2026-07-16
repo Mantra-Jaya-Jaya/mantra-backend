@@ -1,0 +1,27 @@
+meta {
+  name: 409
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+body:json {
+  {
+    "username": "{{registeredUsername}}",
+    "email": "{{registeredEmail}}",
+    "password": "password123",
+    "konfirmasi_password": "password123",
+    "nama_lengkap": "Customer Duplikat",
+    "no_telp": "081299999999"
+  }
+}

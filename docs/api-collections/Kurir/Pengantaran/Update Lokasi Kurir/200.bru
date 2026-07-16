@@ -1,0 +1,27 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/kurir/pengantaran/d2bfb353-1103-4375-a341-0c31b39d6387/lokasi
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "latitude": -6.9828,
+    "longitude": 120.1
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

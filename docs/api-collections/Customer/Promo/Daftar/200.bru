@@ -1,0 +1,19 @@
+meta {
+  name: 200
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/customer/promo/1f36779c-f0c4-47e4-830f-90c67dc9fc64/barang
+  body: none
+  auth: bearer
+}
+
+headers {
+  X-Client-Type: flutter
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

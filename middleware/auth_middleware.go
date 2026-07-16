@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	"backend-mantra/controllers/auth"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -54,7 +57,12 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		secret := os.Getenv("JWT_SECRET")
 		if secret == "" {
-			secret = "rahasia_dapur_mantra"
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Konfigurasi server tidak lengkap: JWT_SECRET tidak di-set",
+			})
+			c.Abort()
+			return
 		}
 
 		claims := &JWTClaims{}
@@ -75,10 +83,26 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		normalizedRole := auth.NormalizeRoleName(claims.Role)
+
+		// Sliding Expiration: Renew token if less than 15 minutes left
+		if claims.ExpiresAt != nil {
+			timeRemaining := time.Until(claims.ExpiresAt.Time)
+			if timeRemaining > 0 && timeRemaining < 15*time.Minute {
+				newToken, errGenerate := auth.GenerateJWT(claims.UserID, claims.PublicID, normalizedRole)
+				if errGenerate == nil && newToken != "" {
+					isSecure := auth.IsSecureCookie(c)
+					c.SetCookie("access_token", newToken, 1800, "/", "", isSecure, true)
+					c.Header("X-New-Access-Token", newToken)
+					c.Header("Access-Control-Expose-Headers", "X-New-Access-Token")
+				}
+			}
+		}
+
 		// Save to context for next handlers
-		c.Set("user_id", claims.UserID)
+		c.Set("user_id", int64(claims.UserID))
 		c.Set("public_id", claims.PublicID)
-		c.Set("role", claims.Role)
+		c.Set("role", normalizedRole)
 		c.Next()
 	}
 }

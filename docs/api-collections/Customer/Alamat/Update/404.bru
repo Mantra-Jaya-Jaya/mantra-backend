@@ -1,0 +1,31 @@
+meta {
+  name: 404
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/customer/alamat/:publicId
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  X-Client-Type: flutter
+}
+
+params:path {
+  publicId: 00000000-0000-0000-0000-000000000000
+}
+
+body:json {
+  {
+    "nama_penerima": "Ghost",
+    "label_alamat": "Nowhere"
+  }
+}
