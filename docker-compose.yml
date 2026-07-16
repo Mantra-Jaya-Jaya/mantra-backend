@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: mantra-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 062006
+      POSTGRES_DB: mantra_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mantra-network
+
+  backend:
+    build: 
+      context: ./mantra-backend
+      dockerfile: Dockerfile
+    container_name: mantra-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    # Membaca environment dari file .env milik backend
+    env_file:
+      - ./mantra-backend/.env
+    environment:
+      # Timpa DB_HOST agar connect ke service 'db' (nama container)
+      DB_HOST: db
+    networks:
+      - mantra-network
+
+  admin-web:
+    build:
+      context: ./mantra-admin-web
+      dockerfile: Dockerfile
+    container_name: mantra-admin-web
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    # Membaca env dari admin-web jika ada
+    env_file:
+      - ./mantra-admin-web/.env
+    environment:
+      # Pastikan frontend diarahkan ke backend
+      NEXT_PUBLIC_API_URL: http://backend:8080/api/v1
+    networks:
+      - mantra-network
+
+volumes:
+  postgres_data:
+
+networks:
+  mantra-network:
+    driver: bridge
